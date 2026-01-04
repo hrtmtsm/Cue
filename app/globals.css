@@ -2,16 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  html {
-    height: 100%;
-    overflow: hidden;
+@keyframes soundwave {
+  0%, 100% {
+    height: 1rem;
+    opacity: 0.4;
   }
-  
-  body {
-    height: 100%;
-    overflow-y: auto;
-    overscroll-behavior-y: contain;
+  50% {
+    height: 3rem;
+    opacity: 0.8;
   }
+}
+
+.animate-soundwave {
+  animation: soundwave 1.2s ease-in-out infinite;
+  min-height: 1rem;
 }
 

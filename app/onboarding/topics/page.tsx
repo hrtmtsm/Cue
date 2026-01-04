@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { ChevronLeft } from 'lucide-react'
 
 const topics = [
   { id: 'work', name: 'Work & meetings' },
@@ -37,8 +38,9 @@ export default function TopicsPage() {
         <div className="flex items-center justify-between">
           <Link 
             href="/"
-            className="text-blue-600 font-medium text-lg py-2 px-1 -ml-1"
+            className="text-blue-600 font-medium text-lg py-2 px-1 -ml-1 inline-flex items-center gap-1"
           >
+            <ChevronLeft className="w-5 h-5" />
             Back
           </Link>
           <span className="text-sm text-gray-500">Step 1 of 3</span>

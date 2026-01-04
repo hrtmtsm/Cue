@@ -4,39 +4,40 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
-import { getOnboardingData, setOnboardingData } from '@/lib/onboardingStore'
+import { setUserPreferences, getUserPreferences, UserLevel } from '@/lib/userPreferences'
 
-const genres = [
-  'Everyday conversations',
-  'Work & meetings',
-  'Social conversations',
-  'Travel & daily interactions',
-  'Videos & shows',
+const levels: { id: UserLevel; name: string }[] = [
+  { id: 'Beginner', name: 'Beginner' },
+  { id: 'Intermediate', name: 'Intermediate' },
+  { id: 'Advanced', name: 'Advanced' },
+  { id: 'Not sure', name: 'Not sure' },
 ]
 
-export default function GenrePage() {
+export default function LevelSelectPage() {
   const router = useRouter()
-  const [selected, setSelected] = useState<string | null>(null)
+  const [selected, setSelected] = useState<UserLevel | null>(null)
 
   useEffect(() => {
     // Load existing selection if any
-    const data = getOnboardingData()
-    if (data.preferredGenre) {
-      setSelected(data.preferredGenre)
+    const prefs = getUserPreferences()
+    if (prefs?.userLevel) {
+      setSelected(prefs.userLevel)
     }
   }, [])
 
-  const handleGenreSelect = (genre: string) => {
-    setSelected(genre)
+  const handleLevelSelect = (level: UserLevel) => {
+    setSelected(level)
   }
 
   const handleContinue = () => {
-    if (selected) {
-      setOnboardingData({
-        preferredGenre: selected,
+    const prefs = getUserPreferences()
+    if (prefs) {
+      setUserPreferences({
+        ...prefs,
+        userLevel: selected || undefined,
       })
     }
-    router.push('/onboarding/level-select')
+    router.push('/onboarding/ready')
   }
 
   const handleSkip = () => {
@@ -48,7 +49,7 @@ export default function GenrePage() {
       {/* Header */}
       <div className="mb-8">
         <Link
-          href="/onboarding/diagnosis"
+          href="/onboarding/genre"
           className="text-blue-600 font-medium text-lg py-2 px-1 -ml-1 inline-flex items-center gap-1"
         >
           <ChevronLeft className="w-5 h-5" />
@@ -60,20 +61,20 @@ export default function GenrePage() {
       <div className="flex-1 space-y-8">
         <div className="space-y-3">
           <h1 className="text-2xl font-bold text-gray-900">
-            What kind of English do you want to practice?
+            About your level
           </h1>
           <p className="text-lg text-gray-400">
-            Optional — you can change this anytime.
+            Optional — we'll adjust based on your practice.
           </p>
         </div>
 
         <div className="space-y-3">
-          {genres.map((genre) => {
-            const isSelected = selected === genre
+          {levels.map((level) => {
+            const isSelected = selected === level.id
             return (
               <button
-                key={genre}
-                onClick={() => handleGenreSelect(genre)}
+                key={level.id}
+                onClick={() => handleLevelSelect(level.id)}
                 className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
                   isSelected
                     ? 'border-blue-600 bg-blue-50'
@@ -82,7 +83,7 @@ export default function GenrePage() {
               >
                 <div className="flex items-center justify-between">
                   <span className={`font-medium ${isSelected ? 'text-blue-900' : 'text-gray-900'}`}>
-                    {genre}
+                    {level.name}
                   </span>
                   {isSelected && (
                     <svg className="w-6 h-6 text-blue-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">

@@ -12,9 +12,9 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className="h-full overflow-hidden">
-      <body className="h-full bg-gray-50 antialiased overflow-x-hidden overflow-y-auto overscroll-contain">
-        <div className="mx-auto max-w-[420px] min-h-full bg-white shadow-lg">
+    <html lang="en">
+      <body className="bg-gray-50 antialiased">
+        <div className="mx-auto max-w-[420px] min-h-screen bg-white shadow-lg">
           {children}
         </div>
       </body>
