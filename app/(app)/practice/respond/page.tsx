@@ -1,15 +1,17 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Suspense } from 'react'
+import { ChevronLeft } from 'lucide-react'
+import AudioWaveLine from '@/components/AudioWaveLine'
 
 interface PracticeData {
   audioUrl: string
   transcript: string
 }
 
-// Mock data - same as before but simplified
+// Mock data - removed quick.mp3 fallback
+// Clips should always come from localStorage/sessionStorage or be generated
 const mockPracticeData: Record<string, PracticeData> = {
   '1': {
     audioUrl: '/audio/clip1.mp3',
@@ -26,14 +28,6 @@ const mockPracticeData: Record<string, PracticeData> = {
   '4': {
     audioUrl: '/audio/clip4.mp3',
     transcript: 'I\'d like to order the pasta with marinara sauce and a side salad.',
-  },
-  quick: {
-    audioUrl: '/audio/quick.mp3',
-    transcript: 'I\'m running a bit late, but I should be there in about ten minutes.',
-  },
-  custom: {
-    audioUrl: '/audio/custom.mp3',
-    transcript: 'This is a custom practice clip from YouTube.',
   },
 }
 
@@ -53,11 +47,75 @@ function RespondPageContent() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isLooping, setIsLooping] = useState(!!focusInsightId) // Auto-enable loop if focused
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [practiceData, setPracticeData] = useState<PracticeData>({
+    audioUrl: '',
+    transcript: 'Loading...',
+  })
   
-  // Get practice data - prefer clipId for backwards compatibility
-  const practiceData = clipId 
-    ? mockPracticeData[clipId] || mockPracticeData.quick
-    : mockPracticeData.quick
+  // Load practice data - check sessionStorage first, then localStorage, then mock
+  useEffect(() => {
+    if (clipId && typeof window !== 'undefined') {
+      // Check sessionStorage for generated clip (stored when clip was selected)
+      const storedClip = sessionStorage.getItem(`clip_${clipId}`)
+      if (storedClip) {
+        try {
+          const clip = JSON.parse(storedClip)
+          console.log('📦 Loaded clip from sessionStorage:', clip.audioUrl)
+          setPracticeData({
+            audioUrl: clip.audioUrl,
+            transcript: clip.text,
+          })
+          return
+        } catch (error) {
+          console.error('Error parsing stored clip from sessionStorage:', error)
+        }
+      }
+      
+      // Check localStorage for generated clips (fallback)
+      try {
+        const userClips = localStorage.getItem('userClips')
+        if (userClips) {
+          const clips = JSON.parse(userClips)
+          const clip = clips.find((c: any) => c.id === clipId)
+          if (clip) {
+            console.log('📦 Loaded clip from localStorage:', clip.audioUrl)
+            // Also store in sessionStorage for next time
+            sessionStorage.setItem(`clip_${clipId}`, JSON.stringify({
+              text: clip.text,
+              audioUrl: clip.audioUrl,
+            }))
+            setPracticeData({
+              audioUrl: clip.audioUrl,
+              transcript: clip.text,
+            })
+            return
+          }
+        }
+      } catch (error) {
+        console.error('Error loading clips from localStorage:', error)
+      }
+      
+      // No fallback to quick.mp3 - clip must exist in storage or be generated
+      if (mockPracticeData[clipId]) {
+        console.warn('⚠️ Using mock data fallback for clip:', clipId, '- audio will not play')
+        setPracticeData(mockPracticeData[clipId])
+      } else {
+        console.error('❌ No clip data found for clipId:', clipId)
+        // Show error state - user should regenerate clips
+        setPracticeData({
+          audioUrl: '',
+          transcript: 'Clip not found. Please generate new clips from onboarding.',
+        })
+      }
+    } else {
+      // No clipId - error state
+      console.error('❌ No clipId provided')
+      setPracticeData({
+        audioUrl: '',
+        transcript: 'No clip selected. Please select a clip from the practice list.',
+      })
+    }
+  }, [clipId])
 
   // Get focus insight title for banner (simplified - in real app, would fetch from API)
   const focusInsightTitle = focusInsightId ? (
@@ -68,44 +126,110 @@ function RespondPageContent() {
   ) : null
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      audioRef.current = new Audio(practiceData.audioUrl)
-      if (audioRef.current) {
-        audioRef.current.addEventListener('ended', () => {
-          if (isLooping && audioRef.current) {
-            audioRef.current.currentTime = 0
-            audioRef.current.play()
-          } else {
-            setIsPlaying(false)
-          }
-        })
-      }
-    }
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause()
+    if (typeof window !== 'undefined' && practiceData && practiceData.audioUrl) {
+      // Clean up previous audio
+      const prevAudio = audioRef.current
+      if (prevAudio) {
+        prevAudio.pause()
         audioRef.current = null
       }
+      
+      // Create new audio element
+      const audio = new Audio(practiceData.audioUrl)
+      audioRef.current = audio
+      
+      // Handle loading errors
+      audio.addEventListener('error', (e) => {
+        console.error('🔴 Audio loading error:', e)
+        console.error('🔴 Failed to load audio from:', practiceData.audioUrl)
+        setIsPlaying(false)
+      })
+      
+      // Handle successful load
+      audio.addEventListener('loadeddata', () => {
+        console.log('✅ Audio loaded successfully:', practiceData.audioUrl)
+      })
+      
+      // Handle play/pause events to sync state
+      const handleAudioPlay = () => {
+        setIsPlaying(true)
+      }
+      
+      const handleAudioPause = () => {
+        setIsPlaying(false)
+      }
+      
+      const handleAudioEnded = () => {
+        if (isLooping && audioRef.current) {
+          audioRef.current.currentTime = 0
+          audioRef.current.play().catch((err) => {
+            console.error('Error replaying audio:', err)
+            setIsPlaying(false)
+          })
+        } else {
+          setIsPlaying(false)
+        }
+      }
+      
+      audio.addEventListener('play', handleAudioPlay)
+      audio.addEventListener('pause', handleAudioPause)
+      audio.addEventListener('ended', handleAudioEnded)
+      
+      // Cleanup function
+      return () => {
+        if (audioRef.current === audio) {
+          audio.pause()
+          audio.removeEventListener('play', handleAudioPlay)
+          audio.removeEventListener('pause', handleAudioPause)
+          audio.removeEventListener('ended', handleAudioEnded)
+          if (audioRef.current === audio) {
+            audioRef.current = null
+          }
+        }
+      }
+    } else if (audioRef.current) {
+      // Clean up audio if no URL available
+      audioRef.current.pause()
+      audioRef.current = null
+      setIsPlaying(false)
     }
-  }, [practiceData.audioUrl, isLooping])
+  }, [practiceData?.audioUrl, isLooping])
 
   const handlePlayPause = () => {
-    if (!audioRef.current) return
+    if (!audioRef.current) {
+      console.warn('⚠️ Audio not ready - cannot play')
+      return
+    }
 
     if (isPlaying) {
+      // Pause audio
       audioRef.current.pause()
-      setIsPlaying(false)
+      // State will be updated by the 'pause' event listener
     } else {
-      setIsPlaying(true)
-      setTimeout(() => setIsPlaying(false), 3000)
+      // Play audio
+      console.log('🎵 Playing audio:', practiceData?.audioUrl)
+      audioRef.current.play().catch((error) => {
+        console.error('🔴 Error playing audio:', error)
+        setIsPlaying(false)
+        alert('Failed to play audio. Please check if the audio file exists.')
+      })
+      // State will be updated by the 'play' event listener
     }
   }
 
   const handleReplay = () => {
-    if (!audioRef.current) return
+    if (!audioRef.current) {
+      console.warn('⚠️ Audio not ready - cannot replay')
+      return
+    }
+    console.log('🔁 Replaying audio')
     audioRef.current.currentTime = 0
     if (!isPlaying) {
-      handlePlayPause()
+      audioRef.current.play().catch((error) => {
+        console.error('🔴 Error replaying audio:', error)
+        setIsPlaying(false)
+        alert('Failed to replay audio. Please check if the audio file exists.')
+      })
     }
   }
 
@@ -134,8 +258,9 @@ function RespondPageContent() {
       <div className="mb-8">
         <button
           onClick={() => router.push('/practice')}
-          className="text-blue-600 font-medium text-lg py-2 px-1 -ml-1"
+          className="text-blue-600 font-medium text-lg py-2 px-1 -ml-1 inline-flex items-center gap-1"
         >
+          <ChevronLeft className="w-5 h-5" />
           Back
         </button>
       </div>
@@ -162,47 +287,45 @@ function RespondPageContent() {
         </div>
 
         {/* Audio Controls - Always accessible */}
-        <div className="flex items-center justify-center space-x-6 py-6">
-          <button
-            onClick={handleReplay}
-            className="p-3 rounded-full bg-gray-100 active:bg-gray-200 transition-colors"
-            aria-label="Replay"
-          >
-            <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </button>
+        <div className="relative flex flex-col items-center justify-center py-6 min-h-[140px] -mx-6 px-6">
+          {/* Continuous waveform line - full width behind controls */}
+          <div className="absolute inset-x-6 top-1/2 -translate-y-1/2 h-12 z-0">
+            <AudioWaveLine audioRef={audioRef} isPlaying={isPlaying} side="full" height={48} />
+          </div>
           
-          <button
-            onClick={handlePlayPause}
-            className="w-20 h-20 rounded-full bg-blue-600 text-white flex items-center justify-center active:bg-blue-700 transition-colors shadow-lg"
-            aria-label={isPlaying ? 'Pause' : 'Play'}
-          >
-            {isPlaying ? (
-              <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-              </svg>
-            ) : (
-              <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            )}
-          </button>
-
-          {focusInsightId && (
+          {/* Center controls - overlays waveform */}
+          <div className="relative flex items-center justify-center space-x-6 z-10">
             <button
-              onClick={handleLoopToggle}
-              className={`p-3 rounded-full transition-colors ${
-                isLooping
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'bg-gray-100 text-gray-700 active:bg-gray-200'
-              }`}
-              aria-label="Loop"
-              title="Loop enabled for focused practice"
+              onClick={handlePlayPause}
+              className="w-20 h-20 rounded-full bg-blue-600 text-white flex items-center justify-center active:bg-blue-700 transition-colors shadow-lg"
+              aria-label={isPlaying ? 'Pause' : 'Play'}
             >
-              <span className="text-2xl">🎯</span>
+              {isPlaying ? (
+                <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+                </svg>
+              ) : (
+                <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              )}
             </button>
-          )}
+
+            {focusInsightId && (
+              <button
+                onClick={handleLoopToggle}
+                className={`p-3 rounded-full transition-colors ${
+                  isLooping
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'bg-gray-100 text-gray-700 active:bg-gray-200'
+                }`}
+                aria-label="Loop"
+                title="Loop enabled for focused practice"
+              >
+                <span className="text-2xl">🎯</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Input mode toggle */}

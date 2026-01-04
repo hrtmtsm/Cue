@@ -34,3 +34,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# generated clips data
+/data
+
+# generated audio files (too large for git)
+/public/audio/generated
+

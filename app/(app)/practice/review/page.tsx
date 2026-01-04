@@ -2,6 +2,7 @@
 
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Suspense, useState } from 'react'
+import { ChevronLeft } from 'lucide-react'
 import { ClipSession, Phrase, FeedbackBundle, Insight } from '@/lib/sessionTypes'
 import { generateFeedback } from '@/lib/mockFeedbackGenerator'
 import PhraseCard from '@/components/PhraseCard'
@@ -28,18 +29,6 @@ const mockSessions: Record<string, ClipSession> = {
       },
     ],
   },
-  quick: {
-    id: 'session-quick',
-    currentIndex: 0,
-    phrases: [
-      {
-        id: 'qp1',
-        text: "I'm running a bit late, but I should be there in about ten minutes.",
-        audioUrl: '/audio/quick.mp3',
-        durationMs: 4000,
-      },
-    ],
-  },
 }
 
 function ReviewPageContent() {
@@ -58,41 +47,84 @@ function ReviewPageContent() {
   let currentPhrase: Phrase
   
   if (clipId) {
-    // Create a single-phrase session from clip
-    const mockPhraseData: Record<string, { text: string; audioUrl: string; durationMs: number }> = {
-      '1': {
-        text: "Can I get a large coffee with oat milk, please?",
-        audioUrl: '/audio/clip1.mp3',
-        durationMs: 3000,
-      },
-      '2': {
-        text: "Tell me about your previous work experience and why you're interested in this role.",
-        audioUrl: '/audio/clip2.mp3',
-        durationMs: 5000,
-      },
-      '3': {
-        text: "Nice weather today, isn't it? Perfect for a walk in the park.",
-        audioUrl: '/audio/clip3.mp3',
-        durationMs: 3500,
-      },
-      '4': {
-        text: "I'd like to order the pasta with marinara sauce and a side salad.",
-        audioUrl: '/audio/clip4.mp3',
-        durationMs: 4000,
-      },
-      quick: {
-        text: "I'm running a bit late, but I should be there in about ten minutes.",
-        audioUrl: '/audio/quick.mp3',
-        durationMs: 4000,
-      },
-      custom: {
-        text: 'This is a custom practice clip from YouTube.',
-        audioUrl: '/audio/custom.mp3',
-        durationMs: 3000,
-      },
+    // Try to load from sessionStorage or localStorage first
+    let phraseData: { text: string; audioUrl: string; durationMs: number } | null = null
+    
+    if (typeof window !== 'undefined') {
+      // Check sessionStorage first
+      const storedClip = sessionStorage.getItem(`clip_${clipId}`)
+      if (storedClip) {
+        try {
+          const clip = JSON.parse(storedClip)
+          phraseData = {
+            text: clip.text,
+            audioUrl: clip.audioUrl,
+            durationMs: clip.durationMs || 5000, // Default duration
+          }
+          console.log('📦 Review: Loaded clip from sessionStorage:', phraseData.audioUrl)
+        } catch (error) {
+          console.error('Error parsing stored clip in review:', error)
+        }
+      }
+      
+      // Check localStorage as fallback
+      if (!phraseData) {
+        try {
+          const userClips = localStorage.getItem('userClips')
+          if (userClips) {
+            const clips = JSON.parse(userClips)
+            const clip = clips.find((c: any) => c.id === clipId)
+            if (clip) {
+              phraseData = {
+                text: clip.text,
+                audioUrl: clip.audioUrl,
+                durationMs: (clip.lengthSec || 5) * 1000,
+              }
+              console.log('📦 Review: Loaded clip from localStorage:', phraseData.audioUrl)
+            }
+          }
+        } catch (error) {
+          console.error('Error loading clips from localStorage in review:', error)
+        }
+      }
     }
     
-    const phraseData = mockPhraseData[clipId] || mockPhraseData.quick
+    // Fall back to mock data if not found (but no quick.mp3)
+    if (!phraseData) {
+      console.warn('⚠️ Review: Using mock data fallback for clip:', clipId, '- audio will not play')
+      const mockPhraseData: Record<string, { text: string; audioUrl: string; durationMs: number }> = {
+        '1': {
+          text: "Can I get a large coffee with oat milk, please?",
+          audioUrl: '/audio/clip1.mp3',
+          durationMs: 3000,
+        },
+        '2': {
+          text: "Tell me about your previous work experience and why you're interested in this role.",
+          audioUrl: '/audio/clip2.mp3',
+          durationMs: 5000,
+        },
+        '3': {
+          text: "Nice weather today, isn't it? Perfect for a walk in the park.",
+          audioUrl: '/audio/clip3.mp3',
+          durationMs: 3500,
+        },
+        '4': {
+          text: "I'd like to order the pasta with marinara sauce and a side salad.",
+          audioUrl: '/audio/clip4.mp3',
+          durationMs: 4000,
+        },
+      }
+      phraseData = mockPhraseData[clipId]
+      if (!phraseData) {
+        // No mock data - create error state
+        phraseData = {
+          text: 'Clip not found. Please generate new clips from onboarding.',
+          audioUrl: '',
+          durationMs: 0,
+        }
+      }
+    }
+    
     currentPhrase = {
       id: `clip-${clipId}`,
       text: phraseData.text,
@@ -107,8 +139,13 @@ function ReviewPageContent() {
     phraseIndex = 0
   } else {
     // Session-based routing
-    const foundSession = sessionId ? mockSessions[sessionId] : mockSessions.quick
-    session = foundSession || mockSessions.quick
+    const foundSession = sessionId ? mockSessions[sessionId] : null
+    if (!foundSession) {
+      // No session found - redirect to practice
+      router.push('/practice')
+      return null
+    }
+    session = foundSession
     currentPhrase = session.phrases[phraseIndex]
   }
 
@@ -182,8 +219,9 @@ function ReviewPageContent() {
         <div className="flex items-center justify-between mb-2">
           <button
             onClick={() => router.push('/practice')}
-            className="text-blue-600 font-medium text-lg py-2 px-1 -ml-1"
+            className="text-blue-600 font-medium text-lg py-2 px-1 -ml-1 inline-flex items-center gap-1"
           >
+            <ChevronLeft className="w-5 h-5" />
             Back
           </button>
           <span className="text-sm text-gray-500">

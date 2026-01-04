@@ -2,6 +2,7 @@
 
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Suspense, useState, useRef, useEffect } from 'react'
+import { ChevronLeft } from 'lucide-react'
 import { analyzeFeedback } from '@/lib/feedbackEngine'
 // LearningCard removed - feedback flow now uses review page
 
@@ -10,7 +11,7 @@ interface PracticeData {
   transcript: string
 }
 
-// Mock data - just transcripts
+// Mock data - removed quick.mp3
 const mockPracticeData: Record<string, PracticeData> = {
   '1': {
     audioUrl: '/audio/clip1.mp3',
@@ -28,22 +29,17 @@ const mockPracticeData: Record<string, PracticeData> = {
     audioUrl: '/audio/clip4.mp3',
     transcript: 'I\'d like to order the pasta with marinara sauce and a side salad.',
   },
-  quick: {
-    audioUrl: '/audio/quick.mp3',
-    transcript: 'I\'m running a bit late, but I should be there in about ten minutes.',
-  },
-  custom: {
-    audioUrl: '/audio/custom.mp3',
-    transcript: 'This is a custom practice clip from YouTube.',
-  },
 }
 
 function FeedbackPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const clipId = searchParams.get('clip') || 'quick'
+  const clipId = searchParams.get('clip') || ''
   const userInput = searchParams.get('userInput') || ''
-  const practiceData = mockPracticeData[clipId] || mockPracticeData.quick
+  const practiceData = clipId && mockPracticeData[clipId] ? mockPracticeData[clipId] : {
+    audioUrl: '',
+    transcript: 'Clip not found. Please select a clip from the practice list.',
+  }
 
   // Analyze feedback using the engine
   const feedback = analyzeFeedback(practiceData.transcript, userInput)
@@ -101,8 +97,9 @@ function FeedbackPageContent() {
       <div className="mb-8">
         <button
           onClick={() => router.push(`/practice/respond?clip=${clipId}`)}
-          className="text-blue-600 font-medium text-lg py-2 px-1 -ml-1"
+          className="text-blue-600 font-medium text-lg py-2 px-1 -ml-1 inline-flex items-center gap-1"
         >
+          <ChevronLeft className="w-5 h-5" />
           Back
         </button>
       </div>

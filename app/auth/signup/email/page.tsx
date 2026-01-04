@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { ChevronLeft } from 'lucide-react'
 
 export default function EmailSignupPage() {
   const router = useRouter()
@@ -50,8 +51,9 @@ export default function EmailSignupPage() {
       <div className="mb-8">
         <Link
           href="/auth"
-          className="text-blue-600 font-medium text-lg py-2 px-1 -ml-1 inline-block"
+          className="text-blue-600 font-medium text-lg py-2 px-1 -ml-1 inline-flex items-center gap-1"
         >
+          <ChevronLeft className="w-5 h-5" />
           Back
         </Link>
       </div>
