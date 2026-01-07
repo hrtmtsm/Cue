@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft } from 'lucide-react'
+import { getOnboardingData, setOnboardingData } from '@/lib/onboardingStore'
 
 const topics = [
   { id: 'work', name: 'Work & meetings' },
@@ -17,6 +18,14 @@ export default function TopicsPage() {
   const [selectedTopics, setSelectedTopics] = useState<Set<string>>(new Set())
   const router = useRouter()
 
+  useEffect(() => {
+    // Load existing selections if any
+    const data = getOnboardingData()
+    if (data.topics && data.topics.length > 0) {
+      setSelectedTopics(new Set(data.topics))
+    }
+  }, [])
+
   const toggleTopic = (topicId: string) => {
     const newSelected = new Set(selectedTopics)
     if (newSelected.has(topicId)) {
@@ -28,6 +37,10 @@ export default function TopicsPage() {
   }
 
   const handleContinue = () => {
+    // Save selected topics
+    setOnboardingData({
+      topics: Array.from(selectedTopics),
+    })
     router.push('/onboarding/level')
   }
 

@@ -61,3 +61,4 @@ export function getCategoryLabel(category: InsightCategory): string {
   return labels[category]
 }
 
+

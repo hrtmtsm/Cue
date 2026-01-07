@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { getOnboardingData } from '@/lib/onboardingStore'
 import { Clip } from '@/lib/clipTypes'
+import { convertClipsToStories } from '@/lib/clipToStoryConverter'
+import { saveUserStories } from '@/lib/storyClient'
 
 export default function ReadyPage() {
   const router = useRouter()
@@ -90,6 +92,8 @@ export default function ReadyPage() {
       
       const generatedClips: Clip[] = result.clips
       console.log(`Generated ${generatedClips.length} clips successfully (source: ${source})`)
+      console.log('🔵 [DEBUG] Generated clips:', generatedClips.length)
+      console.log('🔵 [DEBUG] Clip situations:', Array.from(new Set(generatedClips.map(c => c.situation))))
       
       // Verify source is 'openai' - if not, something went wrong
       if (source !== 'openai') {
@@ -99,12 +103,32 @@ export default function ReadyPage() {
         return
       }
       
-      // Store clips in localStorage
+      // Store clips in localStorage (for compatibility / quick practice)
       localStorage.setItem('userClips', JSON.stringify(generatedClips))
       localStorage.setItem('hasGeneratedClips', 'true')
-      console.log('Stored clips in localStorage')
-      console.log('Verification - userClips:', localStorage.getItem('userClips') ? 'present' : 'missing')
-      console.log('Verification - hasGeneratedClips:', localStorage.getItem('hasGeneratedClips'))
+
+      // Convert clips into stories and persist as single source of truth for stories
+      const userStories = convertClipsToStories(generatedClips)
+      console.log('🔵 [DEBUG] Converted stories:', userStories.length)
+      console.log('🔵 [DEBUG] Story titles:', userStories.map(s => s.title))
+      saveUserStories(userStories)
+      
+      // Debug: Check localStorage after save
+      const storedStories = JSON.parse(localStorage.getItem('userStories') || '[]')
+      console.log('🔵 [DEBUG] userStories in localStorage:', storedStories.length)
+
+      console.log('✅ [ONBOARDING] Onboarding result saved:', {
+        clipCount: generatedClips.length,
+        clipIds: generatedClips.map(c => c.id),
+        sampleTranscript: generatedClips[0]?.text?.substring(0, 50) + '...',
+        situations: Array.from(new Set(generatedClips.map(c => c.situation))),
+        storyCount: userStories.length,
+        storyIds: userStories.map(s => s.id),
+        storyTitles: userStories.map(s => s.title),
+      })
+      console.log('✅ [ONBOARDING] Stored clips in localStorage')
+      console.log('✅ [ONBOARDING] Verification - userClips:', localStorage.getItem('userClips') ? 'present' : 'missing')
+      console.log('✅ [ONBOARDING] Verification - hasGeneratedClips:', localStorage.getItem('hasGeneratedClips'))
       
       // Small delay to ensure localStorage is committed before navigation
       await new Promise(resolve => setTimeout(resolve, 50))

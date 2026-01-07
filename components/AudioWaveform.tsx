@@ -18,12 +18,31 @@ export default function AudioWaveform({ audioRef, isPlaying, barCount = 24, side
   const dataArrayRef = useRef<Uint8Array | null>(null)
   const smoothedDataRef = useRef<number[]>([])
   
-  // Initialize AudioContext and AnalyserNode on first play
+  // Check if audio is cross-origin (CORS)
+  const isCrossOrigin = (audioUrl: string | null | undefined): boolean => {
+    if (!audioUrl || typeof window === 'undefined') return false
+    try {
+      const audioUrlObj = new URL(audioUrl, window.location.href)
+      const currentOrigin = window.location.origin
+      return audioUrlObj.origin !== currentOrigin
+    } catch {
+      return false
+    }
+  }
+
+  // Initialize AudioContext and AnalyserNode on first play (only for same-origin audio)
   useEffect(() => {
     if (typeof window === 'undefined' || !audioRef.current) return
     if (!isPlaying) return // Only initialize when user starts playing
 
     const audio = audioRef.current
+    const audioUrl = audio.src || audio.currentSrc
+
+    // Skip Web Audio API for cross-origin audio (CORS restriction)
+    if (isCrossOrigin(audioUrl)) {
+      console.log('⚠️ [AudioWaveform] Skipping Web Audio API for cross-origin audio:', audioUrl.substring(0, 50) + '...')
+      return
+    }
 
     // Use shared audio context (stored in audio element for reuse)
     let audioContext = (audio as any).__audioContext as AudioContext | null
@@ -75,8 +94,23 @@ export default function AudioWaveform({ audioRef, isPlaying, barCount = 24, side
     }
   }, [audioRef, barCount, isPlaying])
 
-  // Animation loop
+  // Animation loop (only if Web Audio API is available)
   useEffect(() => {
+    if (!audioRef.current) return
+    const audioUrl = audioRef.current.src || audioRef.current.currentSrc
+    
+    // Skip animation for cross-origin audio
+    if (isCrossOrigin(audioUrl)) {
+      // Clear canvas for cross-origin audio
+      if (canvasRef.current) {
+        const ctx = canvasRef.current.getContext('2d')
+        if (ctx) {
+          ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
+        }
+      }
+      return
+    }
+
     if (!canvasRef.current || !analyserRef.current || !dataArrayRef.current) return
     if (!isPlaying) {
       // Stop animation when not playing
