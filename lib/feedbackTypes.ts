@@ -62,3 +62,4 @@ export function getCategoryLabel(category: FeedbackCategory): string {
   return labels[category]
 }
 
+

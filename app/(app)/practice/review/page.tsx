@@ -35,6 +35,8 @@ function ReviewPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const clipId = searchParams.get('clip')
+  const storyId = searchParams.get('storyId')
+  const storyClipId = searchParams.get('clipId') // Clip ID within a story
   const sessionId = searchParams.get('session')
   let phraseIndex = parseInt(searchParams.get('index') || '0', 10)
   const userText = searchParams.get('userText') || ''
@@ -190,6 +192,17 @@ function ReviewPageContent() {
   }
 
   const handleContinue = () => {
+    // Mark clip as done if this is a story clip
+    if (storyId && storyClipId && typeof window !== 'undefined') {
+      const key = `cue_done_${storyId}_${storyClipId}`
+      localStorage.setItem(key, 'true')
+      console.log('✅ Marked clip as done:', key)
+      
+      // Navigate back to story detail page
+      router.push(`/practice/story/${storyId}`)
+      return
+    }
+    
     if (isLastPhrase) {
       // Finish session
       const finalSessionId = clipId ? `clip-${clipId}` : sessionId

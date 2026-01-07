@@ -207,11 +207,17 @@ async function generateMockClips(profiles: ClipProfile[], openai?: OpenAI | null
     "I'd like to get a large coffee with oat milk, please.",
     "Could you tell me about your previous work experience?",
     "Nice weather today, isn't it? Perfect for a walk in the park.",
+    "What time does the train leave for the city center?",
+    "I think we should discuss this with the team first.",
+    "Did you watch the latest episode of that show?",
+    "Can we reschedule our meeting for next week?",
+    "The restaurant is just around the corner from here.",
   ]
   
   const clips: Clip[] = []
   
-  for (let index = 0; index < Math.min(3, profiles.length); index++) {
+  // Generate mock clips for all profiles (up to available mock texts)
+  for (let index = 0; index < Math.min(profiles.length, mockTexts.length); index++) {
     const profile = profiles[index]
     const text = mockTexts[index] || "This is a sample listening practice clip."
     const clipId = generateId()
@@ -331,7 +337,7 @@ export async function POST(request: NextRequest) {
       ]
     }
 
-    // Ensure we have exactly 3 profiles (easy, medium, hard)
+    // Ensure we have at least 3 profiles (fallback if none provided)
     if (profiles.length < 3) {
       const baseProfile = profiles[0] || { focus: ['connected_speech'], targetStyle: 'Everyday conversations' }
       profiles = [
@@ -341,26 +347,31 @@ export async function POST(request: NextRequest) {
       ]
     }
 
-    // Generate 3 clips (easy, medium, hard)
+    // Generate clips for all profiles (15-24 clips expected)
     let clips: Clip[] = []
     let determinedSource: 'mock' | 'openai' | null = null
+    
+    console.log(`🟢 [GENERATION] Generating clips for ${profiles.length} profiles`)
     
     // Use mock mode only if explicitly enabled
     if (useMockMode) {
       console.log('🟡 [MOCK MODE] Generating mock clips (USE_MOCK_CLIPS=true)')
-      clips = await generateMockClips(profiles, openai) // Pass openai if available to generate real audio
+      // For mock mode, limit to 3 clips to match original behavior
+      clips = await generateMockClips(profiles.slice(0, 3), openai)
       determinedSource = 'mock'
       console.log(`🟡 [MOCK MODE] Generated ${clips.length} mock clips, source set to: ${determinedSource}`)
     } else if (openai) {
-      // Generate with REAL OpenAI
+      // Generate with REAL OpenAI for all profiles
       determinedSource = 'openai'
       console.log('🟢 [REAL OPENAI] Starting clip generation...')
+      console.log(`🟢 [REAL OPENAI] Will generate ${profiles.length} clips`)
       console.log('🟢 [REAL OPENAI] Source will be set to: openai')
       let apiFailed = false
       let quotaError = false
       let lastError: Error | null = null
       
-      for (const profile of profiles.slice(0, 3)) {
+      // Generate clips for all profiles (not just first 3)
+      for (const profile of profiles) {
         try {
           console.log(`🟢 [REAL OPENAI] Generating clip for difficulty: ${profile.difficulty}`)
           
@@ -368,9 +379,17 @@ export async function POST(request: NextRequest) {
           const clipId = generateId()
           console.log(`🟢 [REAL OPENAI] Generated clip ID: ${clipId}`)
           
-          // Generate text using OpenAI
-          const text = await generateText(profile, openai)
-          console.log(`🟢 [REAL OPENAI] Generated text for ${profile.difficulty}:`, text.substring(0, 50) + '...')
+          // Check if overrideText is provided (for single clip generation from transcript)
+          let text: string
+          if (body.overrideText && profiles.length === 1) {
+            // Use provided transcript directly
+            text = body.overrideText
+            console.log(`🟢 [REAL OPENAI] Using overrideText for single clip generation`)
+          } else {
+            // Generate text using OpenAI
+            text = await generateText(profile, openai)
+            console.log(`🟢 [REAL OPENAI] Generated text for ${profile.difficulty}:`, text.substring(0, 50) + '...')
+          }
           
           // Generate audio using OpenAI TTS (pass clipId to ensure filename matches)
           const audioUrl = await generateAudio(text, clipId, openai)
@@ -400,7 +419,7 @@ export async function POST(request: NextRequest) {
           }
 
           clips.push(clip)
-          console.log(`🟢 [REAL OPENAI] Successfully created clip ${clips.length}/3 with ID: ${clipId}`)
+          console.log(`🟢 [REAL OPENAI] Successfully created clip ${clips.length}/${profiles.length} with ID: ${clipId}`)
         } catch (error: any) {
           // Extract safe error information
           const errorMessage = error.message || 'Unknown error'
@@ -451,9 +470,9 @@ export async function POST(request: NextRequest) {
           },
           { status: 500 }
         )
-      } else if (clips.length > 0 && clips.length < 3) {
+      } else if (clips.length > 0 && clips.length < profiles.length) {
         // Partial success - log warning but return what we have
-        console.warn(`🟡 [REAL OPENAI] Partial success: ${clips.length}/3 clips generated`)
+        console.warn(`🟡 [REAL OPENAI] Partial success: ${clips.length}/${profiles.length} clips generated`)
       }
       
       // Generate titles for real OpenAI clips

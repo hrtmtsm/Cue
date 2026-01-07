@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft } from 'lucide-react'
+import { getOnboardingData, setOnboardingData } from '@/lib/onboardingStore'
 
 const levels = [
   { id: 'starting', name: 'Just starting', description: null },
@@ -16,7 +17,20 @@ export default function LevelPage() {
   const [selectedLevel, setSelectedLevel] = useState<string | null>(null)
   const router = useRouter()
 
+  useEffect(() => {
+    // Load existing selection if any
+    const data = getOnboardingData()
+    if (data.level) {
+      setSelectedLevel(data.level)
+    }
+  }, [])
+
   const handleContinue = () => {
+    if (selectedLevel) {
+      setOnboardingData({
+        level: selectedLevel,
+      })
+    }
     router.push('/onboarding/ready')
   }
 

@@ -4,6 +4,8 @@
 export interface OnboardingData {
   listeningDifficulties: string[]
   preferredGenre?: string
+  topics?: string[]
+  level?: string
 }
 
 let onboardingData: OnboardingData = {
@@ -33,4 +35,5 @@ export const clearOnboardingData = () => {
     localStorage.removeItem('onboardingData')
   }
 }
+
 
