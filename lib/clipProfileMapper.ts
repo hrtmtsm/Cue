@@ -79,9 +79,9 @@ export function createClipProfiles(
   const userTopics = onboardingData.topics || ['casual']
   
   // Get all unique target styles from selected topics
-  const allTargetStyles = [...new Set(
+  const allTargetStyles = Array.from(new Set(
     userTopics.flatMap(topic => mapTopicToTargetStyles(topic))
-  )]
+  ))
   
   // If preferredGenre is set, prioritize it and add variety
   const baseStyle = onboardingData.preferredGenre
@@ -98,7 +98,7 @@ export function createClipProfiles(
   }
   
   // Ensure at least 3 situations for variety
-  const uniqueStyles = [...new Set(targetStyles)]
+  const uniqueStyles = Array.from(new Set(targetStyles))
   if (uniqueStyles.length < 3) {
     const allAvailableStyles = [
       'Everyday conversations',
@@ -135,8 +135,8 @@ export function createClipProfiles(
   
   console.log('📋 [createClipProfiles] Created clip profiles:', {
     total: profiles.length,
-    situations: [...new Set(profiles.map(p => p.targetStyle))],
-    difficulties: [...new Set(profiles.map(p => p.difficulty))],
+    situations: Array.from(new Set(profiles.map(p => p.targetStyle))),
+    difficulties: Array.from(new Set(profiles.map(p => p.difficulty))),
     clipsPerSituation: stylesToUse.map(style => ({
       style,
       count: profiles.filter(p => p.targetStyle === style).length,
