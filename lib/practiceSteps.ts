@@ -32,6 +32,7 @@ export interface FeedbackItem {
     highlighted: string              // Just the target phrase
     heardAs: string                  // How it sounds (e.g., "later" → "layder")
     chunkDisplay?: string            // Optional: Pattern-based chunk display (e.g., "went-to-the")
+    chunkMeaning?: string            // Optional: Chunk-specific meaning
   }
   extraExample?: {                  // Transfer example - another sentence (optional, omit if no real example)
     sentence: string                 // New sentence using same word/phrase
