@@ -1460,24 +1460,84 @@ function RespondPageContent() {
     setIsLooping(!isLooping)
   }
 
-  const handleCheckAnswer = () => {
-    if (inputMode === 'type' && !userInput.trim()) return
+  const handleCheckAnswer = (e?: React.MouseEvent) => {
+    // Enhanced debugging
+    console.log('🔍 [DEBUG] handleCheckAnswer called')
+    console.log('🔍 [DEBUG] Event:', e)
+    console.log('🔍 [DEBUG] Current pathname:', typeof window !== 'undefined' ? window.location.pathname : 'SSR')
+    console.log('🔍 [DEBUG] Current search:', typeof window !== 'undefined' ? window.location.search : 'SSR')
+    console.log('🔍 [DEBUG] userInput:', userInput?.substring(0, 50) + (userInput?.length > 50 ? '...' : ''))
+    console.log('🔍 [DEBUG] userInput length:', userInput?.length || 0)
+    console.log('🔍 [DEBUG] inputMode:', inputMode)
+    
+    // Prevent any default behavior or event bubbling
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+      console.log('🔍 [DEBUG] Prevented default and stopped propagation')
+    }
+
+    if (inputMode === 'type' && !userInput.trim()) {
+      console.warn('⚠️ [RespondPage] Cannot check answer: userInput is empty')
+      return
+    }
+
+    // Log routing parameters for debugging
+    console.log('🔍 [RespondPage] handleCheckAnswer called:', {
+      storyId,
+      storyClipId,
+      clipId,
+      effectiveClipId,
+      sessionId,
+      phraseIndex,
+      phraseId,
+      userInputLength: userInput.length,
+      routerType: typeof router,
+      routerPushType: typeof router.push,
+    })
 
     // Route to review screen - support story-based, clip-based, and session-based routing
+    let reviewUrl = ''
+    
     if (storyId && storyClipId) {
       // Story-based routing - mark as done and navigate to review
-      router.push(
-        `/practice/review?storyId=${storyId}&clipId=${storyClipId}&userText=${encodeURIComponent(userInput)}`
-      )
+      reviewUrl = `/practice/review?storyId=${storyId}&clipId=${storyClipId}&userText=${encodeURIComponent(userInput)}`
+      console.log('✅ [RespondPage] Navigating to review (story-based):', reviewUrl)
     } else if (clipId) {
       // Clip-based routing (single phrase session - Quick Practice)
-      router.push(`/practice/review?clip=${clipId}&userText=${encodeURIComponent(userInput)}`)
+      reviewUrl = `/practice/review?clip=${clipId}&userText=${encodeURIComponent(userInput)}`
+      console.log('✅ [RespondPage] Navigating to review (clip-based):', reviewUrl)
+    } else if (effectiveClipId) {
+      // Fallback: use effectiveClipId if available
+      reviewUrl = `/practice/review?clip=${effectiveClipId}&userText=${encodeURIComponent(userInput)}`
+      console.log('✅ [RespondPage] Navigating to review (effectiveClipId fallback):', reviewUrl)
     } else {
       // Session-based routing
       const phraseIdParam = phraseId ? `&phraseId=${phraseId}` : ''
-      router.push(
-        `/practice/review?session=${sessionId}&index=${phraseIndex}&userText=${encodeURIComponent(userInput)}${phraseIdParam}`
-      )
+      reviewUrl = `/practice/review?session=${sessionId}&index=${phraseIndex}&userText=${encodeURIComponent(userInput)}${phraseIdParam}`
+      console.log('✅ [RespondPage] Navigating to review (session-based):', reviewUrl)
+    }
+
+    // Navigate to review page
+    // Note: Next.js may show a warning about skipping auto-scroll due to fixed/sticky elements
+    // (BottomNav, FullScreenLoader) - this is expected behavior and harmless
+    if (reviewUrl) {
+      console.log('🔍 [DEBUG] About to call router.push() with URL:', reviewUrl)
+      console.log('🔍 [DEBUG] Router object:', router)
+      try {
+        router.push(reviewUrl)
+        console.log('✅ [DEBUG] router.push() called successfully')
+        // Add a small delay to see if navigation happens
+        setTimeout(() => {
+          console.log('🔍 [DEBUG] After 100ms, pathname is:', typeof window !== 'undefined' ? window.location.pathname : 'SSR')
+        }, 100)
+      } catch (error) {
+        console.error('❌ [DEBUG] Error calling router.push():', error)
+      }
+    } else {
+      console.error('❌ [RespondPage] Cannot determine review URL - missing routing parameters')
+      // Fallback: navigate to practice select if routing fails
+      router.push('/practice/select')
     }
   }
 
@@ -1682,6 +1742,7 @@ function RespondPageContent() {
       {/* Sticky bottom button */}
       <div className="pt-6 pb-6">
         <button
+          type="button"
           onClick={handleCheckAnswer}
           disabled={inputMode === 'type' && !userInput.trim()}
           className={`w-full py-4 px-6 rounded-xl font-semibold text-lg transition-colors ${

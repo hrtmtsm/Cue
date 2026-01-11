@@ -3,13 +3,20 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Play, TrendingUp, User } from 'lucide-react'
+import { shouldHideBottomNav } from '@/lib/navigationUtils'
 
 export default function BottomNav() {
   const pathname = usePathname()
+  const shouldHide = shouldHideBottomNav(pathname)
+
+  // Hide bottom nav in story/clip flow
+  if (shouldHide) {
+    return null
+  }
 
   const isActive = (path: string) => {
     if (path === '/practice') {
-      return pathname === '/practice' || pathname?.startsWith('/practice/')
+      return pathname === '/practice' || pathname?.startsWith('/practice/select')
     }
     return pathname === path || pathname?.startsWith(`${path}/`)
   }
