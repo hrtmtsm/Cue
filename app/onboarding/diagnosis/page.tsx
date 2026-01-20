@@ -16,6 +16,7 @@ import { getOnboardingData } from '@/lib/onboardingStore'
 
 const IS_DEV = process.env.NODE_ENV === 'development'
 const DIAGNOSTIC_CLIP_COUNT = 5
+const MIN_INPUT_CHARS = 3
 
 interface DiagnosticClip {
   id: string
@@ -39,7 +40,9 @@ export default function DiagnosisPage() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [audioStatus, setAudioStatus] = useState<'ready' | 'needs_generation' | 'generating' | 'error'>('needs_generation')
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const hasSubmittedRef = useRef(false) // Prevent double-submission
+  const [inputError, setInputError] = useState<string | null>(null)
 
   // Load diagnostic clips on mount
   useEffect(() => {
@@ -234,11 +237,10 @@ export default function DiagnosisPage() {
     }
   }
 
-  // Validation: wordCount >= 4 OR charCount >= 12 (after trimming)
+  // Validation: charCount >= MIN_INPUT_CHARS (after trimming)
   const trimmedInput = userInput.trim()
-  const wordCount = trimmedInput.split(/\s+/).filter(w => w.length > 0).length
   const charCount = trimmedInput.length
-  const isValidInput = wordCount >= 4 || charCount >= 12
+  const isValidInput = charCount >= MIN_INPUT_CHARS
 
   const handleSubmit = async (skipped: boolean = false) => {
     // Prevent double-submission: check both state and ref
@@ -249,9 +251,16 @@ export default function DiagnosisPage() {
       return
     }
 
-    // If not skipped, validate input
-    if (!skipped && (!trimmedInput || !isValidInput)) {
-      return
+    // If not skipped, validate input length
+    if (!skipped) {
+      if (!trimmedInput || !isValidInput) {
+        // Show error and focus input
+        setInputError(`Please type at least ${MIN_INPUT_CHARS} characters`)
+        inputRef.current?.focus()
+        return
+      }
+      // Clear error if input is valid
+      setInputError(null)
     }
 
     // Mark as submitted immediately to prevent double-submission
@@ -463,6 +472,7 @@ export default function DiagnosisPage() {
         setCurrentIndex(nextIndex)
         setCurrentClip(clips[nextIndex])
         setUserInput('')
+        setInputError(null)
         setIsSubmitting(false)
 
         if (IS_DEV) {
@@ -573,22 +583,39 @@ export default function DiagnosisPage() {
           Type what you heard
         </label>
         <textarea
+          ref={inputRef}
           id="userInput"
           value={userInput}
-          onChange={(e) => setUserInput(e.target.value)}
+          onChange={(e) => {
+            setUserInput(e.target.value)
+            // Clear error as soon as user starts typing
+            if (inputError) {
+              setInputError(null)
+            }
+          }}
+          onKeyDown={(e) => {
+            // Handle Enter-submit: Enter (without Shift) submits via handleSubmit
+            // Shift+Enter creates new line
+            if (e.key === 'Enter' && !e.shiftKey && !isSubmitting && isAudioReady) {
+              e.preventDefault()
+              handleSubmit(false)
+            }
+          }}
           placeholder="Type what you heard..."
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-colors"
+          className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-colors ${
+            inputError ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
+          }`}
           rows={4}
           disabled={isSubmitting}
         />
-        {/* Validation helper text */}
-        {trimmedInput && !isValidInput && !isSubmitting && (
-          <p className="mt-2 text-sm text-gray-500 min-h-[1.25rem]">
-            Type at least 4 words (or 12 characters).
+        {/* Validation error text */}
+        {inputError && (
+          <p className="mt-2 text-sm text-red-600 min-h-[1.25rem]">
+            {inputError}
           </p>
         )}
-        {/* Spacer when helper text is hidden to prevent layout shift */}
-        {(!trimmedInput || isValidInput || isSubmitting) && (
+        {/* Spacer when error text is hidden to prevent layout shift */}
+        {!inputError && (
           <p className="mt-2 text-sm text-transparent min-h-[1.25rem]" aria-hidden="true">
             &nbsp;
           </p>
