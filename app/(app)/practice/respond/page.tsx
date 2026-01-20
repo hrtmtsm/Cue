@@ -58,6 +58,8 @@ function RespondPageContent() {
   
   const [inputMode, setInputMode] = useState<'type' | 'speak'>('type')
   const [userInput, setUserInput] = useState('')
+  const [inputError, setInputError] = useState<string | null>(null)
+  const MIN_INPUT_CHARS = 3
   const [isPlaying, setIsPlaying] = useState(false)
   const [isLooping, setIsLooping] = useState(!!focusInsightId) // Auto-enable loop if focused
   const [voiceMode, setVoiceMode] = useState<'generated' | 'device'>('generated')
@@ -1496,9 +1498,17 @@ function RespondPageContent() {
       console.log('🔍 [DEBUG] Prevented default and stopped propagation')
     }
 
-    if (inputMode === 'type' && !userInput.trim()) {
-      console.warn('⚠️ [RespondPage] Cannot check answer: userInput is empty')
-      return
+    if (inputMode === 'type') {
+      const trimmedInput = userInput.trim()
+      // Validate minimum input length
+      if (!trimmedInput || trimmedInput.length < MIN_INPUT_CHARS) {
+        setInputError(`Please type at least ${MIN_INPUT_CHARS} characters`)
+        const inputElement = document.getElementById('answer-input') as HTMLTextAreaElement
+        inputElement?.focus()
+        return
+      }
+      // Clear error if valid
+      setInputError(null)
     }
 
     // Don't complete steps here - progress advances when Review page loads (screen entry)
@@ -1734,13 +1744,28 @@ function RespondPageContent() {
             <label htmlFor="answer-input" className="block text-sm font-medium text-gray-700">
               Type what you heard
             </label>
-            <textarea
-              id="answer-input"
-              value={userInput}
-              onChange={(e) => setUserInput(e.target.value)}
-              placeholder="Type what you heard..."
-              className="w-full h-40 p-4 border-2 border-gray-200 rounded-xl resize-none focus:outline-none focus:border-blue-600 text-lg"
-            />
+            <div className="space-y-2">
+              <textarea
+                id="answer-input"
+                value={userInput}
+                onChange={(e) => {
+                  setUserInput(e.target.value)
+                  // Clear error when user starts typing
+                  if (inputError) {
+                    setInputError(null)
+                  }
+                }}
+                placeholder="Type what you heard..."
+                className={`w-full h-40 p-4 border-2 rounded-xl resize-none focus:outline-none text-lg ${
+                  inputError 
+                    ? 'border-red-300 focus:border-red-500' 
+                    : 'border-gray-200 focus:border-blue-600'
+                }`}
+              />
+              {inputError && (
+                <p className="text-sm text-red-600">{inputError}</p>
+              )}
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
@@ -1762,9 +1787,9 @@ function RespondPageContent() {
           <button
             type="button"
             onClick={handleCheckAnswer}
-            disabled={inputMode === 'type' && !userInput.trim()}
+            disabled={inputMode === 'type' && (!userInput.trim() || userInput.trim().length < MIN_INPUT_CHARS)}
             className={`w-full py-4 px-6 rounded-xl font-semibold text-lg transition-colors ${
-              inputMode === 'type' && userInput.trim()
+              inputMode === 'type' && userInput.trim() && userInput.trim().length >= MIN_INPUT_CHARS
                 ? 'bg-blue-600 text-white active:bg-blue-700 shadow-lg'
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             }`}

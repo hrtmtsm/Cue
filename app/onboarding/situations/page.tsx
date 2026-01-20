@@ -4,20 +4,13 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft } from 'lucide-react'
-import { getOnboardingData, setOnboardingData } from '@/lib/onboardingStore'
+import { getOnboardingData, setOnboardingData, type SituationKey } from '@/lib/onboardingStore'
+import { SITUATION_OPTIONS, MAX_SITUATION_SELECTIONS, DEFAULT_SITUATION } from '@/lib/situations'
 
-const situations = [
-  { id: 'work', name: 'Work & professional conversations' },
-  { id: 'daily', name: 'Daily conversations' },
-  { id: 'travel', name: 'Travel & daily life' },
-  { id: 'media', name: 'Movies, videos & shows' },
-  { id: 'general', name: 'Just want to get better' },
-]
-
-const MAX_SELECTIONS = 2
+const MAX_SELECTIONS = MAX_SITUATION_SELECTIONS
 
 export default function SituationsPage() {
-  const [selectedSituations, setSelectedSituations] = useState<Set<string>>(new Set())
+  const [selectedSituations, setSelectedSituations] = useState<Set<SituationKey>>(new Set())
   const router = useRouter()
 
   useEffect(() => {
@@ -28,23 +21,23 @@ export default function SituationsPage() {
     }
   }, [])
 
-  const toggleSituation = (situationId: string) => {
+  const toggleSituation = (situationKey: SituationKey) => {
     const newSelected = new Set(selectedSituations)
-    if (newSelected.has(situationId)) {
-      newSelected.delete(situationId)
+    if (newSelected.has(situationKey)) {
+      newSelected.delete(situationKey)
     } else {
       // Enforce max 2 selections
       if (newSelected.size < MAX_SELECTIONS) {
-        newSelected.add(situationId)
+        newSelected.add(situationKey)
       }
     }
     setSelectedSituations(newSelected)
   }
 
   const handleContinue = () => {
-    // Save selected situations
+    // Save selected situations as ordered array
     setOnboardingData({
-      situations: Array.from(selectedSituations),
+      situations: Array.from(selectedSituations) as SituationKey[],
     })
     // Navigate to practice select (will show ready modal)
     router.push('/practice/select')
@@ -53,7 +46,7 @@ export default function SituationsPage() {
   const handleSkip = () => {
     // "Not now" - save with default general situation
     setOnboardingData({
-      situations: ['general'],
+      situations: [DEFAULT_SITUATION],
     })
     // Navigate to practice select
     router.push('/practice/select')
@@ -87,13 +80,13 @@ export default function SituationsPage() {
         </div>
 
         <div className="space-y-3">
-          {situations.map((situation) => {
-            const isSelected = selectedSituations.has(situation.id)
+          {SITUATION_OPTIONS.map((situation) => {
+            const isSelected = selectedSituations.has(situation.key)
             const isDisabled = !isSelected && !canSelectMore
             return (
               <button
-                key={situation.id}
-                onClick={() => toggleSituation(situation.id)}
+                key={situation.key}
+                onClick={() => toggleSituation(situation.key)}
                 disabled={isDisabled}
                 className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
                   isSelected
@@ -104,7 +97,7 @@ export default function SituationsPage() {
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">{situation.name}</span>
+                  <span className="font-medium">{situation.label}</span>
                   {isSelected && (
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />

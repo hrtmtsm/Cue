@@ -5,9 +5,9 @@ type CefrLevel = 'A1' | 'A2' | 'B1' | 'B2'
 
 interface FeedRequest {
   cefr: CefrLevel
-  weaknessRank?: string[]
   preferredGenre?: string
   limit?: number
+  // Note: weaknessRank removed for MVP - categories only for explanation UI
 }
 
 interface Clip {
@@ -90,15 +90,14 @@ function formatClips(clips: any[], limit: number, defaultCefr: CefrLevel): Clip[
  * POST /api/clips/feed
  * 
  * Returns adaptive feed of practice clips based on:
- * - CEFR level (required)
- * - Weakness rank (optional, prioritizes matching clips)
+ * - CEFR level (required, from quickStartSummary.startingDifficulty)
  * - Preferred genre (optional, for future use)
  * 
  * Strategy:
- * - If weaknessRank[0] exists, do two queries:
- *   1) Focused: clips matching focus_areas contains weaknessRank[0]
- *   2) Fallback: remaining clips by cefr
- * - Merge unique by id until limit
+ * - Fetch clips by CEFR level only (no weakness-based ranking for MVP)
+ * - Limit to requested count
+ * 
+ * Note: weaknessRank removed for MVP - categories only for explanation UI
  * 
  * Response shape matches diagnostic endpoint shape
  */
@@ -118,101 +117,34 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (body.weaknessRank && !Array.isArray(body.weaknessRank)) {
-      return NextResponse.json(
-        {
-          error: 'Invalid weaknessRank',
-          code: 'VALIDATION_ERROR',
-          message: 'weaknessRank must be an array',
-        },
-        { status: 400 }
-      )
-    }
-
     const limit = body.limit || 10
     const supabase = getSupabaseAdminClient()
-    const chosenFocus = body.weaknessRank?.[0] || null
 
     // Dev-only log
     if (IS_DEV) {
-      console.log('🔍 [Clips Feed] Request (dev only):', {
+      console.log('🔍 [Clips Feed POST] Request (dev only):', {
         cefr: body.cefr,
-        chosenFocus,
-        weaknessRank: body.weaknessRank?.slice(0, 3),
         preferredGenre: body.preferredGenre,
         limit,
       })
     }
 
-    let focusedClips: any[] = []
-    let fallbackClips: any[] = []
+    // Fetch clips by CEFR only (no weakness-based ranking for MVP)
+    let clips: any[] = []
 
-    // Query 1: Focused clips (if weaknessRank[0] exists)
-    if (chosenFocus) {
-      try {
-        // Try cefr column first, fallback to difficulty mapping
-        let focusedQuery = supabase
-          .from('curated_clips')
-          .select('*')
-          .eq('clip_type', 'practice')
-          .contains('focus_areas', [chosenFocus]) // Array contains check
-        
-        // Filter by cefr column if it exists
-        focusedQuery = focusedQuery.eq('cefr', body.cefr) as any
-
-        const { data: focused, error: focusedError } = await focusedQuery
-
-        if (focusedError) {
-          // If cefr column doesn't exist, try difficulty mapping
-          if (focusedError.message?.includes('column') && focusedError.message?.includes('cefr')) {
-            const cefrToDifficulty: Record<CefrLevel, string> = {
-              'A1': 'easy',
-              'A2': 'easy',
-              'B1': 'medium',
-              'B2': 'hard',
-            }
-            const difficulty = cefrToDifficulty[body.cefr]
-            
-            const retryQuery = supabase
-              .from('curated_clips')
-              .select('*')
-              .eq('clip_type', 'practice')
-              .contains('focus_areas', [chosenFocus])
-              .eq('difficulty', difficulty)
-            
-            const { data: retryFocused, error: retryError } = await retryQuery
-            
-            if (retryError) {
-              console.error('❌ [Clips Feed] Focused query error:', retryError)
-            } else {
-              focusedClips = retryFocused || []
-            }
-          } else {
-            console.error('❌ [Clips Feed] Focused query error:', focusedError)
-          }
-        } else {
-          focusedClips = focused || []
-        }
-      } catch (error) {
-        console.error('❌ [Clips Feed] Focused query exception:', error)
-      }
-    }
-
-    // Query 2: Fallback clips (remaining clips by cefr, excluding focused ones)
     try {
-      const focusedIds = new Set(focusedClips.map(c => c.id))
-      
-      let fallbackQuery = supabase
+      let query = supabase
         .from('curated_clips')
         .select('*')
         .eq('clip_type', 'practice')
         .eq('cefr', body.cefr)
+        .limit(limit)
 
-      const { data: fallback, error: fallbackError } = await fallbackQuery
+      const { data, error } = await query
 
-      if (fallbackError) {
+      if (error) {
         // If cefr column doesn't exist, try difficulty mapping
-        if (fallbackError.message?.includes('column') && fallbackError.message?.includes('cefr')) {
+        if (error.message?.includes('column') && error.message?.includes('cefr')) {
           const cefrToDifficulty: Record<CefrLevel, string> = {
             'A1': 'easy',
             'A2': 'easy',
@@ -221,54 +153,32 @@ export async function POST(request: NextRequest) {
           }
           const difficulty = cefrToDifficulty[body.cefr]
           
-          const retryFallbackQuery = supabase
+          const retryQuery = supabase
             .from('curated_clips')
             .select('*')
             .eq('clip_type', 'practice')
             .eq('difficulty', difficulty)
+            .limit(limit)
           
-          const { data: retryFallback, error: retryFallbackError } = await retryFallbackQuery
+          const { data: retryData, error: retryError } = await retryQuery
           
-          if (retryFallbackError) {
-            console.error('❌ [Clips Feed] Fallback query error:', retryFallbackError)
+          if (retryError) {
+            console.error('❌ [Clips Feed POST] Query error:', retryError)
           } else {
-            // Filter out focused clips in JavaScript
-            fallbackClips = (retryFallback || []).filter((c: any) => !focusedIds.has(c.id))
+            clips = retryData || []
           }
         } else {
-          console.error('❌ [Clips Feed] Fallback query error:', fallbackError)
+          console.error('❌ [Clips Feed POST] Query error:', error)
         }
       } else {
-        // Filter out focused clips in JavaScript
-        fallbackClips = (fallback || []).filter((c: any) => !focusedIds.has(c.id))
+        clips = data || []
       }
     } catch (error) {
-      console.error('❌ [Clips Feed] Fallback query exception:', error)
+      console.error('❌ [Clips Feed POST] Query exception:', error)
     }
 
-    // Merge unique by id until limit
-    const clipMap = new Map<string, any>()
-    
-    // First add focused clips (prioritized)
-    for (const clip of focusedClips) {
-      if (clipMap.size >= limit) break
-      if (!clipMap.has(clip.id)) {
-        clipMap.set(clip.id, clip)
-      }
-    }
-    
-    // Then add fallback clips until limit
-    for (const clip of fallbackClips) {
-      if (clipMap.size >= limit) break
-      if (!clipMap.has(clip.id)) {
-        clipMap.set(clip.id, clip)
-      }
-    }
-
-    const mergedClips = Array.from(clipMap.values())
-
-    if (mergedClips.length === 0) {
-      console.warn('⚠️ [Clips Feed] No practice clips found for CEFR level:', body.cefr)
+    if (clips.length === 0) {
+      console.warn('⚠️ [Clips Feed POST] No practice clips found for CEFR level:', body.cefr)
       return NextResponse.json(
         {
           clips: [],
@@ -278,20 +188,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Map to response shape (same as diagnostic endpoint)
-    const formattedClips = formatClips(mergedClips, limit, body.cefr)
+    const formattedClips = formatClips(clips, limit, body.cefr)
 
     const returnedCount = formattedClips.length
     const firstIds = formattedClips.slice(0, 5).map(c => c.id)
 
     // Dev-only logs
     if (IS_DEV) {
-      console.log('📊 [Clips Feed] Results (dev only):', {
-        chosenFocus,
+      console.log('📊 [Clips Feed POST] Results (dev only):', {
         returnedCount,
         firstIds,
-        focusedCount: focusedClips.length,
-        fallbackCount: fallbackClips.length,
-        mergedCount: mergedClips.length,
+        clipCount: clips.length,
       })
     }
 
@@ -345,14 +252,10 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const cefrParam = searchParams.get('cefr')
-    const weaknessParam = searchParams.get('weakness')
     const situationParam = searchParams.get('situation')
     const limitParam = searchParams.get('limit')
 
-    // Parse weakness (comma-separated string)
-    const weakness = weaknessParam
-      ? weaknessParam.split(',').map(w => w.trim()).filter(Boolean)
-      : undefined
+    // Note: weakness parameter removed for MVP - categories only for explanation UI
 
     const cefr = cefrParam as CefrLevel | null
     const situation = situationParam || undefined
@@ -406,7 +309,6 @@ export async function GET(request: NextRequest) {
     if (IS_DEV) {
       console.log('🔍 [Clips Feed GET] Request (dev only):', {
         cefr,
-        weakness: weakness?.slice(0, 3),
         situation,
         allowedCefrLevels,
         limit,
@@ -471,24 +373,7 @@ export async function GET(request: NextRequest) {
         return { clip, score: -1 }
       }
 
-      // Priority 1: focusAreas overlap with weakness
-      if (weakness && weakness.length > 0) {
-        const clipFocusAreas = Array.isArray(clip.focus_areas)
-          ? clip.focus_areas.map((f: any) => String(f).toLowerCase())
-          : Array.isArray(clip.focus)
-            ? clip.focus.map((f: any) => String(f).toLowerCase())
-            : []
-
-        const weaknesses = weakness.map(w => w.toLowerCase())
-        
-        for (const w of weaknesses) {
-          if (clipFocusAreas.includes(w)) {
-            score += 1000 // High priority for weakness match
-          }
-        }
-      }
-
-      // Priority 2: situation match
+      // Priority 1: situation match (weakness-based ranking removed for MVP)
       if (situation && clip.situation) {
         const clipSituation = String(clip.situation).toLowerCase()
         const requestedSituation = String(situation).toLowerCase()
@@ -521,7 +406,6 @@ export async function GET(request: NextRequest) {
     if (IS_DEV) {
       console.log('📊 [Clips Feed GET] Results (dev only):', {
         cefr,
-        weakness: weakness?.slice(0, 3),
         situation,
         totalClipsFetched: allClips.length,
         validClips: validClips.length,

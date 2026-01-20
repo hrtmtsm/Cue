@@ -12,6 +12,7 @@ import { Clip as ClipType } from '@/lib/clipTypes'
 import { convertClipsToStories } from '@/lib/clipToStoryConverter'
 import { loadUserStories, saveUserStories } from '@/lib/storyClient'
 import { loadDiagnosticSummary, type DiagnosticSummary } from '@/lib/diagnosticSummary'
+import { loadQuickStartSummary, getFeedStartDifficulty } from '@/lib/quickStartSummary'
 import { getOnboardingData } from '@/lib/onboardingStore'
 import ClipsReadyModal from '@/components/ClipsReadyModal'
 
@@ -57,11 +58,12 @@ export default function PracticeSelectPage() {
   const [summary, setSummary] = useState<DiagnosticSummary | null>(null)
   const [showClipsReadyModal, setShowClipsReadyModal] = useState(false)
 
-  // Load diagnostic summary on mount and check for popup
+  // Load quick start summary on mount and check for popup
   useEffect(() => {
-    const s = loadDiagnosticSummary()
-    console.log('[SELECT] diagnosticSummary', s)
-    setSummary(s)
+    // Keep diagnostic summary for analytics (but don't use for feed)
+    const diagnosticSummary = loadDiagnosticSummary()
+    console.log('[SELECT] diagnosticSummary (analytics only)', diagnosticSummary)
+    setSummary(diagnosticSummary)
     
     // Show modal if showClipsReadyOnce flag is set (only right after diagnostic completion)
     if (typeof window !== 'undefined') {
@@ -102,12 +104,13 @@ export default function PracticeSelectPage() {
       return // Exit early, don't continue to feed logic
     }
 
-    // Load diagnostic summary (already loaded in separate useEffect above)
-    const diagnosticSummary = summary
+    // Load quick start summary for feed seeding
+    const quickStartSummary = loadQuickStartSummary()
 
-    // Step 4: Check if diagnostic summary exists for adaptive feed (after diagnostic is complete)
-    if (diagnosticSummary) {
-      // Fetch adaptive feed based on diagnostic results
+    // Step 4: Check if quick start summary exists for initial feed seeding
+    // Safety: fallback to defaults if missing
+    if (quickStartSummary) {
+      // Fetch adaptive feed based on quick start results
       const fetchFeed = async () => {
         try {
           // Get preferences from onboarding data
@@ -117,22 +120,45 @@ export default function PracticeSelectPage() {
             ? onboardingData.situations[0]
             : 'general' // Fallback to general if no situations selected
 
-          console.log('🎯 [SELECT PAGE] Fetching adaptive feed from diagnostic summary:', {
-            cefr: diagnosticSummary.cefr,
-            weakness: diagnosticSummary.weaknessRank.slice(0, 3),
+          // Calculate feed start difficulty: max(0, startingDifficulty - 20)
+          const feedStartDifficulty = getFeedStartDifficulty(quickStartSummary)
+          
+          // Map feedStartDifficulty to CEFR for API (ensures feed starts easier)
+          // 0-14 -> A1, 15-24 -> A2, 25-34 -> B1, 35+ -> B2
+          let cefr: string
+          if (feedStartDifficulty <= 14) {
+            cefr = 'A1'
+          } else if (feedStartDifficulty <= 24) {
+            cefr = 'A2'
+          } else if (feedStartDifficulty <= 34) {
+            cefr = 'B1'
+          } else {
+            cefr = 'B2'
+          }
+
+          // Debug log at feed selection entry point (dev-only)
+          if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+            console.log('[Feed] seed difficulty', {
+              source: 'quickStartSummary',
+              startingDifficulty: quickStartSummary.startingDifficulty,
+              feedStartDifficulty,
+              cefr,
+            })
+          }
+
+          console.log('🎯 [SELECT PAGE] Fetching feed from quick start summary:', {
+            cefr,
+            feedStartDifficulty,
+            missedRate: (quickStartSummary.missedRate * 100).toFixed(1) + '%',
+            attemptAccuracy: quickStartSummary.attemptAccuracy.toFixed(1) + '%',
             situation,
             situations: onboardingData.situations,
           })
           
           // Build query params for GET request
           const params = new URLSearchParams({
-            cefr: diagnosticSummary.cefr,
+            cefr,
           })
-          
-          // Add weakness as comma-separated string if exists
-          if (diagnosticSummary.weaknessRank.length > 0) {
-            params.append('weakness', diagnosticSummary.weaknessRank.join(','))
-          }
           
           // Add situation (from situations[0]) - always provide at least 'general'
           params.append('situation', situation)
@@ -195,7 +221,57 @@ export default function PracticeSelectPage() {
           console.log('✅ [SELECT PAGE] Saved feed clips to localStorage')
           
           // Convert to stories
-          const userStories = convertClipsToStories(clips)
+          let userStories = convertClipsToStories(clips)
+          
+          // Local sorting: score stories based on situations only (removed weaknessRank)
+          const situations = onboardingData.situations || []
+          
+          // Map SituationKey to Story.situation values
+          const situationKeyToStorySituation: Record<string, string> = {
+            'work_meetings': 'Work',
+            'daily': 'Daily Life',
+            'travel': 'Travel',
+            'videos_shows': 'Media',
+            'interviews_presentations': 'Work', // Map to Work
+            'general': 'Daily Life', // Default fallback
+          }
+          
+          // Score and sort stories (situations only, no category-based ranking)
+          const scoredStories = userStories.map((story, index) => {
+            let score = 0
+            
+            // Score +50 if story matches selected situations (both if present)
+            if (story.situation) {
+              const storySituationLower = story.situation.toLowerCase()
+              situations.forEach((sitKey) => {
+                const mappedSituation = situationKeyToStorySituation[sitKey] || 'Daily Life'
+                if (storySituationLower === mappedSituation.toLowerCase()) {
+                  score += 50
+                }
+              })
+            }
+            
+            return { story, score, originalIndex: index }
+          })
+          
+          // Sort by score DESC, keep original order on tie
+          scoredStories.sort((a, b) => {
+            if (b.score !== a.score) {
+              return b.score - a.score
+            }
+            return a.originalIndex - b.originalIndex
+          })
+          
+          userStories = scoredStories.map(item => item.story)
+          
+          console.log('✅ [SELECT PAGE] Scored and sorted stories (situations only):', {
+            storyCount: userStories.length,
+            topScores: scoredStories.slice(0, 3).map(item => ({
+              storyId: item.story.id,
+              title: item.story.title,
+              score: item.score,
+            })),
+          })
           
           // Save stories to localStorage
           saveUserStories(userStories)
@@ -215,24 +291,67 @@ export default function PracticeSelectPage() {
       
       fetchFeed()
     } else {
-      // No diagnostic summary - use existing behavior
+      // No quick start summary - use existing behavior (fallback)
       loadExistingStories()
     }
     
     function loadExistingStories() {
       // Load user-generated stories from localStorage
       try {
-        // 1) Try userStories first (newer format, single source of truth)
-        const userStories = loadUserStories()
-        if (userStories.length > 0) {
-          console.log('🎯 [SELECT PAGE] client_cached_data: Loaded from userStories:', {
-            storyCount: userStories.length,
-            storyIds: userStories.map(s => s.id),
-            storyTitles: userStories.map(s => s.title),
-            source: 'localStorage_userStories',
-          })
-          setStories(userStories)
-          setIsHydrated(true)
+          // 1) Try userStories first (newer format, single source of truth)
+          let userStories = loadUserStories()
+          if (userStories.length > 0) {
+            // Apply local sorting if we have situations (removed weaknessRank)
+            const onboardingData = getOnboardingData()
+            
+            if (onboardingData.situations) {
+              const situations = onboardingData.situations || []
+              
+              // Map SituationKey to Story.situation values
+              const situationKeyToStorySituation: Record<string, string> = {
+                'work_meetings': 'Work',
+                'daily': 'Daily Life',
+                'travel': 'Travel',
+                'videos_shows': 'Media',
+                'interviews_presentations': 'Work',
+                'general': 'Daily Life',
+              }
+              
+              // Score and sort stories (situations only, no category-based ranking)
+              const scoredStories = userStories.map((story, index) => {
+                let score = 0
+                
+                if (story.situation) {
+                  const storySituationLower = story.situation.toLowerCase()
+                  situations.forEach((sitKey) => {
+                    const mappedSituation = situationKeyToStorySituation[sitKey] || 'Daily Life'
+                    if (storySituationLower === mappedSituation.toLowerCase()) {
+                      score += 50
+                    }
+                  })
+                }
+                
+                return { story, score, originalIndex: index }
+              })
+              
+              scoredStories.sort((a, b) => {
+                if (b.score !== a.score) {
+                  return b.score - a.score
+                }
+                return a.originalIndex - b.originalIndex
+              })
+              
+              userStories = scoredStories.map(item => item.story)
+            }
+            
+            console.log('🎯 [SELECT PAGE] client_cached_data: Loaded from userStories:', {
+              storyCount: userStories.length,
+              storyIds: userStories.map(s => s.id),
+              storyTitles: userStories.map(s => s.title),
+              source: 'localStorage_userStories',
+            })
+            setStories(userStories)
+            setIsHydrated(true)
         } else {
           // 2) Fallback: derive stories from userClips (older format)
           const storedClips = localStorage.getItem('userClips')
@@ -286,18 +405,7 @@ export default function PracticeSelectPage() {
   // Prevent rendering until hydrated to avoid flash
   if (!isHydrated) {
     return (
-      <div 
-        className="fixed z-[100] flex items-center justify-center bg-white"
-        style={{
-          top: 0,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: '100%',
-          maxWidth: '420px',
-          height: '100vh',
-          overflow: 'hidden',
-        }}
-      >
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-white">
         <div className="flex flex-col items-center gap-4">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           <p className="text-gray-600">Loading stories...</p>

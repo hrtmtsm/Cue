@@ -11,12 +11,7 @@ export default function ClipsReadyModal({ isOpen, onClose }: ClipsReadyModalProp
   return (
     <div 
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30"
-      style={{ 
-        left: '50%',
-        transform: 'translateX(-50%)',
-        width: '100%',
-        maxWidth: '420px',
-      }}
+      onClick={onClose}
     >
       <div 
         className="bg-white rounded-2xl shadow-xl w-full max-w-[360px] p-6 space-y-4 relative"
@@ -35,7 +30,7 @@ export default function ClipsReadyModal({ isOpen, onClose }: ClipsReadyModalProp
           onClick={onClose}
           className="w-full py-3 px-6 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors"
         >
-          Start practicing
+          Start
         </button>
       </div>
     </div>
