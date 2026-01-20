@@ -12,6 +12,7 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now()
   let clipId: string | undefined
   let userId: string | undefined
+  let variantKey: string | undefined
   
   try {
     console.log('🎵 [Audio Generate] Request started')
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
 
     clipId = body.clipId
     const transcript = body.transcript
-    const variantKey = body.variantKey || 'clean_normal'
+    variantKey = body.variantKey || 'clean_normal'
 
     // Log request details (safe info only)
     console.log('📝 [Audio Generate] Request details:', {
@@ -465,7 +466,7 @@ export async function POST(request: NextRequest) {
       name: error?.name,
       stack: error?.stack,
       clipId,
-      variantKey: clipId ? (body?.variantKey || 'clean_normal') : undefined,
+      variantKey: variantKey || 'clean_normal',
       userId: userId?.substring(0, 8) + '...',
       durationMs: duration,
       err: error,
