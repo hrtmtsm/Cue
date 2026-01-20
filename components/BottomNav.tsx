@@ -41,16 +41,9 @@ export default function BottomNav() {
 
   return (
     <nav 
-      className="fixed bottom-0 z-50 bg-white border-t border-gray-200"
-      style={{
-        left: '50%',
-        transform: 'translateX(-50%)',
-        width: '100%',
-        maxWidth: '420px',
-        paddingBottom: 'env(safe-area-inset-bottom)',
-      }}
+      className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 md:hidden pb-[env(safe-area-inset-bottom)]"
     >
-      <div className="px-6">
+      <div className="mx-auto w-full max-w-[520px] px-4">
         <div className="flex items-center justify-around h-16">
           {tabs.map((tab) => {
             const Icon = tab.icon

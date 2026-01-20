@@ -58,6 +58,9 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Trigger to auto-update updated_at
+-- Drop existing trigger if it exists (idempotent)
+DROP TRIGGER IF EXISTS update_clip_audio_updated_at ON clip_audio;
+
 CREATE TRIGGER update_clip_audio_updated_at
   BEFORE UPDATE ON clip_audio
   FOR EACH ROW

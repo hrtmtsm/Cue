@@ -62,3 +62,4 @@ But this is usually unnecessary since Next.js handles it correctly.
 
 This warning is **expected and harmless**. Next.js is correctly detecting our fixed navigation elements and adjusting scroll behavior accordingly. No action needed unless it's causing actual UI issues (which it shouldn't).
 
+

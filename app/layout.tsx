@@ -14,7 +14,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="overflow-x-hidden">
       <body className="bg-gray-50 antialiased overflow-x-hidden">
-        <div className="mx-auto max-w-[420px] min-h-screen bg-white shadow-lg">
+        <div className="min-h-dvh w-full">
           {children}
         </div>
       </body>

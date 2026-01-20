@@ -271,7 +271,14 @@ async function uploadToBlobInBackground(
     }
     
     // Update DB record with durable https URL
-    await supabaseAdmin
+    const onConflictColumns = 'clip_id,variant_key'
+    console.log('💾 [Audio Stream] Upserting clip_audio row (background)...', {
+      onConflict: onConflictColumns,
+      clipId,
+      variantKey,
+    })
+
+    const upsertResult = await supabaseAdmin
       .from('clip_audio')
       .upsert({
         user_id: userId,
@@ -284,10 +291,111 @@ async function uploadToBlobInBackground(
         blob_path: blob.url, // Store durable https URL (never blob: URL)
         updated_at: new Date().toISOString(),
       }, {
-        onConflict: 'user_id,clip_id,variant_key,transcript_hash', // Include transcript_hash for uniqueness
+        onConflict: onConflictColumns,
       })
-    
-    console.log('✅ [Audio Stream] DB updated (background) with https URL:', blob.url.substring(0, 80) + '...')
+
+    // Fallback for PostgreSQL error 42P10 (invalid_column_reference)
+    if (upsertResult.error?.code === '42P10' || upsertResult.error?.code === '42704') {
+      console.warn('⚠️ [Audio Stream] ON CONFLICT error (42P10), using fallback path (background):', {
+        errorCode: upsertResult.error.code,
+        errorMessage: upsertResult.error.message,
+        clipId,
+        variantKey,
+      })
+
+      try {
+        // Try to find existing row by (user_id, clip_id, variant_key) - actual unique constraint
+        const { data: existingRow, error: selectError } = await supabaseAdmin
+          .from('clip_audio')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('clip_id', clipId)
+          .eq('variant_key', variantKey)
+          .single()
+
+        if (selectError && selectError.code !== 'PGRST116') { // PGRST116 = not found
+          console.error('❌ [Audio Stream] Fallback: Error selecting existing row (background):', selectError)
+          throw selectError
+        }
+
+        if (existingRow) {
+          // Row exists: update it
+          console.log('✅ [Audio Stream] Fallback: Found existing row, updating (background)...', {
+            existingId: existingRow.id,
+            clipId,
+            variantKey,
+          })
+
+          const { error: updateError } = await supabaseAdmin
+            .from('clip_audio')
+            .update({
+              transcript,
+              transcript_hash: transcriptHash,
+              audio_status: 'ready',
+              blob_path: blob.url,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingRow.id)
+
+          if (updateError) {
+            console.error('❌ [Audio Stream] Fallback: Error updating existing row (background):', updateError)
+            throw updateError
+          }
+
+          console.log('✅ [Audio Stream] Fallback path completed successfully (background):', {
+            audioRowId: existingRow.id,
+            clipId,
+            variantKey,
+          })
+        } else {
+          // Row doesn't exist: insert new one
+          console.log('✅ [Audio Stream] Fallback: No existing row found, inserting new row (background)...', {
+            clipId,
+            variantKey,
+          })
+
+          const { error: insertError } = await supabaseAdmin
+            .from('clip_audio')
+            .insert({
+              user_id: userId,
+              clip_id: clipId,
+              transcript,
+              transcript_hash: transcriptHash,
+              variant_key: variantKey,
+              voice_profile: 'alloy',
+              audio_status: 'ready',
+              blob_path: blob.url,
+              updated_at: new Date().toISOString(),
+            })
+
+          if (insertError) {
+            console.error('❌ [Audio Stream] Fallback: Error inserting new row (background):', insertError)
+            throw insertError
+          }
+
+          console.log('✅ [Audio Stream] Fallback path completed successfully (background):', {
+            clipId,
+            variantKey,
+          })
+        }
+      } catch (fallbackError: any) {
+        console.error('❌ [Audio Stream] Fallback path failed (background):', {
+          error: fallbackError.message,
+          clipId,
+          variantKey,
+        })
+        // Don't throw - this is background, shouldn't affect client
+      }
+    } else if (upsertResult.error) {
+      // Other errors (not 42P10) - log but don't throw in background
+      console.error('❌ [Audio Stream] Upsert error (background):', {
+        error: upsertResult.error.message,
+        clipId,
+        variantKey,
+      })
+    } else {
+      console.log('✅ [Audio Stream] DB updated (background) with https URL:', blob.url.substring(0, 80) + '...')
+    }
   } catch (error: any) {
     console.error('❌ [Audio Stream] Background upload error:', {
       error: error.message,

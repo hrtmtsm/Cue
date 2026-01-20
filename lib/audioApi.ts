@@ -4,13 +4,12 @@
  */
 
 import { generateTextHash } from './audioHash'
+import { getSupabase } from './supabase/client'
 
-// Lazy import to avoid initialization errors if Supabase isn't configured
-async function getSupabaseClient() {
-  // Dynamic import ensures this only runs when called, not at module load
-  const supabaseModule = await import('./supabase/client')
-  // Use the getter function for true lazy initialization
-  return supabaseModule.getSupabase()
+// Get Supabase client (already lazy-initialized)
+function getSupabaseClient() {
+  // getSupabase() is already lazy - only initializes when called
+  return getSupabase()
 }
 
 export type AudioStatus = 'needs_generation' | 'generating' | 'ready' | 'error'
@@ -36,7 +35,7 @@ export async function getAudioMetadata(
   const transcriptHash = generateTextHash(transcript)
   
   try {
-    const supabase = await getSupabaseClient()
+    const supabase = getSupabaseClient()
     
     // Get session if available
     const { data: { session }, error: authError } = await supabase.auth.getSession()
@@ -71,16 +70,34 @@ export async function getAudioMetadata(
     }
 
     // If API call fails, return needs_generation
-    console.warn('Error fetching audio metadata from API:', response.status)
+    let errorText = ''
+    try {
+      errorText = await response.text()
+    } catch (e) {
+      // Ignore text parsing errors
+    }
+    console.error('[Diagnosis] Error', {
+      message: `Audio metadata fetch failed: ${response.status}`,
+      name: 'ResponseError',
+      status: response.status,
+      statusText: response.statusText,
+      errorText,
+      err: response,
+    })
     return {
       clipId,
       transcript,
       transcriptHash,
       audioStatus: 'needs_generation',
     }
-  } catch (error) {
+  } catch (error: any) {
     // If Supabase isn't configured or there's an error, return needs_generation
-    console.warn('Error in getAudioMetadata:', error)
+    console.error('[Diagnosis] Error', {
+      message: error?.message || 'Error in getAudioMetadata',
+      name: error?.name,
+      stack: error?.stack,
+      err: error,
+    })
     return {
       clipId,
       transcript,
@@ -101,7 +118,7 @@ export async function streamAudio(
   cache: boolean = true
 ): Promise<{ success: boolean; stream?: ReadableStream<Uint8Array>; error?: string; code?: string; message?: string }> {
   try {
-    const supabase = await getSupabaseClient()
+    const supabase = getSupabaseClient()
     
     // Get session if available
     const { data: { session }, error: authError } = await supabase.auth.getSession()
@@ -119,13 +136,33 @@ export async function streamAudio(
     })
 
     if (!response.ok) {
-      // Try to parse error JSON
-      const error = await response.json().catch(() => ({ error: 'Unknown error', code: 'UNKNOWN' }))
+      let errorText = ''
+      let errorJson: any = {}
+      try {
+        errorText = await response.text()
+        try {
+          errorJson = JSON.parse(errorText)
+        } catch {
+          // Not JSON, keep as text
+        }
+      } catch (e) {
+        // Ignore parsing errors
+      }
+      
+      console.error('[Diagnosis] Error', {
+        message: `Audio stream failed: ${response.status}`,
+        name: 'ResponseError',
+        status: response.status,
+        statusText: response.statusText,
+        errorText,
+        err: response,
+      })
+      
       return { 
         success: false, 
-        error: error.error || 'Stream failed',
-        code: error.code || 'UNKNOWN',
-        message: error.message || error.error || 'Stream failed',
+        error: errorJson.error || 'Stream failed',
+        code: errorJson.code || 'UNKNOWN',
+        message: errorJson.message || errorJson.error || 'Stream failed',
       }
     }
 
@@ -140,12 +177,28 @@ export async function streamAudio(
     // Check if response is JSON (error case)
     const contentType = response.headers.get('content-type')
     if (contentType?.includes('application/json')) {
-      const error = await response.json()
+      let errorJson: any
+      try {
+        errorJson = await response.json()
+      } catch (err: any) {
+        console.error('[Diagnosis] Error', {
+          message: err?.message || 'Failed to parse error JSON',
+          name: err?.name,
+          stack: err?.stack,
+          err,
+        })
+        return {
+          success: false,
+          error: 'Failed to parse error response',
+          code: 'PARSE_ERROR',
+          message: 'Stream failed',
+        }
+      }
       return { 
         success: false, 
-        error: error.error || 'Stream failed',
-        code: error.code || 'UNKNOWN',
-        message: error.message || error.error || 'Stream failed',
+        error: errorJson.error || 'Stream failed',
+        code: errorJson.code || 'UNKNOWN',
+        message: errorJson.message || errorJson.error || 'Stream failed',
       }
     }
 
@@ -159,12 +212,17 @@ export async function streamAudio(
 
     return { success: false, error: 'No stream available', code: 'NO_STREAM' }
   } catch (error: any) {
-    console.error('Error in streamAudio:', error)
+    console.error('[Diagnosis] Error', {
+      message: error?.message,
+      name: error?.name,
+      stack: error?.stack,
+      err: error,
+    })
     return { 
       success: false, 
-      error: error.message || 'Stream failed',
+      error: error?.message || 'Stream failed',
       code: 'NETWORK_ERROR',
-      message: error.message || 'Network error. Please check your connection.',
+      message: error?.message || 'Network error. Please check your connection.',
     }
   }
 }
@@ -178,7 +236,7 @@ export async function generateAudio(
   variantKey: string = 'clean_normal'
 ): Promise<{ success: boolean; audioUrl?: string; error?: string; code?: string; message?: string; details?: string }> {
   try {
-    const supabase = await getSupabaseClient()
+    const supabase = getSupabaseClient()
     
     // Get session if available
     const { data: { session }, error: authError } = await supabase.auth.getSession()
@@ -203,17 +261,54 @@ export async function generateAudio(
     })
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Unknown error', code: 'UNKNOWN' }))
+      let errorText = ''
+      let errorJson: any = {}
+      try {
+        errorText = await response.text()
+        try {
+          errorJson = JSON.parse(errorText)
+        } catch {
+          // Not JSON, keep as text
+        }
+      } catch (e) {
+        // Ignore parsing errors
+      }
+      
+      console.error('[Diagnosis] Error', {
+        message: `Audio generation failed: ${response.status}`,
+        name: 'ResponseError',
+        status: response.status,
+        statusText: response.statusText,
+        errorText,
+        err: response,
+      })
+      
       return { 
         success: false, 
-        error: error.error || 'Generation failed',
-        code: error.code || 'UNKNOWN',
-        message: error.message || error.error || 'Generation failed',
-        details: error.details,
+        error: errorJson.error || 'Generation failed',
+        code: errorJson.code || 'UNKNOWN',
+        message: errorJson.message || errorJson.error || 'Generation failed',
+        details: errorJson.details,
       }
     }
 
-    const data = await response.json()
+    let data: any
+    try {
+      data = await response.json()
+    } catch (err: any) {
+      console.error('[Diagnosis] Error', {
+        message: err?.message || 'Failed to parse response JSON',
+        name: err?.name,
+        stack: err?.stack,
+        err,
+      })
+      return {
+        success: false,
+        error: 'Failed to parse response',
+        code: 'PARSE_ERROR',
+        message: 'Failed to parse server response',
+      }
+    }
     
     // Use blobPath directly from response, but wait for URL readiness before returning
     if (data.success && data.blobPath) {
@@ -254,12 +349,17 @@ export async function generateAudio(
 
     return { success: false, error: 'Generation failed', code: 'UNKNOWN' }
   } catch (error: any) {
-    console.error('Error in generateAudio:', error)
+    console.error('[Diagnosis] Error', {
+      message: error?.message,
+      name: error?.name,
+      stack: error?.stack,
+      err: error,
+    })
     return { 
       success: false, 
-      error: error.message || 'Generation failed',
+      error: error?.message || 'Generation failed',
       code: 'NETWORK_ERROR',
-      message: error.message || 'Network error. Please check your connection.',
+      message: error?.message || 'Network error. Please check your connection.',
     }
   }
 }
