@@ -29,8 +29,12 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   process.exit(1)
 }
 
+// Type assertion: After validation, we know these are defined
+const SUPABASE_URL_VALIDATED = SUPABASE_URL as string
+const SUPABASE_SERVICE_ROLE_KEY_VALIDATED = SUPABASE_SERVICE_ROLE_KEY as string
+
 async function seedMeanings() {
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+  const supabase = createClient(SUPABASE_URL_VALIDATED, SUPABASE_SERVICE_ROLE_KEY_VALIDATED)
 
   console.log('📝 Checking meaning_general seed status for reduced forms...')
   console.log('   SQL file: supabase/migrations/007_seed_meaning_general.sql\n')
