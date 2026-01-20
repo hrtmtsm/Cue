@@ -110,16 +110,18 @@ export default function PracticeSelectPage() {
       // Fetch adaptive feed based on diagnostic results
       const fetchFeed = async () => {
         try {
-          // Get topic preferences from onboarding data for preferredGenre
+          // Get preferences from onboarding data
           const onboardingData = getOnboardingData()
-          const preferredGenre = onboardingData.topics && onboardingData.topics.length > 0
-            ? onboardingData.topics[0] // Use first topic as preferred genre
-            : undefined
+          // Use situations[0] as primary situation, or fallback to 'general'
+          const situation = onboardingData.situations && onboardingData.situations.length > 0
+            ? onboardingData.situations[0]
+            : 'general' // Fallback to general if no situations selected
 
           console.log('🎯 [SELECT PAGE] Fetching adaptive feed from diagnostic summary:', {
             cefr: diagnosticSummary.cefr,
             weakness: diagnosticSummary.weaknessRank.slice(0, 3),
-            situation: preferredGenre,
+            situation,
+            situations: onboardingData.situations,
           })
           
           // Build query params for GET request
@@ -132,10 +134,8 @@ export default function PracticeSelectPage() {
             params.append('weakness', diagnosticSummary.weaknessRank.join(','))
           }
           
-          // Add situation if available
-          if (preferredGenre) {
-            params.append('situation', preferredGenre)
-          }
+          // Add situation (from situations[0]) - always provide at least 'general'
+          params.append('situation', situation)
           
           const response = await fetch(`/api/clips/feed?${params.toString()}`, {
             method: 'GET',

@@ -108,6 +108,12 @@ export function ClipLessonProgressProvider({ children }: { children: React.React
     setProgress(prev => {
       // If already initialized for this clip, only update details count if needed
       if (initializedRef.current === clipId && prev) {
+        // Early return if detailsCount hasn't changed (prevents unnecessary state updates)
+        if (detailsCount === prev.detailsCount) {
+          // No change needed - return prev without logging to prevent loops
+          return prev
+        }
+        
         // Update details count without resetting progress
         if (detailsCount > prev.detailsCount) {
           const baseSteps = 5 // listen, input, check, review, continue
@@ -181,17 +187,7 @@ export function ClipLessonProgressProvider({ children }: { children: React.React
           }
         }
         
-        // No change needed
-        if (DEBUG_PROGRESS && typeof window !== 'undefined') {
-          console.log('🎯 [PROGRESS DEBUG] initialize called but no update needed:', {
-            source: new Error().stack?.split('\n')[2]?.trim(),
-            clipId,
-            pathname: window.location.pathname,
-            currentDetailsCount: prev.detailsCount,
-            requestedDetailsCount: detailsCount,
-            timestamp: Date.now(),
-          })
-        }
+        // Details count decreased or other edge case - just return prev
         return prev
       }
 
@@ -446,11 +442,29 @@ export function ClipLessonProgressProvider({ children }: { children: React.React
   }, [])
 
   // Auto-initialize on mount if clipId is available
+  const hasInitializedRef = useRef<boolean>(false)
   useEffect(() => {
     const clipId = getClipId()
-    if (clipId && !progress) {
+    
+    // Don't auto-initialize on pages that don't have a real clipId (like /practice/select)
+    // Only initialize if we have a meaningful clipId (not 'default')
+    const shouldAutoInit = clipId && clipId !== 'default'
+    
+    // Only initialize once per clipId, and only if progress doesn't exist
+    if (shouldAutoInit && !progress && !hasInitializedRef.current) {
+      hasInitializedRef.current = true
       // Initialize with default details count (will be updated when details are known)
       initialize(0)
+    }
+    
+    // Reset initialization flag when clipId changes to a different real clipId
+    if (clipId && clipId !== 'default' && clipId !== initializedRef.current) {
+      hasInitializedRef.current = false
+    }
+    
+    // Reset flag when progress is cleared (allows re-initialization of same clipId)
+    if (!progress) {
+      hasInitializedRef.current = false
     }
   }, [getClipId, initialize, progress])
   

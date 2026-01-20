@@ -15,7 +15,7 @@ import {
 import { getOnboardingData } from '@/lib/onboardingStore'
 
 const IS_DEV = process.env.NODE_ENV === 'development'
-const DIAGNOSTIC_CLIP_COUNT = 5
+const DIAGNOSTIC_CLIP_COUNT = 3 // Reduced from 5 to 3 for quick listening check
 const MIN_INPUT_CHARS = 3
 
 interface DiagnosticClip {
@@ -101,7 +101,7 @@ export default function DiagnosisPage() {
           throw new Error('No diagnostic clips found')
         }
 
-        // Take first 5 clips
+        // Take first 3 clips (quick listening check)
         const clipsToUse = diagnosticClips.slice(0, DIAGNOSTIC_CLIP_COUNT)
         setClips(clipsToUse)
         setCurrentClip(clipsToUse[0])
@@ -408,10 +408,10 @@ export default function DiagnosisPage() {
         })
       }
 
-      // Check if diagnostic is complete (5/5 clips)
+      // Check if quick listening check is complete (3/3 clips)
       if (currentIndex + 1 === DIAGNOSTIC_CLIP_COUNT) {
         if (IS_DEV) {
-          console.log('🎉 [Diagnosis] All clips completed (5/5), building summary...')
+          console.log('🎉 [Diagnosis] All clips completed (3/3), building summary...')
         }
 
         // Get onboarding CEFR level
@@ -449,11 +449,11 @@ export default function DiagnosisPage() {
           localStorage.setItem('showClipsReadyOnce', '1')
 
           if (IS_DEV) {
-            console.log('✅ [Diagnosis] Diagnostic complete, setting showClipsReadyOnce flag and navigating to /practice/select')
+            console.log('✅ [Diagnosis] Quick listening check complete, setting showClipsReadyOnce flag and navigating to /onboarding/situations')
           }
 
-          // Navigate to practice select
-          router.push('/practice/select')
+          // Navigate to situations onboarding page
+          router.push('/onboarding/situations')
           return
         } else {
           console.error('❌ [Diagnosis] Failed to build diagnostic summary')
@@ -512,7 +512,7 @@ export default function DiagnosisPage() {
   if (!currentClip) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center px-6">
-        <div className="text-gray-500">No diagnostic clips found. Please try again.</div>
+        <div className="text-gray-500">No clips found. Please try again.</div>
       </main>
     )
   }
@@ -525,7 +525,7 @@ export default function DiagnosisPage() {
       {/* Progress indicator */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
-          <h1 className="text-xl font-bold text-gray-900">Diagnostic Test</h1>
+          <h1 className="text-xl font-bold text-gray-900">Quick listening check</h1>
           <span className="text-sm text-gray-600">{progressText}</span>
       </div>
         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">

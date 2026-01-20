@@ -41,7 +41,16 @@ export default function TopicsPage() {
     setOnboardingData({
       topics: Array.from(selectedTopics),
     })
-    router.push('/onboarding/level')
+    // Navigate directly to practice select (skip level/ready pages)
+    router.push('/practice/select')
+  }
+
+  const handleSkip = () => {
+    // Save empty topics array and navigate directly to practice select
+    setOnboardingData({
+      topics: [],
+    })
+    router.push('/practice/select')
   }
 
   return (
@@ -96,13 +105,24 @@ export default function TopicsPage() {
         </div>
       </div>
 
-      {/* Sticky bottom button */}
-      <div className="pt-6 pb-6">
+      {/* Sticky bottom buttons */}
+      <div className="pt-6 pb-6 space-y-3">
         <button
           onClick={handleContinue}
-          className="w-full py-4 px-6 rounded-xl font-semibold text-lg bg-blue-600 text-white active:bg-blue-700 shadow-lg transition-colors"
+          disabled={selectedTopics.size === 0}
+          className={`w-full py-4 px-6 rounded-xl font-semibold text-lg transition-colors ${
+            selectedTopics.size > 0
+              ? 'bg-blue-600 text-white active:bg-blue-700 shadow-lg'
+              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+          }`}
         >
           Continue
+        </button>
+        <button
+          onClick={handleSkip}
+          className="w-full py-3 px-6 rounded-xl font-medium text-lg text-gray-600 hover:text-gray-900 transition-colors"
+        >
+          Not now
         </button>
       </div>
     </main>
