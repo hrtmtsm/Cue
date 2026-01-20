@@ -12,6 +12,10 @@ import {
   isDiagnosticComplete,
   completeDiagnostic,
 } from '@/lib/diagnosticSummary'
+import {
+  storeQuickStartClipResult,
+  completeQuickStart,
+} from '@/lib/quickStartSummary'
 import { getOnboardingData } from '@/lib/onboardingStore'
 
 const IS_DEV = process.env.NODE_ENV === 'development'
@@ -391,72 +395,62 @@ export default function DiagnosisPage() {
         ? []
         : Array.from(new Set(errorCategories.map(mapToDiagnosticCategory)))
 
-      // Store diagnostic result after each clip is completed
+      // Store diagnostic result after each clip is completed (for analytics only)
       storeDiagnosticResult({
         clipId: currentClip.id,
         accuracyPercent,
         categories: diagnosticCategories,
       })
 
+      // Store quick start clip result
+      storeQuickStartClipResult({
+        clipId: currentClip.id,
+        skipped: skipped || false,
+        userInputLength: trimmedInput.length,
+        accuracyPercent,
+      })
+
       if (IS_DEV) {
-        console.log('💾 [Diagnosis] Stored diagnostic result:', {
+        console.log('💾 [QuickStart] Stored clip result:', {
           clipId: currentClip.id,
+          skipped,
+          userInputLength: trimmedInput.length,
           accuracyPercent,
-          categories: diagnosticCategories,
-          practiceStepsCount: practiceSteps.length,
           progress: `${currentIndex + 1}/${clips.length}`,
         })
       }
 
-      // Check if quick listening check is complete (3/3 clips)
+      // Check if Quick Start is complete (3/3 clips)
       if (currentIndex + 1 === DIAGNOSTIC_CLIP_COUNT) {
         if (IS_DEV) {
-          console.log('🎉 [Diagnosis] All clips completed (3/3), building summary...')
+          console.log('🎉 [QuickStart] All clips completed (3/3), building summary...')
         }
 
-        // Get onboarding CEFR level
-        const onboardingData = getOnboardingData()
-        const levelMap: Record<string, 'A1' | 'A2' | 'B1' | 'B2'> = {
-          'A1': 'A1',
-          'A2': 'A2',
-          'B1': 'B1',
-          'B2': 'B2',
-        }
-        const onboardingCefr = (onboardingData.level && levelMap[onboardingData.level]) || 'A2'
+        // Build and store quick start summary
+        const quickStartSummary = completeQuickStart()
 
-        // Build and store summary
-        const summary = completeDiagnostic({ 
-          expectedCount: DIAGNOSTIC_CLIP_COUNT, 
-          onboardingCefr 
-        })
-
-        if (summary) {
-          // Log the returned DiagnosticSummary
-          console.log('📊 [Diagnosis] DiagnosticSummary:', {
-            version: summary.version,
-            createdAt: summary.createdAt,
-            cefr: summary.cefr,
-            avgAccuracyPercent: summary.avgAccuracyPercent.toFixed(1) + '%',
-            categoryScore: Object.entries(summary.categoryScore).map(([cat, score]) => ({
-              category: cat,
-              score: score.toFixed(3),
-            })),
-            weaknessRank: summary.weaknessRank,
-            topWeaknesses: summary.weaknessRank.slice(0, 3),
+        if (quickStartSummary) {
+          // Log the quick start summary
+          console.log('📊 [QuickStart] Summary:', {
+            version: quickStartSummary.version,
+            createdAt: new Date(quickStartSummary.createdAt).toISOString(),
+            missedRate: (quickStartSummary.missedRate * 100).toFixed(1) + '%',
+            attemptAccuracy: quickStartSummary.attemptAccuracy.toFixed(1) + '%',
+            startingDifficulty: quickStartSummary.startingDifficulty,
           })
 
           // Set flag to show clips ready modal on next page load
           localStorage.setItem('showClipsReadyOnce', '1')
 
           if (IS_DEV) {
-            console.log('✅ [Diagnosis] Quick listening check complete, setting showClipsReadyOnce flag and navigating to /onboarding/situations')
+            console.log('✅ [QuickStart] Complete, setting showClipsReadyOnce flag and navigating to /onboarding/situations')
           }
 
           // Navigate to situations onboarding page
           router.push('/onboarding/situations')
           return
         } else {
-          console.error('❌ [Diagnosis] Failed to build diagnostic summary')
+          console.error('❌ [QuickStart] Failed to build summary')
           setIsSubmitting(false)
           hasSubmittedRef.current = false
           return
@@ -525,7 +519,7 @@ export default function DiagnosisPage() {
       {/* Progress indicator */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
-          <h1 className="text-xl font-bold text-gray-900">Quick listening check</h1>
+          <h1 className="text-xl font-bold text-gray-900">Quick Start</h1>
           <span className="text-sm text-gray-600">{progressText}</span>
       </div>
         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">

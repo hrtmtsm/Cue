@@ -1,14 +1,27 @@
 // Simple store for onboarding state
 // Can be replaced with Zustand or Context later if needed
 
+/**
+ * SituationKey: Valid situation identifiers for onboarding
+ * Ordered array (max 2 selections) represents user's preferred practice contexts
+ */
+export type SituationKey = 
+  | 'work_meetings'
+  | 'daily'
+  | 'travel'
+  | 'videos_shows'
+  | 'interviews_presentations'
+  | 'general'
+
 export interface OnboardingData {
   listeningDifficulties: string[]
-  preferredGenre?: string
+  preferredGenre?: string // Legacy: kept for backward compatibility
   topics?: string[] // Legacy: kept for backward compatibility
   level?: string
   purpose?: string // Legacy: kept for backward compatibility
   tasteTopics?: string[] // Legacy: kept for backward compatibility
-  situations?: string[] // New: merged purpose + topics, max 2 selections (work | daily | travel | media | general)
+  situations?: SituationKey[] // New: max 2 selections, ordered
+  version?: number // Optional version field for future migrations
 }
 
 let onboardingData: OnboardingData = {
@@ -26,17 +39,18 @@ function normalizeOnboardingData(data: OnboardingData): OnboardingData {
   }
 
   // Legacy migration: convert purpose/topics/tasteTopics to situations
-  const situations: string[] = []
+  const situations: SituationKey[] = []
 
   // Map tasteTopics first (most recent format)
   if (data.tasteTopics && data.tasteTopics.length > 0) {
-    // Map old IDs to new unified IDs
-    const idMap: Record<string, string> = {
-      'work': 'work',
+    // Map old IDs to new SituationKey values
+    const idMap: Record<string, SituationKey> = {
+      'work': 'work_meetings',
       'casual': 'daily',
       'travel': 'travel',
-      'tech': 'work', // Map tech to work
-      'culture': 'general', // Map culture to general
+      'tech': 'work_meetings',
+      'culture': 'interviews_presentations',
+      'media': 'videos_shows',
     }
     for (const topic of data.tasteTopics) {
       const mapped = idMap[topic] || 'general'
@@ -48,11 +62,11 @@ function normalizeOnboardingData(data: OnboardingData): OnboardingData {
 
   // Map purpose if exists and situations still empty
   if (situations.length === 0 && data.purpose) {
-    const purposeMap: Record<string, string> = {
-      'work': 'work',
+    const purposeMap: Record<string, SituationKey> = {
+      'work': 'work_meetings',
       'travel': 'travel',
       'daily': 'daily',
-      'videos': 'media',
+      'videos': 'videos_shows',
       'better': 'general',
     }
     const mapped = purposeMap[data.purpose] || 'general'
@@ -61,17 +75,37 @@ function normalizeOnboardingData(data: OnboardingData): OnboardingData {
 
   // Map topics if exists and situations still empty
   if (situations.length === 0 && data.topics && data.topics.length > 0) {
-    const topicMap: Record<string, string> = {
-      'work': 'work',
+    const topicMap: Record<string, SituationKey> = {
+      'work': 'work_meetings',
       'casual': 'daily',
-      'tech': 'work',
+      'tech': 'work_meetings',
       'travel': 'travel',
-      'culture': 'general',
+      'culture': 'interviews_presentations',
     }
     for (const topic of data.topics.slice(0, 2)) {
       const mapped = topicMap[topic] || 'general'
       if (!situations.includes(mapped)) {
         situations.push(mapped)
+      }
+    }
+  }
+
+  // Also handle legacy situations array with old string values (if any)
+  if (situations.length === 0 && data.situations && Array.isArray(data.situations)) {
+    const legacyMap: Record<string, SituationKey> = {
+      'work': 'work_meetings',
+      'daily': 'daily',
+      'travel': 'travel',
+      'media': 'videos_shows',
+      'general': 'general',
+    }
+    for (const legacy of data.situations.slice(0, 2)) {
+      const mapped = legacyMap[legacy] || (legacy as SituationKey)
+      // Validate it's a valid SituationKey
+      if (['work_meetings', 'daily', 'travel', 'videos_shows', 'interviews_presentations', 'general'].includes(mapped)) {
+        if (!situations.includes(mapped)) {
+          situations.push(mapped)
+        }
       }
     }
   }
