@@ -27,6 +27,7 @@ function getCategoryLabel(category: FeedbackCategory): string {
     elision: 'Elision',
     contraction: 'Contraction',
     similar_words: 'Similar words',
+    spelling: 'Spelling',
     missed: 'Missed',
     speed_chunking: 'Speed & chunking',
   }
@@ -163,6 +164,7 @@ export default function PhraseCard(props: PhraseCardProps) {
   const category = isLegacy ? undefined : props.feedbackItem.category
   const actualSpan = isLegacy ? undefined : props.feedbackItem.actualSpan
   const type = isLegacy ? undefined : props.feedbackItem.type
+  const explainAllowed = isLegacy ? true : props.feedbackItem.explainAllowed // Legacy items always show explanations
 
   // Chunk mode: active when chunkDisplay exists
   const hasChunk = Boolean(inSentence?.chunkDisplay)
@@ -204,8 +206,10 @@ export default function PhraseCard(props: PhraseCardProps) {
   // In non-chunk mode: use existing tautology guards
   
   // "How it sounds" section
-  const showHowItSounds = hasChunk ? true : !isTautological // Always show in chunk mode
-  const showFallbackInHowItSounds = !hasChunk && isTautological && inSentence
+  // TRUST-FIRST MVP: Hide if explainAllowed is false (trust > coverage gate)
+  // Also hide for spelling category (not a listening issue)
+  const showHowItSounds = explainAllowed && (category === 'spelling' ? false : (hasChunk ? true : !isTautological))
+  const showFallbackInHowItSounds = explainAllowed && !hasChunk && isTautological && inSentence && category !== 'spelling'
   
   // Determine soundRule text for chunk mode
   // In chunk mode: only show if soundRule describes chunk behavior, otherwise use generic text
@@ -216,13 +220,14 @@ export default function PhraseCard(props: PhraseCardProps) {
     : null
   
   // "In this sentence" section
+  // TRUST-FIRST MVP: Hide chunk/heardAs explanations if explainAllowed is false
   // In chunk mode: ONLY show chunk line, NEVER show heardAs line
   // In non-chunk mode: show heardAs line if not tautological
-  const showHeardAsLine = inSentence && !hasChunk && !heardAsTautology // Hide in chunk mode
-  const showFallbackInSentence = !hasChunk && heardAsTautology && !soundRuleTautology && inSentence
+  const showHeardAsLine = explainAllowed && inSentence && !hasChunk && !heardAsTautology // Hide in chunk mode
+  const showFallbackInSentence = explainAllowed && !hasChunk && heardAsTautology && !soundRuleTautology && inSentence
   
-  // Chunk display line (only in chunk mode)
-  const showChunkLine = hasChunk && inSentence && inSentence.chunkDisplay
+  // Chunk display line (only in chunk mode, only if explainAllowed)
+  const showChunkLine = explainAllowed && hasChunk && inSentence && inSentence.chunkDisplay
   
   // "Another example" section
   // Only hide when redundant/tautological or missing, not just because it's single-word-focused
@@ -257,7 +262,7 @@ export default function PhraseCard(props: PhraseCardProps) {
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
           <h1 className="text-3xl font-bold text-gray-900 leading-tight">{phrase}</h1>
-          {category && (
+          {category && explainAllowed && (
             <span className="text-xs font-medium px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full">
               {getCategoryLabel(category)}
             </span>
@@ -299,45 +304,81 @@ export default function PhraseCard(props: PhraseCardProps) {
         </div>
       )}
 
-      {/* Meaning section: chunk-aware rendering */}
+      {/* Meaning section: 3-layer system with parent fallback */}
       {(() => {
-        // Chunk mode: show "What it means here" with chunk meaning, or hide if missing
-        if (hasChunk) {
-          const chunkMeaning = inSentence?.chunkMeaning || meaningInContext
-          if (!chunkMeaning || chunkMeaning.trim() === '') {
-            return null // Hide if no chunk meaning
-          }
+        const hasDirectMeaning = meaningInContext && meaningInContext.trim() !== ''
+        const hasParentFallback = inSentence?.parentChunkDisplay && !hasDirectMeaning
+        
+        // Debug log for hasParentFallback computation (Location 1) - for spelling only
+        if (category === 'spelling') {
+          console.log('🔍 [PhraseCard] hasParentFallback computation (spelling):', {
+            hasParentFallback,
+            hasDirectMeaning,
+            'inSentence?.parentChunkDisplay': inSentence?.parentChunkDisplay || '(none)',
+            'inSentence exists': !!inSentence,
+            category: category,
+            meaningInContext: meaningInContext?.substring(0, 50) || '(empty)',
+          })
+        }
+        
+        // Case 1: Direct meaning exists
+        if (hasDirectMeaning && !hasParentFallback) {
+          const label = hasChunk ? 'What it means here' : 'Meaning'
           return (
             <div className="mb-6">
-              <div className="text-sm font-medium text-gray-500 mb-2">What it means here</div>
-              <div className="text-base text-gray-900 leading-7">{chunkMeaning}</div>
+              <div className="text-sm font-medium text-gray-500 mb-2">{label}</div>
+              <div className="text-base text-gray-900 leading-7">{meaningInContext}</div>
             </div>
           )
         }
         
-        // Non-chunk mode: show "Meaning" only if not placeholder/empty
-        if (!meaningInContext || meaningInContext.trim() === '') {
-          return null // Hide if empty
+        // Case 2: Parent-based fallback
+        // Debug log BEFORE Case 2 check (Location 2)
+        console.log('🔍 [PhraseCard] Before Case 2 check:', {
+          hasParentFallback,
+          willRenderCase2: hasParentFallback === true,
+          'inSentence?.parentChunkDisplay': inSentence?.parentChunkDisplay,
+          hasDirectMeaning,
+        })
+        
+        if (hasParentFallback) {
+          console.log('✅ [PhraseCard] Rendering Case 2 - parent fallback')
+          
+          const currentChunk = inSentence?.chunkDisplay || inSentence?.reducedForm || phrase
+          const parentChunk = inSentence.parentChunkDisplay
+          const title = category === 'spelling' ? 'What you heard' : 'What it means'
+          
+          // Debug log INSIDE Case 2 (Location 3)
+          console.log('✅ [PhraseCard] Inside Case 2 - rendering parent fallback:', {
+            parentChunkDisplay: inSentence.parentChunkDisplay,
+            chunkDisplay: inSentence.chunkDisplay,
+          })
+          
+          return (
+            <div className="mb-6">
+              <div className="text-sm font-medium text-gray-500 mb-2">{title}</div>
+              <div className="text-base text-gray-900 leading-7">
+                &quot;{currentChunk}&quot; is how &quot;{parentChunk}&quot; sounds in casual, fast speech.
+              </div>
+            </div>
+          )
         }
         
-        // Check if it's a placeholder (simple check for common patterns)
-        const normalized = meaningInContext.toLowerCase().trim()
-        const isPlaceholder = normalized.includes('this phrase carries meaning') ||
-                              normalized.includes('this small word is often spoken softly') ||
-                              normalized.includes('this contraction combines') ||
-                              normalized.includes('these words connect together') ||
-                              normalized.includes('this word can sound like') ||
-                              normalized.includes('these words flow together as one chunk')
-        
-        if (isPlaceholder) {
-          return null // Hide placeholder text
+        // Case 3: True fallback - no meaning available
+        // Never show generic listening tip for spelling (spelling has its own tip section)
+        if (category === 'spelling') {
+          if (process.env.NODE_ENV === 'development') {
+            console.log('⚠️ [PhraseCard] Spelling case with no parent fallback - returning null')
+          }
+          return null
         }
         
-        // Show real meaning
         return (
           <div className="mb-6">
-            <div className="text-sm font-medium text-gray-500 mb-2">Meaning</div>
-            <div className="text-base text-gray-900 leading-7">{meaningInContext}</div>
+            <div className="text-sm font-medium text-gray-500 mb-2">Listening tip</div>
+            <div className="text-base text-gray-900 leading-7">
+              Try listening to this part again—it becomes clearer with practice.
+            </div>
           </div>
         )
       })()}
@@ -381,7 +422,17 @@ export default function PhraseCard(props: PhraseCardProps) {
           {/* Chunk mode: show chunk line */}
           {showChunkLine && (
             <div className="text-sm text-gray-600 leading-6">
-              <span className="font-medium">"{inSentence.highlighted}"</span> links into <span className="font-medium">"{inSentence.chunkDisplay}"</span>
+              {inSentence.chunkDisplay && inSentence.reducedForm ? (
+                <>
+                  <span className="font-medium">"{inSentence.chunkDisplay}"</span> →{' '}
+                  <span className="font-medium">"{inSentence.reducedForm}"</span>
+                </>
+              ) : (
+                <>
+                  <span className="font-medium">"{inSentence.highlighted}"</span> links into{' '}
+                  <span className="font-medium">"{inSentence.chunkDisplay}"</span>
+                </>
+              )}
             </div>
           )}
           {/* Non-chunk mode: show heardAs line or fallback */}

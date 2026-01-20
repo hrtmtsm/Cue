@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation'
 import BottomNav from '@/components/BottomNav'
 import { shouldHideBottomNav } from '@/lib/navigationUtils'
+import { ClipLessonProgressProvider } from '@/lib/clipLessonProgress'
 
 export default function AppLayout({
   children,
@@ -13,20 +14,19 @@ export default function AppLayout({
   const shouldHide = shouldHideBottomNav(pathname)
 
   return (
-    <>
-      <div 
-        className="w-full min-h-full"
-        style={{
-          // Only add bottom padding when bottom nav is visible
-          paddingBottom: shouldHide 
-            ? 'env(safe-area-inset-bottom)' 
-            : 'calc(64px + env(safe-area-inset-bottom))',
-        }}
-      >
-        {children}
+    <ClipLessonProgressProvider>
+      {/* AppShell: outer container */}
+      <div className="min-h-dvh w-full">
+        {/* Inner container: responsive, max-width 520px */}
+        <div className="mx-auto w-full max-w-[520px] px-4">
+          {/* Page content with bottom padding for mobile nav */}
+          <div className={`w-full min-h-dvh ${shouldHide ? 'pb-4 md:pb-4' : 'pb-20 md:pb-4'}`}>
+            {children}
+          </div>
+        </div>
       </div>
       <BottomNav />
-    </>
+    </ClipLessonProgressProvider>
   )
 }
 

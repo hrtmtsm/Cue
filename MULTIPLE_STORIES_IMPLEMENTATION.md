@@ -106,3 +106,4 @@
 - Mock mode still generates only 3 clips (for development/testing)
 - Real OpenAI mode generates all requested clips (15-24)
 
+

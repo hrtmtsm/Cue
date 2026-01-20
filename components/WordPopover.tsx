@@ -2,22 +2,14 @@
 
 import { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
-import { generateWordFeedback } from '@/lib/wordFeedback'
+import type { CoachingInsight } from '@/lib/coachingInsights'
 
 interface WordPopoverProps {
   isOpen: boolean
   onClose: () => void
   token: {
-    type: 'wrong' | 'missing' | 'extra'
-    expected?: string
-    actual?: string
-    confidenceLevel?: 'HIGH' | 'MED' | 'LOW'
-    startMs?: number | null
-    endMs?: number | null
-    previousWord?: string | null
-    nextWord?: string | null
-    originalSentence?: string
-    userInput?: string
+    insight?: CoachingInsight
+    event?: any
   }
   onReplay?: () => void
 }
@@ -68,22 +60,8 @@ export default function WordPopover({
 
   if (!isOpen) return null
 
-  // Map token type to wordType for feedback generator
-  const wordType = token.type === 'missing' ? 'grey' : token.type === 'extra' ? 'grey-slash' : 'red'
-  
-  // Generate context-specific feedback
-  const feedback = generateWordFeedback({
-    originalSentence: token.originalSentence || '',
-    userInput: token.userInput || '',
-    word: token.expected || token.actual || '',
-    wordType,
-    previousWord: token.previousWord || null,
-    nextWord: token.nextWord || null,
-    userTypedWord: token.actual || null,
-  })
-
-  const canReplaySegment = !!onReplay && token.startMs != null && token.endMs != null
-  const confidenceText = token.confidenceLevel || 'MED'
+  const insight = token.insight
+  const replayText = insight?.replay_target?.text || token.event?.phraseHint?.spanText || token.event?.expectedSpan || ''
 
   return (
     <div 
@@ -119,7 +97,7 @@ export default function WordPopover({
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl">
           <h3 id="popover-title" className="text-lg font-semibold text-gray-900">
-            Listening feedback
+            {insight?.title || 'Listening feedback'}
           </h3>
           <button
             onClick={onClose}
@@ -132,114 +110,40 @@ export default function WordPopover({
 
         {/* Content (scrollable area) */}
         <div className="px-6 py-6 space-y-4 max-h-[60vh] overflow-y-auto">
-          {feedback.type === 'missing' && (
+          {insight ? (
             <>
-              {/* What you might have heard */}
               <div>
                 <div className="text-sm font-medium text-gray-500 mb-1">What you might have heard</div>
-                <div className="text-lg text-gray-900">
-                  <span className="text-gray-400 italic">{feedback.feedback.whatUserMightHaveHeard}</span>
-                </div>
+                <div className="text-base text-gray-900">{insight.what_you_might_have_heard}</div>
               </div>
-
-              {/* What it was */}
               <div>
                 <div className="text-sm font-medium text-gray-500 mb-1">What it was</div>
-                <div className="text-lg text-gray-900">
-                  <span className="font-semibold">{feedback.feedback.whatItWas}</span>
-                </div>
+                <div className="text-base text-gray-900">{insight.what_it_was}</div>
               </div>
-
-              {/* Why this was hard */}
               <div>
-                <div className="text-sm font-medium text-gray-500 mb-1">Why this was hard</div>
-                <div className="text-base text-gray-700 leading-relaxed">
-                  {feedback.feedback.whyThisWasHard}
-                </div>
+                <div className="text-sm font-medium text-gray-500 mb-1">Why this happened here</div>
+                <div className="text-base text-gray-900">{insight.why_this_happens_here}</div>
+              </div>
+              <div>
+                <div className="text-sm font-medium text-gray-500 mb-1">Try this</div>
+                <div className="text-base text-gray-900">{insight.try_this}</div>
               </div>
             </>
+          ) : (
+            <div className="text-sm text-gray-600">Loading…</div>
           )}
-
-          {feedback.type === 'extra' && (
-            <>
-              {/* What you heard */}
-              <div>
-                <div className="text-sm font-medium text-gray-500 mb-1">What you heard</div>
-                <div className="text-lg text-gray-900">
-                  <span className="font-semibold">{feedback.feedback.whatUserHeard}</span>
-                </div>
-              </div>
-
-              {/* What was actually said */}
-              <div>
-                <div className="text-sm font-medium text-gray-500 mb-1">What was actually said</div>
-                <div className="text-lg text-gray-900">
-                  <span className="font-semibold">{feedback.feedback.whatWasActuallySaid}</span>
-                </div>
-              </div>
-
-              {/* Why this happened */}
-              <div>
-                <div className="text-sm font-medium text-gray-500 mb-1">Why this happened</div>
-                <div className="text-base text-gray-700 leading-relaxed">
-                  {feedback.feedback.whyThisHappened}
-                </div>
-              </div>
-            </>
-          )}
-
-          {feedback.type === 'substitution' && (
-            <>
-              {/* What you heard */}
-              <div>
-                <div className="text-sm font-medium text-gray-500 mb-1">What you heard</div>
-                <div className="text-lg text-gray-900">
-                  <span className="font-semibold">{feedback.feedback.whatUserHeard}</span>
-                </div>
-              </div>
-
-              {/* What it was */}
-              <div>
-                <div className="text-sm font-medium text-gray-500 mb-1">What it was</div>
-                <div className="text-lg text-gray-900">
-                  <span className="font-semibold">{feedback.feedback.whatItWas}</span>
-                </div>
-              </div>
-
-              {/* Why they sounded similar here */}
-              <div>
-                <div className="text-sm font-medium text-gray-500 mb-1">Why they sounded similar here</div>
-                <div className="text-base text-gray-700 leading-relaxed">
-                  {feedback.feedback.whyTheySoundedSimilarHere}
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* Confidence */}
-          <div className="flex items-center justify-between">
-            <div className="text-sm font-medium text-gray-500">Confidence</div>
-            <div className="text-sm font-semibold text-gray-800">{confidenceText}</div>
-          </div>
 
           {/* CTA */}
-          {onReplay && (
-            <button
-              onClick={() => {
-                if (!canReplaySegment) return
-                onReplay()
-                onClose()
-              }}
-              className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
-                canReplaySegment
-                  ? 'bg-blue-600 text-white active:bg-blue-700'
-                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              }`}
-              title={canReplaySegment ? 'Replay segment' : 'Segment timing unavailable'}
-            >
-              Replay segment
-            </button>
-          )}
+          <button
+            onClick={() => {
+              onReplay?.()
+              onClose()
+            }}
+            className="w-full py-3 px-4 bg-blue-600 text-white rounded-lg font-medium active:bg-blue-700 transition-colors"
+            title={replayText ? `Replay: ${replayText}` : 'Replay'}
+          >
+            Replay this part
+          </button>
         </div>
       </div>
     </div>

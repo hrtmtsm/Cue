@@ -10,6 +10,7 @@ export interface PatternMatchResult {
   soundRule: string
   tip?: string
   chunkDisplay: string
+  reducedForm?: string // Optional phonetic reduction (e.g., "wanna" for "want to")
 }
 
 /**
@@ -28,19 +29,24 @@ function extractContext(
 }
 
 /**
- * Match listening pattern from local patterns array
+ * Match listening pattern from patterns array (or local fallback)
  * Returns best match based on focus word and context tokens
  * Priority: longer patterns > shorter patterns > fallback
+ * @param patterns - Optional array of patterns. If not provided or empty, uses local fallback.
  */
 export function matchListeningPattern(
   focus: string,
   tokens: string[],
-  targetIndex: number
+  targetIndex: number,
+  patterns?: ListeningPattern[]
 ): PatternMatchResult | null {
   const focusLower = focus.toLowerCase()
   
+  // Use provided patterns or fallback to local patterns
+  const patternsToUse = (patterns && patterns.length > 0) ? patterns : LISTENING_PATTERNS
+  
   // Find all patterns that start with the focus word
-  const candidatePatterns = LISTENING_PATTERNS.filter(pattern => 
+  const candidatePatterns = patternsToUse.filter(pattern => 
     pattern.words.length > 0 && pattern.words[0].toLowerCase() === focusLower
   )
   
@@ -78,11 +84,22 @@ export function matchListeningPattern(
     
     if (matches) {
       // Found a match!
+      // Dev-only logging for pattern matching
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 [PatternMatch] Matched pattern:', {
+          pattern_key: pattern.id,
+          focus: focusLower,
+          chunkDisplay: pattern.chunkDisplay,
+          words: pattern.words,
+        })
+      }
+      
       return {
         pattern,
         soundRule: pattern.howItSounds,
         tip: pattern.tip || undefined, // Ensure tip is undefined if null
         chunkDisplay: pattern.chunkDisplay,
+        reducedForm: pattern.reducedForm || undefined,
       }
     }
   }
@@ -95,16 +112,21 @@ export function matchListeningPattern(
  * Match listening pattern that ENDS with the target word (backward matching)
  * Used for verb chunks like "gonna go", "going to go", "want to go"
  * Returns best match based on target word and left context
+ * @param patterns - Optional array of patterns. If not provided or empty, uses local fallback.
  */
 export function matchListeningPatternBackward(
   target: string,
   tokens: string[],
-  targetIndex: number
+  targetIndex: number,
+  patterns?: ListeningPattern[]
 ): PatternMatchResult | null {
   const targetLower = target.toLowerCase()
   
+  // Use provided patterns or fallback to local patterns
+  const patternsToUse = (patterns && patterns.length > 0) ? patterns : LISTENING_PATTERNS
+  
   // Find all patterns that END with the target word
-  const candidatePatterns = LISTENING_PATTERNS.filter(pattern => {
+  const candidatePatterns = patternsToUse.filter(pattern => {
     if (pattern.words.length === 0) return false
     const lastWord = pattern.words[pattern.words.length - 1]?.toLowerCase()
     return lastWord === targetLower
@@ -154,11 +176,22 @@ export function matchListeningPatternBackward(
     
     if (matches) {
       // Found a match!
+      // Dev-only logging for backward pattern matching
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 [PatternMatch] Matched backward pattern:', {
+          pattern_key: pattern.id,
+          focus: targetLower,
+          chunkDisplay: pattern.chunkDisplay,
+          words: pattern.words,
+        })
+      }
+      
       return {
         pattern,
         soundRule: pattern.howItSounds,
         tip: pattern.tip || undefined,
         chunkDisplay: pattern.chunkDisplay,
+        reducedForm: pattern.reducedForm || undefined,
       }
     }
   }
@@ -169,11 +202,13 @@ export function matchListeningPatternBackward(
 
 /**
  * Check if a word is eligible for pattern matching
- * Currently: any word that is the start of a pattern in LISTENING_PATTERNS
+ * Currently: any word that is the start of a pattern in the patterns array
+ * @param patterns - Optional array of patterns. If not provided or empty, uses local fallback.
  */
-export function isEligibleForPatternMatching(word: string): boolean {
+export function isEligibleForPatternMatching(word: string, patterns?: ListeningPattern[]): boolean {
   const lowerWord = word.toLowerCase()
-  return LISTENING_PATTERNS.some(pattern => 
+  const patternsToUse = (patterns && patterns.length > 0) ? patterns : LISTENING_PATTERNS
+  return patternsToUse.some(pattern => 
     pattern.words.length > 0 && pattern.words[0].toLowerCase() === lowerWord
   )
 }

@@ -12,6 +12,7 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now()
   let clipId: string | undefined
   let userId: string | undefined
+  let variantKey: string | undefined
   
   try {
     console.log('🎵 [Audio Generate] Request started')
@@ -39,10 +40,38 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    const body = await request.json()
+    let body: any
+    try {
+      body = await request.json()
+    } catch (parseError: any) {
+      console.error('❌ [Audio Generate] Error parsing request body:', {
+        message: parseError?.message,
+        name: parseError?.name,
+        stack: parseError?.stack,
+        err: parseError,
+      })
+      return NextResponse.json(
+        { 
+          error: 'Invalid request body',
+          code: 'PARSE_ERROR',
+          message: 'Request body must be valid JSON',
+        },
+        { status: 400 }
+      )
+    }
+
     clipId = body.clipId
     const transcript = body.transcript
-    const variantKey = body.variantKey || 'clean_normal'
+    variantKey = body.variantKey || 'clean_normal'
+
+    // Log request details (safe info only)
+    console.log('📝 [Audio Generate] Request details:', {
+      clipId,
+      variantKey,
+      transcriptLength: transcript?.length || 0,
+      hasTranscript: !!transcript,
+      hasClipId: !!clipId,
+    })
 
     if (!clipId || !transcript) {
       console.error('❌ [Audio Generate] Missing required fields:', { clipId: !!clipId, transcript: !!transcript })
@@ -55,13 +84,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-
-    console.log('📝 [Audio Generate] Request details:', {
-      clipId,
-      variantKey,
-      transcriptLength: transcript.length,
-      transcriptPreview: getTextPreview(transcript),
-    })
 
     // Compute transcript hash
     const transcriptHash = generateTextHash(transcript)
@@ -123,8 +145,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Upsert with generating status
-    console.log('💾 [Audio Generate] Upserting clip_audio row...')
-    const { data: audioRow, error: upsertError } = await supabaseAdmin
+    const onConflictColumns = 'clip_id,variant_key'
+    console.log('💾 [Audio Generate] Upserting clip_audio row...', {
+      onConflict: onConflictColumns,
+      clipId,
+      variantKey,
+    })
+    let audioRow: any = null
+    let upsertError: any = null
+
+    // Try upsert first
+    const upsertResult = await supabaseAdmin
       .from('clip_audio')
       .upsert({
         user_id: userId,
@@ -137,10 +168,110 @@ export async function POST(request: NextRequest) {
         blob_path: null,
         updated_at: new Date().toISOString(),
       }, {
-        onConflict: 'user_id,clip_id,variant_key,transcript_hash', // Include transcript_hash for uniqueness
+        onConflict: onConflictColumns,
       })
       .select()
       .single()
+
+    audioRow = upsertResult.data
+    upsertError = upsertResult.error
+
+    // Fallback for PostgreSQL error 42P10 (invalid_column_reference)
+    // This occurs when ON CONFLICT columns don't match any unique constraint
+    if (upsertError?.code === '42P10' || upsertError?.code === '42704') {
+      console.warn('⚠️ [Audio Generate] ON CONFLICT error (42P10), using fallback path:', {
+        errorCode: upsertError.code,
+        errorMessage: upsertError.message,
+        clipId,
+        variantKey,
+      })
+
+      try {
+        // Try to find existing row by (user_id, clip_id, variant_key) - actual unique constraint
+        const { data: existingRow, error: selectError } = await supabaseAdmin
+          .from('clip_audio')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('clip_id', clipId)
+          .eq('variant_key', variantKey)
+          .single()
+
+        if (selectError && selectError.code !== 'PGRST116') { // PGRST116 = not found
+          console.error('❌ [Audio Generate] Fallback: Error selecting existing row:', selectError)
+          throw selectError
+        }
+
+        if (existingRow) {
+          // Row exists: update it
+          console.log('✅ [Audio Generate] Fallback: Found existing row, updating...', {
+            existingId: existingRow.id,
+            clipId,
+            variantKey,
+          })
+
+          const { data: updatedRow, error: updateError } = await supabaseAdmin
+            .from('clip_audio')
+            .update({
+              transcript,
+              transcript_hash: transcriptHash,
+              audio_status: 'generating',
+              blob_path: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingRow.id)
+            .select()
+            .single()
+
+          if (updateError || !updatedRow) {
+            console.error('❌ [Audio Generate] Fallback: Error updating existing row:', updateError)
+            throw updateError || new Error('Update returned no data')
+          }
+
+          audioRow = updatedRow
+          upsertError = null // Clear error since fallback succeeded
+        } else {
+          // Row doesn't exist: insert new one
+          console.log('✅ [Audio Generate] Fallback: No existing row found, inserting new row...', {
+            clipId,
+            variantKey,
+          })
+
+          const { data: insertedRow, error: insertError } = await supabaseAdmin
+            .from('clip_audio')
+            .insert({
+              user_id: userId,
+              clip_id: clipId,
+              transcript,
+              transcript_hash: transcriptHash,
+              variant_key: variantKey,
+              voice_profile: 'alloy',
+              audio_status: 'generating',
+              blob_path: null,
+              updated_at: new Date().toISOString(),
+            })
+            .select()
+            .single()
+
+          if (insertError || !insertedRow) {
+            console.error('❌ [Audio Generate] Fallback: Error inserting new row:', insertError)
+            throw insertError || new Error('Insert returned no data')
+          }
+
+          audioRow = insertedRow
+          upsertError = null // Clear error since fallback succeeded
+        }
+
+        console.log('✅ [Audio Generate] Fallback path completed successfully:', {
+          audioRowId: audioRow.id,
+          clipId,
+          variantKey,
+        })
+      } catch (fallbackError: any) {
+        console.error('❌ [Audio Generate] Fallback path failed:', fallbackError)
+        // Continue with original error - will be handled below
+        upsertError = fallbackError
+      }
+    }
 
     if (upsertError || !audioRow) {
       console.error('❌ [Audio Generate] Error upserting clip_audio:', {
@@ -331,11 +462,14 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     const duration = Date.now() - startTime
     console.error('❌ [Audio Generate] Unhandled error:', {
-      error: error.message,
-      stack: error.stack,
+      message: error?.message,
+      name: error?.name,
+      stack: error?.stack,
       clipId,
+      variantKey: variantKey || 'clean_normal',
       userId: userId?.substring(0, 8) + '...',
       durationMs: duration,
+      err: error,
     })
     
     return NextResponse.json(

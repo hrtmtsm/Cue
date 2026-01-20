@@ -41,7 +41,7 @@ export default function FullScreenLoader({ open }: FullScreenLoaderProps) {
           transform: 'translateX(-50%)',
           width: '100%',
           maxWidth: '420px',
-          height: '100vh',
+          height: '100%',
           transition: 'opacity 200ms ease-out',
           opacity: open ? 1 : 0,
           pointerEvents: open ? 'auto' : 'none',

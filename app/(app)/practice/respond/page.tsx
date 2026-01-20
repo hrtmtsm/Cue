@@ -8,8 +8,10 @@ import AudioWaveLine from '@/components/AudioWaveLine'
 import Snackbar from '@/components/Snackbar'
 import FullScreenLoader from '@/components/FullScreenLoader'
 import TopStatusSnackbar from '@/components/TopStatusSnackbar'
+import ClipTopBar from '@/components/ClipTopBar'
 import { getStoryByIdClient } from '@/lib/storyClient'
 import { getAudioMetadata, generateAudio } from '@/lib/audioApi'
+import { useClipLessonProgress } from '@/lib/clipLessonProgress'
 
 interface PracticeData {
   audioUrl: string
@@ -50,6 +52,10 @@ function RespondPageContent() {
   const phraseId = searchParams.get('phraseId')
   const focusInsightId = searchParams.get('focusInsightId')
   
+  // Shared clip lesson progress
+  const { initialize, completeStep } = useClipLessonProgress()
+  const hasEnteredScreenRef = useRef(false) // Track if we've marked this screen entry
+  
   const [inputMode, setInputMode] = useState<'type' | 'speak'>('type')
   const [userInput, setUserInput] = useState('')
   const [isPlaying, setIsPlaying] = useState(false)
@@ -82,6 +88,17 @@ function RespondPageContent() {
   
   // Get clipId from query params (required)
   const effectiveClipId = storyClipId || clipId
+
+  // Initialize progress on mount and mark screen entry
+  // Progress only advances on screen/page entry, not button clicks or typing
+  useEffect(() => {
+    if (effectiveClipId && !hasEnteredScreenRef.current) {
+      hasEnteredScreenRef.current = true
+      initialize(0) // Will be updated when we know details count
+      // Complete 'listen' step when user enters Respond page (screen entry)
+      completeStep('listen')
+    }
+  }, [effectiveClipId, initialize, completeStep])
 
   // Single derived state for UI busy/loading (used to disable buttons, NOT to show spinners)
   // Buttons should be disabled when busy, but never show spinners (only global indicators show loading)
@@ -921,6 +938,7 @@ function RespondPageContent() {
         if (audioRef.current === audio) {
           console.log('🎵 [AUDIO_FLOW] CASE C: "play" event fired - setting isPlaying=true')
           setIsPlaying(true)
+          // Progress only advances on screen entry, not button clicks
         }
       }
       
@@ -1062,6 +1080,7 @@ function RespondPageContent() {
           ttsRef.current = utterance
           window.speechSynthesis.speak(utterance)
           setIsPlaying(true)
+          // Progress only advances on screen entry, not button clicks
         }
         // Don't set error if device voice unavailable - just don't play
       }
@@ -1482,6 +1501,9 @@ function RespondPageContent() {
       return
     }
 
+    // Don't complete steps here - progress advances when Review page loads (screen entry)
+    // Progress only advances on screen entry, not button clicks
+
     // Log routing parameters for debugging
     console.log('🔍 [RespondPage] handleCheckAnswer called:', {
       storyId,
@@ -1541,28 +1563,25 @@ function RespondPageContent() {
     }
   }
 
-  return (
-    <main className="flex min-h-screen flex-col px-6 py-6">
-      {/* Header */}
-      <div className="mb-8">
-        <button
-          onClick={() => {
-            // Navigate back to story page if from story, otherwise to practice select
-            if (storyId) {
-              router.push(`/practice/story/${storyId}`)
-            } else {
-              router.push('/practice/select')
-            }
-          }}
-          className="text-blue-600 font-medium text-lg py-2 px-1 -ml-1 inline-flex items-center gap-1"
-        >
-          <ChevronLeft className="w-5 h-5" />
-          Back
-        </button>
-      </div>
+  const handleBack = () => {
+    // Navigate back to story page if from story, otherwise to practice select
+    if (storyId) {
+      router.push(`/practice/story/${storyId}`)
+    } else {
+      router.push('/practice/select')
+    }
+  }
 
-      {/* Content */}
-      <div className="flex-1 space-y-6">
+  return (
+    <main className="flex min-h-screen flex-col">
+      {/* Top Bar - Progress bar at very top (Duolingo style) */}
+      {/* Progress now managed by shared ClipLessonProgress context */}
+      <ClipTopBar 
+        onBack={handleBack}
+      />
+
+      {/* Content with padding */}
+      <div className="flex-1 px-6 py-6 space-y-6">
         {/* Missing clipId error */}
         {!effectiveClipId && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-lg space-y-3">
@@ -1737,22 +1756,22 @@ function RespondPageContent() {
             </div>
           </div>
         )}
-      </div>
-
-      {/* Sticky bottom button */}
-      <div className="pt-6 pb-6">
-        <button
-          type="button"
-          onClick={handleCheckAnswer}
-          disabled={inputMode === 'type' && !userInput.trim()}
-          className={`w-full py-4 px-6 rounded-xl font-semibold text-lg transition-colors ${
-            inputMode === 'type' && userInput.trim()
-              ? 'bg-blue-600 text-white active:bg-blue-700 shadow-lg'
-              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-          }`}
-        >
-          Check answer
-        </button>
+        
+        {/* Sticky bottom button */}
+        <div className="pt-6 pb-6">
+          <button
+            type="button"
+            onClick={handleCheckAnswer}
+            disabled={inputMode === 'type' && !userInput.trim()}
+            className={`w-full py-4 px-6 rounded-xl font-semibold text-lg transition-colors ${
+              inputMode === 'type' && userInput.trim()
+                ? 'bg-blue-600 text-white active:bg-blue-700 shadow-lg'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            Check answer
+          </button>
+        </div>
       </div>
     </main>
   )

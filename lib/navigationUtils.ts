@@ -36,6 +36,7 @@ export function shouldHideBottomNav(pathname: string | null): boolean {
     '/practice/review', // Review page
     '/practice/feedback', // Feedback page
     '/practice/session-summary', // Session summary
+    '/practice/', // Practice flow pages (including /practice/[clipId]/practice)
   ]
 
   // Check if pathname matches any hide route

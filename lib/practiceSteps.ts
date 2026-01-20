@@ -2,6 +2,7 @@ import type { AlignmentEvent } from './alignmentEngine'
 import { expandContraction, isContraction } from './contractionNormalizer'
 import { matchListeningPattern, isEligibleForPatternMatching, matchListeningPatternBackward, isEligibleForBackwardPatternMatching } from './listeningPatternMatcher'
 import { shouldSynthesizeChunk, isEligibleForChunkSynthesis, synthesizeChunk } from './chunkSynthesizer'
+import type { ListeningPattern } from './listeningPatterns'
 
 export type FeedbackCategory = 
   | 'weak_form'      // Function words reduced (the, to, and → thuh, ta, n)
@@ -9,6 +10,7 @@ export type FeedbackCategory =
   | 'elision'        // Sounds dropped (going to → gonna)
   | 'contraction'    // Contractions (you're → yer, I'm → im)
   | 'similar_words'  // Phonetically similar words (a/the, your/you're)
+  | 'spelling'       // Spelling/typo errors (1-char edit distance)
   | 'missed'         // Generic missed content
   | 'speed_chunking' // Fast speech chunking
 
@@ -24,6 +26,9 @@ export interface FeedbackItem {
   // NEW: Categorized feedback
   category: FeedbackCategory
   
+  // Trust-first MVP: Eligibility gate for listening explanations
+  explainAllowed: boolean           // If false, hide listening explanation UI sections
+  
   // NEW: Enhanced feedback fields
   meaningInContext: string          // What this word/phrase means IN THIS sentence (1-2 sentences)
   soundRule: string                 // What happens to the sound in fast speech (phonetic/weak-form/linking)
@@ -32,7 +37,9 @@ export interface FeedbackItem {
     highlighted: string              // Just the target phrase
     heardAs: string                  // How it sounds (e.g., "later" → "layder")
     chunkDisplay?: string            // Optional: Pattern-based chunk display (e.g., "went-to-the")
+    reducedForm?: string             // Optional: Phonetic reduction (e.g., "wanna" for "want to")
     chunkMeaning?: string            // Optional: Chunk-specific meaning
+    parentChunkDisplay?: string      // Optional: Parent's chunk_display (for fallback explanation)
   }
   extraExample?: {                  // Transfer example - another sentence (optional, omit if no real example)
     sentence: string                 // New sentence using same word/phrase
@@ -50,11 +57,91 @@ export interface PracticeStep extends FeedbackItem {
 }
 
 /**
+ * Compute simple edit distance (Levenshtein) for short strings
+ * Optimized for length ≤ 6
+ */
+function computeEditDistance(s1: string, s2: string): number {
+  const m = s1.length
+  const n = s2.length
+  
+  // Early exit if length difference > 1 (can't be 1-edit)
+  if (Math.abs(m - n) > 1) {
+    return Math.max(m, n)
+  }
+  
+  // Simple DP for small strings
+  const dp: number[][] = Array(m + 1)
+    .fill(null)
+    .map(() => Array(n + 1).fill(0))
+  
+  for (let i = 0; i <= m; i++) {
+    dp[i][0] = i
+  }
+  for (let j = 0; j <= n; j++) {
+    dp[0][j] = j
+  }
+  
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (s1[i - 1] === s2[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1]
+      } else {
+        dp[i][j] = Math.min(
+          dp[i - 1][j - 1] + 1, // substitution
+          dp[i - 1][j] + 1,     // deletion
+          dp[i][j - 1] + 1      // insertion
+        )
+      }
+    }
+  }
+  
+  return dp[m][n]
+}
+
+/**
+ * Function words that can be reduced/weakened in speech
+ * Used to identify when weak-form explanations are safe (no content words present)
+ */
+const FUNCTION_WORDS = new Set([
+  'a', 'an', 'the', 'to', 'of', 'for', 'and', 'or', 'but', 'with', 'at', 'in', 'on',
+  'by', 'from', 'as', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had',
+  'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can',
+  'this', 'that', 'these', 'those', 'it', 'its', 'they', 'them', 'we', 'us', 'you',
+  'he', 'him', 'she', 'her', 'his', 'hers', 'their', 'our', 'your', 'my', 'me'
+])
+
+/**
+ * Check if a word is a function word (safe for weak-form explanations)
+ */
+function isFunctionWord(word: string): boolean {
+  return FUNCTION_WORDS.has(word.toLowerCase().trim())
+}
+
+/**
+ * Check if a phrase contains only function words (no content words)
+ */
+function containsOnlyFunctionWords(phrase: string): boolean {
+  const words = phrase.toLowerCase().trim().split(/\s+/).filter(w => w.length > 0)
+  return words.length > 0 && words.every(w => isFunctionWord(w))
+}
+
+/**
  * Detect category based on phrase and context
  */
 function detectCategory(phrase: string, actualSpan?: string): FeedbackCategory {
   const lower = phrase.toLowerCase().trim()
   const actualLower = actualSpan?.toLowerCase().trim() || ''
+  
+  // Debug log for spelling detection
+  if (lower === 'gonna' || actualLower === 'gona') {
+    console.log('🔴 [detectCategory] Checking spelling for gona->gonna:', {
+      phrase,
+      lower,
+      actualSpan: actualSpan || '(none)',
+      actualLower: actualLower || '(none)',
+      willCheckSpelling: !!actualSpan,
+    })
+  }
   
   // Contractions
   if (lower.match(/\b(you're|i'm|we're|they're|it's|that's|what's|who's|he's|she's)\b/)) {
@@ -71,10 +158,10 @@ function detectCategory(phrase: string, actualSpan?: string): FeedbackCategory {
     return 'elision'
   }
   
-  // Weak forms (function words)
-  const weakFormWords = ['the', 'to', 'and', 'for', 'of', 'with', 'a', 'an', 'at', 'in', 'on']
+  // Weak forms (function words ONLY - must not contain content words)
   const words = lower.split(/\s+/)
-  if (words.some(w => weakFormWords.includes(w))) {
+  const hasFunctionWord = words.some(w => isFunctionWord(w))
+  if (hasFunctionWord && containsOnlyFunctionWords(lower)) {
     return 'weak_form'
   }
   
@@ -89,12 +176,34 @@ function detectCategory(phrase: string, actualSpan?: string): FeedbackCategory {
         return 'similar_words'
       }
     }
+    
+    // Spelling/typo: 1 character edit distance in short words (≤6 chars)
+    if (lower.length <= 6 && actualLower.length <= 6) {
+      const editDist = computeEditDistance(lower, actualLower)
+      
+      // Debug log for spelling check
+      if (lower === 'gonna' || actualLower === 'gona') {
+        console.log('🔴 [detectCategory] Spelling check result:', {
+          lower,
+          actualLower,
+          editDist,
+          lowerLength: lower.length,
+          actualLowerLength: actualLower.length,
+          willReturnSpelling: editDist === 1,
+        })
+      }
+      
+      if (editDist === 1) {
+        return 'spelling'
+      }
+    }
   }
   
   // Multi-word phrases often chunked
-  if (words.length >= 2) {
-    return 'speed_chunking'
-  }
+  // REMOVED: speed_chunking category mapped to 'missed' (trust-first MVP)
+  // if (words.length >= 2) {
+  //   return 'speed_chunking'
+  // }
   
   return 'missed'
 }
@@ -148,117 +257,6 @@ function generateHeardAs(phrase: string, category: FeedbackCategory): string {
   }
   
   return lower // Fallback: return as-is
-}
-
-/**
- * Check if a meaning string is a placeholder/generic fallback
- */
-function isPlaceholderMeaning(text: string): boolean {
-  const normalized = text.toLowerCase().trim()
-  const placeholders = [
-    'this phrase carries meaning but can be hard to catch in fast speech',
-    'this phrase carries meaning in context',
-    'this phrase can sound different in fast speech',
-    'this small word is often spoken softly and can be hard to hear',
-    'this contraction combines two words into one sound',
-    'these words connect together when spoken quickly',
-    'this word can sound like another similar word in fast speech',
-    'these words flow together as one chunk in natural speech',
-  ]
-  return placeholders.some(placeholder => normalized.includes(placeholder))
-}
-
-/**
- * Generate meaning in context
- */
-function generateMeaningInContext(
-  phrase: string,
-  fullSentence: string,
-  category: FeedbackCategory,
-  chunkDisplay?: string
-): string {
-  const lower = phrase.toLowerCase().trim()
-  
-  // CHUNK MEANINGS: If chunkDisplay exists, provide contextual chunk meaning
-  if (chunkDisplay) {
-    const chunkMeanings: Record<string, string> = {
-      'gonna-go': 'Expresses an intention to leave or do something soon.',
-      'going-to-go': 'Describes a future plan to move or take action.',
-      'want-to-go': 'Expresses a desire to leave or participate.',
-      'gonna': 'Expresses future intention or plan.',
-      'going-to': 'Future plan or intention.',
-      'want-to': 'Expressing desire or intention to do something.',
-    }
-    
-    const chunkLower = chunkDisplay.toLowerCase()
-    if (chunkMeanings[chunkLower]) {
-      return chunkMeanings[chunkLower]
-    }
-    
-    // No chunk meaning available - return empty string (caller should handle)
-    return ''
-  }
-  
-  // For contractions, expand them (e.g., "I'm" = "I am") and explain role
-  if (category === 'contraction' && isContraction(phrase)) {
-    const expanded = expandContraction(phrase)
-    // Determine role based on the expanded form
-    if (expanded.includes(' am ') || expanded.includes(' are ') || expanded.includes(' is ')) {
-      return `${phrase} means "${expanded}" - it describes a state or identity.`
-    } else if (expanded.includes(' will ')) {
-      return `${phrase} means "${expanded}" - it shows future action or intention.`
-    } else if (expanded.includes(' would ')) {
-      return `${phrase} means "${expanded}" - it shows conditional or past habit.`
-    } else if (expanded.includes(' have ') || expanded.includes(' has ')) {
-      return `${phrase} means "${expanded}" - it shows completion or possession.`
-    } else if (expanded.includes(' not ')) {
-      return `${phrase} means "${expanded}" - it makes the statement negative.`
-    } else {
-      return `${phrase} means "${expanded}" - it combines two words into one sound.`
-    }
-  }
-  
-  // Context-aware meanings based on category and common phrases
-  const contextMeanings: Record<string, string> = {
-    'have you': 'Asking if someone did something.',
-    'want to': 'Expressing desire or intention to do something.',
-    'going to': 'Future plan or intention.',
-    'you\'re': 'Describing someone or their state.',
-    'i\'m': 'Describing yourself or your state.',
-    'we\'re': 'Describing a group or situation.',
-    'later': 'Referring to a time after now.',
-    'the': 'Pointing to a specific thing.',
-    'to': 'Showing direction or purpose.',
-    'and': 'Connecting ideas together.',
-    'for': 'Indicating purpose or recipient.',
-    'with': 'Showing accompaniment or means.',
-    'in the': 'Inside or within something specific.',
-    'on the': 'Located on top of something specific.',
-    'at the': 'Located near or at a specific place.',
-  }
-  
-  // Check for exact matches first
-  for (const [key, meaning] of Object.entries(contextMeanings)) {
-    if (lower === key || lower.includes(key)) {
-      return meaning
-    }
-  }
-  
-  // Category-based fallbacks
-  switch (category) {
-    case 'contraction':
-      return 'This contraction combines two words into one sound.'
-    case 'linking':
-      return 'These words connect together when spoken quickly.'
-    case 'weak_form':
-      return 'This small word is often spoken softly and can be hard to hear.'
-    case 'similar_words':
-      return 'This word can sound like another similar word in fast speech.'
-    case 'speed_chunking':
-      return 'These words flow together as one chunk in natural speech.'
-    default:
-      return 'This phrase carries meaning but can be hard to catch in fast speech.'
-  }
 }
 
 /**
@@ -369,8 +367,13 @@ function generateExtraExample(phrase: string, category: FeedbackCategory): { sen
 /**
  * Generate optional listening tip
  */
-function generateTip(category: FeedbackCategory, phrase: string): string | undefined {
+function generateTip(category: FeedbackCategory, phrase: string, actualSpan?: string): string | undefined {
   switch (category) {
+    case 'spelling':
+      if (actualSpan) {
+        return `You typed "${actualSpan}". "${phrase}" is the correct spelling.`
+      }
+      return `Check the spelling of "${phrase}".`
     case 'contraction':
       return 'Listen for the apostrophe sound - it blends the words together.'
     case 'linking':
@@ -387,13 +390,15 @@ function generateTip(category: FeedbackCategory, phrase: string): string | undef
 /**
  * Extract practice steps from alignment events (top 3-5 mistakes)
  * Returns FeedbackItem[] with enhanced feedback structure
+ * @param patterns - Optional array of listening patterns. If not provided, uses local fallback.
  */
 export function extractPracticeSteps(
   events: AlignmentEvent[],
   refTokens: string[],
   userTokens: string[],
   maxSteps: number = 5,
-  fullTranscript?: string // Optional: full sentence for context
+  fullTranscript?: string, // Optional: full sentence for context
+  patterns?: ListeningPattern[] // Optional: patterns from Supabase, falls back to local
 ): PracticeStep[] {
   const steps: PracticeStep[] = []
   const fullSentence = fullTranscript || refTokens.join(' ')
@@ -415,23 +420,59 @@ export function extractPracticeSteps(
       refTokens.slice(span.spanRefStart, span.spanRefEnd).join(' ')
     
     let actualSpan: string | undefined
-    if (event.actualSpan) {
-      actualSpan = event.actualSpan
-    } else if (event.type === 'missing') {
-      actualSpan = undefined
-    } else if (event.userStart !== undefined && event.userEnd !== undefined) {
+    // Priority 1: Extract from userTokens (most reliable source of what user actually typed)
+    if (event.userStart !== undefined && event.userEnd !== undefined) {
       actualSpan = userTokens.slice(event.userStart, event.userEnd).join(' ')
+    } else if (event.type === 'missing') {
+      // Missing events have no user input
+      actualSpan = undefined
+    } else if (event.actualSpan && event.actualSpan !== '(not heard)') {
+      // Use event.actualSpan if it's not a placeholder
+      actualSpan = event.actualSpan
+    } else {
+      // Placeholder or no data - treat as undefined
+      actualSpan = undefined
     }
     
-    const category = detectCategory(target, actualSpan)
+    // Debug: log actualSpan for tracing
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 [practiceSteps] actualSpan extraction:', {
+        target,
+        eventType: event.type,
+        eventActualSpan: event.actualSpan || '(none)',
+        eventUserStart: event.userStart,
+        eventUserEnd: event.userEnd,
+        extractedActualSpan: actualSpan || '(undefined)',
+        userTokens: userTokens.slice(0, 5),
+      })
+    }
+    
+    let category = detectCategory(target, actualSpan)
+    
+    // Debug log after category detection
+    if (target.toLowerCase() === 'gonna' || actualSpan?.toLowerCase() === 'gona') {
+      console.log('🔴 [practiceSteps] Category after detectCategory:', {
+        target,
+        actualSpan: actualSpan || '(none)',
+        detectedCategory: category,
+      })
+    }
+    
     const heardAs = generateHeardAs(target, category)
     const extraExample = generateExtraExample(target, category)
-    let tip = generateTip(category, target)
+    let tip = generateTip(category, target, actualSpan)
     let soundRule = generateSoundRule(target, category, heardAs)
     let chunkDisplay: string | undefined = undefined
+    let reducedForm: string | undefined = undefined
+    let matchedPattern: ListeningPattern | undefined = undefined
 
-    // Pattern-based matching: if category is 'weak_form' or 'missed' AND target is eligible
-    if ((category === 'weak_form' || category === 'missed') && isEligibleForPatternMatching(target)) {
+    // Pattern-based matching: if category is 'weak_form', 'missed', or 'spelling' AND target is eligible
+    // Include 'spelling' so we can get parentChunkDisplay for parent fallback explanations
+    if ((category === 'weak_form' || category === 'missed' || category === 'spelling') && isEligibleForPatternMatching(target, patterns)) {
+      // SAFETY GUARD: Only allow weak-form/chunk explanations if target contains ONLY function words
+      // If content words are missed, do not show weak-form/chunk explanations (trust > coverage)
+      const targetHasContentWord = !containsOnlyFunctionWords(target)
+      
       // Find target index in refTokens
       // For multi-word spans, use the first token
       const targetTokens = target.split(' ').filter(t => t.length > 0)
@@ -449,23 +490,91 @@ export function extractPracticeSteps(
           
           // If found, try pattern matching
           if (targetIndex >= 0) {
-            const patternMatch = matchListeningPattern(firstTargetToken, refTokens, targetIndex)
+            const patternMatch = matchListeningPattern(firstTargetToken, refTokens, targetIndex, patterns)
             if (patternMatch) {
-              // Override soundRule and tip with pattern-based feedback
-              // Use nullish coalescing to preserve existing values when pattern match doesn't provide them
+              matchedPattern = patternMatch.pattern
+              
+              // Debug log to verify matchedPattern has parentChunkDisplay
+              if (process.env.NODE_ENV === 'development' && (target.toLowerCase() === 'gonna' || category === 'spelling')) {
+                console.log('🔍 [practiceSteps] Pattern match found:', {
+                  target,
+                  category,
+                  patternId: matchedPattern.id,
+                  patternParentChunkDisplay: matchedPattern.parentChunkDisplay || '(none)',
+                  patternParentPatternKey: matchedPattern.parentPatternKey || '(none)',
+                })
+              }
+              
+              // SAFETY: If target contains content words and category was 'weak_form', 
+              // do NOT apply pattern-based chunk/weak-form explanations
+              if (targetHasContentWord && category === 'weak_form') {
+                // Force category to 'missed' to avoid incorrect weak-form explanations
+                category = 'missed'
+                // Do NOT override soundRule/tip/chunkDisplay for content word phrases
+              } else {
+                // Safe to apply pattern-based feedback (only function words or not weak_form category)
               soundRule = patternMatch.soundRule
               tip = patternMatch.tip ?? tip // Preserve original tip if patternMatch.tip is null/undefined
               chunkDisplay = patternMatch.chunkDisplay
-              // Note: chunkMeaning will be set from generateMeaningInContext if chunkDisplay exists
+                reducedForm = patternMatch.reducedForm
+              }
             }
           }
         }
     }
     
+    // For spelling errors: if pattern wasn't matched yet, look up pattern by TARGET word directly
+    // This ensures we find patterns even if the misspelled input didn't match
+    if (category === 'spelling' && !matchedPattern && patterns && patterns.length > 0) {
+      const targetLower = target.toLowerCase().trim()
+      
+      console.log('🔍 [practiceSteps] Spelling - looking up target pattern:', {
+        userTyped: actualSpan || '(none)',
+        correctTarget: target,
+        normalizedTarget: targetLower,
+        patternsAvailable: patterns.length,
+        willSearchPatterns: true,
+      })
+      
+      // Try to find pattern by chunkDisplay, words array, patternKey (from API), or id matching target
+      // Note: convertSupabasePattern sets id = pattern_key, so p.id should contain the pattern key
+      matchedPattern = patterns.find(p => {
+        const patternChunkDisplay = p.chunkDisplay?.toLowerCase().trim()
+        const patternWords = p.words.join(' ').toLowerCase().trim()
+        const patternKey = (p as any).patternKey?.toLowerCase().trim() // patternKey from API (if exists as separate field)
+        const patternId = p.id?.toLowerCase().trim() // This should be pattern_key after conversion
+        const matches = patternChunkDisplay === targetLower || patternWords === targetLower || patternKey === targetLower || patternId === targetLower
+        return matches
+      })
+      
+      if (matchedPattern) {
+        console.log('✅ [practiceSteps] Found pattern for spelling target:', {
+          target,
+          patternId: matchedPattern.id,
+          patternChunkDisplay: matchedPattern.chunkDisplay,
+          patternParentChunkDisplay: matchedPattern.parentChunkDisplay || '(none)',
+          patternParentPatternKey: matchedPattern.parentPatternKey || '(none)',
+        })
+      } else {
+        console.log('⚠️ [practiceSteps] Pattern NOT found for spelling target:', {
+          target,
+          normalizedTarget: targetLower,
+          samplePatterns: patterns.slice(0, 5).map(p => ({
+            id: p.id,
+            chunkDisplay: p.chunkDisplay,
+            words: p.words,
+            parentChunkDisplay: p.parentChunkDisplay || '(none)',
+          })),
+        })
+        }
+    }
+    
     // Dynamic chunk synthesis for function words
-    // If pattern matching didn't find a meaningful chunk, synthesize one from context
+    // SAFETY: Only synthesize chunks if target contains ONLY function words
+    // If content words are present, do not synthesize (trust > coverage)
     if (shouldSynthesizeChunk(target, chunkDisplay) && 
         isEligibleForChunkSynthesis(target) && 
+        containsOnlyFunctionWords(target) && // SAFETY: Only for function-word-only phrases
         (event.type === 'missing' || category === 'weak_form' || category === 'missed')) {
       const right1 = span.spanRefEnd < refTokens.length ? refTokens[span.spanRefEnd]?.toLowerCase() : null
       const right2 = span.spanRefEnd + 1 < refTokens.length ? refTokens[span.spanRefEnd + 1]?.toLowerCase() : null
@@ -489,9 +598,114 @@ export function extractPracticeSteps(
       }
     }
     
-    // Generate meaning - in chunk mode, use chunk-aware meaning
-    const meaningText = generateMeaningInContext(target, fullSentence, category, chunkDisplay)
-    const chunkMeaning = chunkDisplay && !isPlaceholderMeaning(meaningText) ? meaningText : undefined
+    // TRUST-FIRST: Extract meaning from pattern (3-layer system with parent fallback)
+    // Priority: meaning_approved > meaning_general > parent meaning_general > null
+    let meaningText: string | null = null
+    let parentChunkDisplay: string | undefined = undefined
+    let useParentFallback = false
+    
+    if (matchedPattern) {
+      const status = matchedPattern.meaningStatus || 'none'
+      if (status === 'approved' && matchedPattern.meaningApproved) {
+        meaningText = matchedPattern.meaningApproved
+      } else if (status === 'general' && matchedPattern.meaningGeneral) {
+        meaningText = matchedPattern.meaningGeneral
+      } else if (matchedPattern.parentPatternKey && matchedPattern.parentMeaningGeneral) {
+        // Parent fallback: use parent's meaning_general if current pattern has none
+        meaningText = matchedPattern.parentMeaningGeneral
+        parentChunkDisplay = matchedPattern.parentChunkDisplay
+        useParentFallback = true
+      }
+      // else: meaningText remains null (Layer 3: no meaning)
+    }
+    
+    // SAFETY: Never show meaning for spelling category
+    // BUT allow parent fallback (sound explanation) if parent exists
+    if (category === 'spelling') {
+      meaningText = null // Suppress semantic meaning
+      // For spelling: enable parent fallback if parentChunkDisplay exists (even without parentMeaningGeneral)
+      // This allows sound explanations like "gonna is how going to sounds..." for spelling cases
+      if (matchedPattern?.parentChunkDisplay) {
+        parentChunkDisplay = matchedPattern.parentChunkDisplay
+        useParentFallback = true
+        // Suppress tautological soundRule when parent fallback is available (e.g., "gonna can sound like gonna")
+        if (soundRule) {
+          const quotedMatch = soundRule.toLowerCase().match(/"([^"]+)"/)?.[1]?.toLowerCase()
+          if (quotedMatch && target.toLowerCase().trim() === quotedMatch) {
+            soundRule = '' // Clear tautological soundRule
+          }
+        }
+      } else if (!parentChunkDisplay) {
+        useParentFallback = false // No parent, no fallback
+      } else {
+        useParentFallback = Boolean(parentChunkDisplay) // Use already-set parentChunkDisplay if available
+      }
+    }
+    
+    // Debug log for 'gonna' or spelling cases
+    if (process.env.NODE_ENV === 'development' && (target.toLowerCase() === 'gonna' || category === 'spelling')) {
+      console.log('🔍 [practiceSteps] Pattern processing:', {
+        target,
+        category,
+        actualSpan: actualSpan || '(none)',
+        matchedPatternId: matchedPattern?.id || '(none)',
+        matchedPatternParentPatternKey: matchedPattern?.parentPatternKey || '(none)',
+        matchedPatternParentChunkDisplay: matchedPattern?.parentChunkDisplay || '(none)',
+        meaningText: meaningText || '(null)',
+        parentChunkDisplay: parentChunkDisplay || '(none)',
+        useParentFallback,
+      })
+    }
+    
+    // TRUST-FIRST MVP: Compute explainAllowed eligibility gate
+    // Determines if listening explanation UI sections should be shown
+    let explainAllowed = false
+    if (category === 'spelling') {
+      explainAllowed = false // Spelling never shows listening explanations
+    } else if (containsOnlyFunctionWords(target)) {
+      explainAllowed = true // Function-word-only phrases are safe
+    } else if (chunkDisplay && reducedForm) {
+      // Pattern matched with reducedForm: check if any content words in span are actually missing
+      // If event is 'missing' type and target contains content words, content tokens are missing
+      const hasMissingContentWord = event.type === 'missing' && !containsOnlyFunctionWords(target)
+      explainAllowed = !hasMissingContentWord
+    } else {
+      explainAllowed = false // Default: don't explain if uncertain
+    }
+    
+    // Debug log RIGHT BEFORE creating step (for 'gonna' or spelling)
+    console.log('🔍 [practiceSteps] Matched pattern for feedback:', {
+      target,
+      category,
+      'matchedPattern?.chunkDisplay': matchedPattern?.chunkDisplay || '(none)',
+      'matchedPattern?.parentChunkDisplay': matchedPattern?.parentChunkDisplay || '(none)',
+      'matchedPattern?.parentPatternKey': matchedPattern?.parentPatternKey || '(none)',
+      'matchedPattern exists': !!matchedPattern,
+      parentChunkDisplay_var: parentChunkDisplay || '(none)',
+    })
+    
+    if (process.env.NODE_ENV === 'development' && (target.toLowerCase() === 'gonna' || category === 'spelling')) {
+      console.log('🔍 [practiceSteps] RIGHT BEFORE step creation:', {
+        category,
+        target,
+        matchedPatternId: matchedPattern?.id || '(none)',
+        matchedPatternParentChunkDisplay: matchedPattern?.parentChunkDisplay || '(none)',
+        parentChunkDisplay_var: parentChunkDisplay || '(none)',
+        meaningText_var: meaningText || '(null)',
+        useParentFallback,
+      })
+    }
+    
+    // Debug log RIGHT BEFORE creating step (for spelling)
+    if (category === 'spelling') {
+      console.log('🔍 [practiceSteps] Before step creation (spelling):', {
+        target,
+        matchedPatternId: matchedPattern?.id || '(none)',
+        matchedPatternParentChunkDisplay: matchedPattern?.parentChunkDisplay || '(none)',
+        parentChunkDisplay_var: parentChunkDisplay || '(none)',
+        willSetInSentenceParentChunkDisplay: !!parentChunkDisplay,
+      })
+    }
     
     const step: PracticeStep = {
       id: event.eventId,
@@ -502,8 +716,9 @@ export function extractPracticeSteps(
       refEnd: span.spanRefEnd,
       type: event.type,
       category,
-      meaningInContext: chunkMeaning || (!isPlaceholderMeaning(meaningText) ? meaningText : ''),
-      meaning: chunkMeaning || (!isPlaceholderMeaning(meaningText) ? meaningText : ''), // Legacy compatibility
+      explainAllowed,
+      meaningInContext: meaningText || '', // Layer 3: empty string if no meaning (UI will show Action Hint)
+      meaning: meaningText || '', // Legacy compatibility
       soundRule,
       howItSounds: soundRule, // Legacy compatibility
       inSentence: {
@@ -511,18 +726,29 @@ export function extractPracticeSteps(
         highlighted: target,
         heardAs,
         chunkDisplay,
-        chunkMeaning,
+        reducedForm,
+        chunkMeaning: meaningText || undefined, // Legacy field for chunk mode
+        parentChunkDisplay: parentChunkDisplay || undefined, // Always pass parentChunkDisplay if available (UI decides display)
       },
       extraExample,
       tip,
     }
     
+    // Debug log RIGHT AFTER creating step (for spelling)
+    if (category === 'spelling') {
+      console.log('🔍 [practiceSteps] After step creation (spelling):', {
+        target,
+        step_inSentence_parentChunkDisplay: step.inSentence.parentChunkDisplay || '(none)',
+        step_meaningInContext: step.meaningInContext || '(empty)',
+      })
+    }
+    
     // Validation: ensure required fields
     // Note: extraExample is optional - if undefined, omit the section entirely (no placeholder)
-    if (!step.meaningInContext || !step.soundRule || !step.inSentence.original) {
+    // Note: meaningInContext can be empty (Layer 3) - UI will show Action Hint instead
+    if (!step.soundRule || !step.inSentence.original) {
       console.warn(`⚠️ FeedbackItem missing required fields for ${target}:`, step)
-      // Fill fallbacks if missing (but don't create placeholder extraExample)
-      step.meaningInContext = step.meaningInContext || 'This phrase carries meaning in context.'
+      // Fill fallbacks if missing (but NEVER create placeholder meaning)
       step.soundRule = step.soundRule || 'This phrase can sound different in fast speech.'
       step.inSentence.original = step.inSentence.original || fullSentence
     }
@@ -542,12 +768,18 @@ export function extractPracticeSteps(
         refTokens.slice(event.refStart, event.refEnd).join(' ')
       
       let actualSpan: string | undefined
-      if (event.actualSpan) {
-        actualSpan = event.actualSpan
-      } else if (event.type === 'missing') {
-        actualSpan = undefined
-      } else if (event.userStart !== undefined && event.userEnd !== undefined) {
+      // Priority 1: Extract from userTokens (most reliable source of what user actually typed)
+      if (event.userStart !== undefined && event.userEnd !== undefined) {
         actualSpan = userTokens.slice(event.userStart, event.userEnd).join(' ')
+      } else if (event.type === 'missing') {
+        // Missing events have no user input
+        actualSpan = undefined
+      } else if (event.actualSpan && event.actualSpan !== '(not heard)') {
+        // Use event.actualSpan if it's not a placeholder
+        actualSpan = event.actualSpan
+      } else {
+        // Placeholder or no data - treat as undefined
+        actualSpan = undefined
       }
       
       // Expand to phrase (2-5 words) if it's a single word
@@ -563,36 +795,76 @@ export function extractPracticeSteps(
         expandedTarget = refTokens.slice(phraseStart, phraseEnd).join(' ')
       }
       
-      const category = detectCategory(expandedTarget, actualSpan)
+      let category = detectCategory(expandedTarget, actualSpan)
       const heardAs = generateHeardAs(expandedTarget, category)
       const extraExample = generateExtraExample(expandedTarget, category)
-      let tip = generateTip(category, expandedTarget)
+      let tip = generateTip(category, expandedTarget, actualSpan)
       let soundRule = generateSoundRule(expandedTarget, category, heardAs)
       let chunkDisplay: string | undefined = undefined
+      let reducedForm: string | undefined = undefined
+      let matchedPattern: ListeningPattern | undefined = undefined
 
-      // Pattern-based matching: if category is 'weak_form' or 'missed' AND target is eligible
-      if ((category === 'weak_form' || category === 'missed') && isEligibleForPatternMatching(expandedTarget)) {
+      // Pattern-based matching: if category is 'weak_form', 'missed', or 'spelling' AND target is eligible
+      // Include 'spelling' so we can get parentChunkDisplay for parent fallback explanations
+      if ((category === 'weak_form' || category === 'missed' || category === 'spelling') && isEligibleForPatternMatching(expandedTarget, patterns)) {
+        // SAFETY GUARD: Only allow weak-form/chunk explanations if target contains ONLY function words
+        const expandedTargetHasContentWord = !containsOnlyFunctionWords(expandedTarget)
+        
         // Find target index in refTokens (use phraseStart as starting point)
         const targetTokens = expandedTarget.split(' ').filter(t => t.length > 0)
         const firstTargetToken = targetTokens[0]?.toLowerCase()
         
         if (firstTargetToken && phraseStart >= 0) {
           // Try pattern matching starting at phraseStart
-          const patternMatch = matchListeningPattern(firstTargetToken, refTokens, phraseStart)
+          const patternMatch = matchListeningPattern(firstTargetToken, refTokens, phraseStart, patterns)
           if (patternMatch) {
-            // Override soundRule and tip with pattern-based feedback
-            // Use nullish coalescing to preserve existing values when pattern match doesn't provide them
+            matchedPattern = patternMatch.pattern
+            // SAFETY: If expandedTarget contains content words and category was 'weak_form',
+            // do NOT apply pattern-based chunk/weak-form explanations
+            if (expandedTargetHasContentWord && category === 'weak_form') {
+              // Force category to 'missed' to avoid incorrect weak-form explanations
+              category = 'missed'
+              // Do NOT override soundRule/tip/chunkDisplay for content word phrases
+            } else {
+              // Safe to apply pattern-based feedback
             soundRule = patternMatch.soundRule
-            tip = patternMatch.tip ?? tip // Preserve original tip if patternMatch.tip is null/undefined
+              tip = patternMatch.tip ?? tip
             chunkDisplay = patternMatch.chunkDisplay
+              reducedForm = patternMatch.reducedForm
+            }
           }
         }
       }
       
+      // For spelling errors: if pattern wasn't matched yet, look up pattern by TARGET word directly
+      // This ensures we find patterns even if the misspelled input didn't match
+      if (category === 'spelling' && !matchedPattern && patterns && patterns.length > 0) {
+        const targetLower = expandedTarget.toLowerCase().trim()
+        // Try to find pattern by chunkDisplay, words array, patternKey (from API), or id matching target
+        matchedPattern = patterns.find(p => {
+          const patternChunkDisplay = p.chunkDisplay?.toLowerCase().trim()
+          const patternWords = p.words.join(' ').toLowerCase().trim()
+          const patternKey = (p as any).patternKey?.toLowerCase().trim() // patternKey from API
+          const patternId = p.id?.toLowerCase().trim()
+          return patternChunkDisplay === targetLower || patternWords === targetLower || patternKey === targetLower || patternId === targetLower
+        })
+        
+        if (matchedPattern) {
+          console.log('🔍 [practiceSteps] Found pattern for spelling target (otherEvents):', {
+            target: expandedTarget,
+            patternId: matchedPattern.id,
+            patternParentChunkDisplay: matchedPattern.parentChunkDisplay || '(none)',
+            patternParentPatternKey: matchedPattern.parentPatternKey || '(none)',
+          })
+        }
+      }
+      
       // Dynamic chunk synthesis for function words (in other events loop)
-      // Check if the original target (before expansion) is eligible for synthesis
+      // SAFETY: Only synthesize chunks if target contains ONLY function words
+      // Check the original target (before expansion) - if it has content words, don't synthesize
       if (shouldSynthesizeChunk(target, chunkDisplay) && 
           isEligibleForChunkSynthesis(target) && 
+          containsOnlyFunctionWords(target) && // SAFETY: Only for function-word-only phrases
           (event.type === 'missing' || category === 'weak_form' || category === 'missed')) {
         // For single-token events, refEnd is inclusive (same as refStart)
         // So the next token is at refEnd + 1
@@ -619,9 +891,80 @@ export function extractPracticeSteps(
         }
       }
       
-      // Generate meaning - in chunk mode, use chunk-aware meaning
-      const meaningText = generateMeaningInContext(expandedTarget, fullSentence, category, chunkDisplay)
-      const chunkMeaning = chunkDisplay && !isPlaceholderMeaning(meaningText) ? meaningText : undefined
+      // TRUST-FIRST: Extract meaning from pattern (3-layer system with parent fallback)
+      // Priority: meaning_approved > meaning_general > parent meaning_general > null
+      let meaningText: string | null = null
+      let parentChunkDisplay: string | undefined = undefined
+      let useParentFallback = false
+      
+      if (matchedPattern) {
+        const status = matchedPattern.meaningStatus || 'none'
+        if (status === 'approved' && matchedPattern.meaningApproved) {
+          meaningText = matchedPattern.meaningApproved
+        } else if (status === 'general' && matchedPattern.meaningGeneral) {
+          meaningText = matchedPattern.meaningGeneral
+        } else if (matchedPattern.parentPatternKey && matchedPattern.parentMeaningGeneral) {
+          // Parent fallback: use parent's meaning_general if current pattern has none
+          meaningText = matchedPattern.parentMeaningGeneral
+          parentChunkDisplay = matchedPattern.parentChunkDisplay
+          useParentFallback = true
+        }
+        // else: meaningText remains null (Layer 3: no meaning)
+      }
+      
+      // SAFETY: Never show meaning for spelling category
+      // BUT allow parent fallback (sound explanation) if parent exists
+      if (category === 'spelling') {
+        meaningText = null // Suppress semantic meaning
+        // For spelling: enable parent fallback if parentChunkDisplay exists (even without parentMeaningGeneral)
+        // This allows sound explanations like "gonna is how going to sounds..." for spelling cases
+        if (matchedPattern?.parentChunkDisplay) {
+          parentChunkDisplay = matchedPattern.parentChunkDisplay
+          useParentFallback = true
+          // Suppress tautological soundRule when parent fallback is available (e.g., "gonna can sound like gonna")
+          if (soundRule) {
+            const quotedMatch = soundRule.toLowerCase().match(/"([^"]+)"/)?.[1]?.toLowerCase()
+            if (quotedMatch && expandedTarget.toLowerCase().trim() === quotedMatch) {
+              soundRule = '' // Clear tautological soundRule
+            }
+          }
+        } else if (!parentChunkDisplay) {
+          useParentFallback = false // No parent, no fallback
+        } else {
+          useParentFallback = Boolean(parentChunkDisplay) // Use already-set parentChunkDisplay if available
+        }
+      }
+      
+      // Debug log for 'gonna' or spelling cases (otherEvents loop)
+      if (process.env.NODE_ENV === 'development' && (expandedTarget.toLowerCase() === 'gonna' || category === 'spelling')) {
+        console.log('🔍 [practiceSteps] Pattern processing (otherEvents):', {
+          target: expandedTarget,
+          category,
+          actualSpan: actualSpan || '(none)',
+          matchedPatternId: matchedPattern?.id || '(none)',
+          matchedPatternParentPatternKey: matchedPattern?.parentPatternKey || '(none)',
+          matchedPatternParentChunkDisplay: matchedPattern?.parentChunkDisplay || '(none)',
+          meaningText: meaningText || '(null)',
+          parentChunkDisplay: parentChunkDisplay || '(none)',
+          useParentFallback,
+        })
+      }
+      
+      // TRUST-FIRST MVP: Compute explainAllowed eligibility gate
+      // Determines if listening explanation UI sections should be shown
+      let explainAllowed = false
+      if (category === 'spelling') {
+        explainAllowed = false // Spelling never shows listening explanations
+      } else if (containsOnlyFunctionWords(expandedTarget)) {
+        explainAllowed = true // Function-word-only phrases are safe
+      } else if (chunkDisplay && reducedForm) {
+        // Pattern matched with reducedForm: check if any content words in span are actually missing
+        // If event is 'missing' type and expandedTarget contains content words, content tokens are missing
+        const hasMissingContentWord = event.type === 'missing' && !containsOnlyFunctionWords(expandedTarget)
+        explainAllowed = !hasMissingContentWord
+      } else {
+        explainAllowed = false // Default: don't explain if uncertain
+      }
       
       const step: PracticeStep = {
         id: event.eventId,
@@ -632,8 +975,9 @@ export function extractPracticeSteps(
         refEnd: phraseEnd,
         type: event.type,
         category,
-        meaningInContext: chunkMeaning || (!isPlaceholderMeaning(meaningText) ? meaningText : ''),
-        meaning: chunkMeaning || (!isPlaceholderMeaning(meaningText) ? meaningText : ''), // Legacy compatibility
+        explainAllowed,
+        meaningInContext: meaningText || '', // Layer 3: empty string if no meaning (UI will show Action Hint)
+        meaning: meaningText || '', // Legacy compatibility
         soundRule,
         howItSounds: soundRule, // Legacy compatibility
         inSentence: {
@@ -641,18 +985,35 @@ export function extractPracticeSteps(
           highlighted: expandedTarget,
           heardAs,
           chunkDisplay,
-          chunkMeaning,
+          reducedForm,
+          chunkMeaning: meaningText || undefined, // Legacy field for chunk mode
+          parentChunkDisplay: parentChunkDisplay || undefined, // Always pass parentChunkDisplay if available (UI decides display)
         },
         extraExample,
         tip,
       }
       
+      // Debug log for 'gonna' before pushing to steps (otherEvents loop)
+      if (process.env.NODE_ENV === 'development' && expandedTarget.toLowerCase() === 'gonna') {
+        console.log('🔍 [practiceSteps] Feedback item created (gonna, otherEvents):', {
+          category,
+          target: expandedTarget,
+          actualSpan: actualSpan || '(none)',
+          matchedPatternId: matchedPattern?.id || '(none)',
+          matchedPatternParentChunkDisplay: matchedPattern?.parentChunkDisplay || '(none)',
+          useParentFallback,
+          meaningText: meaningText || '(null)',
+          parentChunkDisplay: parentChunkDisplay || '(none)',
+          feedbackItemParentChunkDisplay: step.inSentence.parentChunkDisplay || '(none)',
+        })
+      }
+      
       // Validation: ensure required fields
       // Note: extraExample is optional - if undefined, omit the section entirely (no placeholder)
-      if (!step.meaningInContext || !step.soundRule || !step.inSentence.original) {
+      // Note: meaningInContext can be empty (Layer 3) - UI will show Action Hint instead
+      if (!step.soundRule || !step.inSentence.original) {
         console.warn(`⚠️ FeedbackItem missing required fields for ${expandedTarget}:`, step)
-        // Fill fallbacks if missing (but don't create placeholder extraExample)
-        step.meaningInContext = step.meaningInContext || 'This phrase carries meaning in context.'
+        // Fill fallbacks if missing (but NEVER create placeholder meaning)
         step.soundRule = step.soundRule || 'This phrase can sound different in fast speech.'
         step.inSentence.original = step.inSentence.original || fullSentence
       }

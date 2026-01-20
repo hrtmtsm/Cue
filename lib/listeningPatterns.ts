@@ -6,10 +6,17 @@
 export interface ListeningPattern {
   id: string
   words: string[]            // e.g. ["went", "to", "the"]
-  chunkDisplay: string       // e.g. "went-to-the"
+  chunkDisplay: string       // e.g. "went-to-the" (canonical, learner-recognizable)
+  reducedForm?: string       // Optional phonetic reduction (e.g. "wanna" for "want to")
   howItSounds: string        // Explanation text
   tip?: string               // Optional listening tip
   priority: number           // Higher = better match
+  meaningGeneral?: string    // Layer 1: Structural meaning (generalizable)
+  meaningApproved?: string   // Layer 2: Context-specific, human-approved meaning
+  meaningStatus?: 'none' | 'general' | 'approved' | 'revoked' // Controls which meaning to show
+  parentPatternKey?: string  // Parent pattern reference (for fallback meanings)
+  parentChunkDisplay?: string // Parent's chunk_display (for fallback explanation)
+  parentMeaningGeneral?: string // Parent's meaning_general (for fallback)
 }
 
 export const LISTENING_PATTERNS: ListeningPattern[] = [
@@ -35,7 +42,8 @@ export const LISTENING_PATTERNS: ListeningPattern[] = [
   {
     id: 'want-to',
     words: ['want', 'to'],
-    chunkDisplay: 'want-to',
+    chunkDisplay: 'want to',
+    reducedForm: 'wanna',
     howItSounds: 'In casual speech, "want to" often sounds like "wanna".',
     tip: 'The "t" between "want" and "to" disappears in fast speech.',
     priority: 100,
@@ -45,7 +53,8 @@ export const LISTENING_PATTERNS: ListeningPattern[] = [
   {
     id: 'going-to',
     words: ['going', 'to'],
-    chunkDisplay: 'going-to',
+    chunkDisplay: 'going to',
+    reducedForm: 'gonna',
     howItSounds: 'In fast speech, "going to" often sounds like "gonna".',
     tip: 'The "ing" and "to" blend together in casual speech.',
     priority: 100,
@@ -92,7 +101,8 @@ export const LISTENING_PATTERNS: ListeningPattern[] = [
   {
     id: 'lot-of',
     words: ['lot', 'of'],
-    chunkDisplay: 'lot-of',
+    chunkDisplay: 'lot of',
+    reducedForm: 'lotta',
     howItSounds: 'In fast speech, "lot of" sounds like "lotta" - the "f" is dropped.',
     tip: 'The "f" in "of" disappears in casual speech.',
     priority: 90,
@@ -102,15 +112,16 @@ export const LISTENING_PATTERNS: ListeningPattern[] = [
   {
     id: 'kind-of',
     words: ['kind', 'of'],
-    chunkDisplay: 'kind-of',
+    chunkDisplay: 'kind of',
+    reducedForm: 'kinda',
     howItSounds: 'In fast speech, "kind of" sounds like "kinda" - the "f" in "of" is dropped.',
     tip: 'The "f" in "of" disappears in casual speech.',
     priority: 90,
   },
   
-  // Single-word "to" fallback
+  // Single-word "to" pattern
   {
-    id: 'to-fallback',
+    id: 'to',
     words: ['to'],
     chunkDisplay: 'to',
     howItSounds: 'In fast speech, "to" often sounds like "tuh" - the vowel is reduced.',
@@ -118,9 +129,9 @@ export const LISTENING_PATTERNS: ListeningPattern[] = [
     priority: 80,
   },
   
-  // Single-word "of" fallback
+  // Single-word "of" pattern
   {
-    id: 'of-fallback',
+    id: 'of',
     words: ['of'],
     chunkDisplay: 'of',
     howItSounds: 'In fast speech, "of" often sounds like "uh" - the vowel is reduced and the "f" can be dropped.',
