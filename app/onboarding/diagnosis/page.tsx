@@ -380,7 +380,7 @@ export default function DiagnosisPage() {
       // Map and deduplicate categories (empty array if skipped)
       const diagnosticCategories: DiagnosticCategory[] = skipped
         ? []
-        : [...new Set(errorCategories.map(mapToDiagnosticCategory))]
+        : Array.from(new Set(errorCategories.map(mapToDiagnosticCategory)))
 
       // Store diagnostic result after each clip is completed
       storeDiagnosticResult({

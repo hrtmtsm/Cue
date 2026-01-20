@@ -450,9 +450,9 @@ function ReviewPageContent() {
             }
             
             // Map and deduplicate categories
-            const diagnosticCategories: DiagnosticCategory[] = [
-              ...new Set(errorCategories.map(mapToDiagnosticCategory))
-            ]
+            const diagnosticCategories: DiagnosticCategory[] = Array.from(
+              new Set(errorCategories.map(mapToDiagnosticCategory))
+            )
             
             // Store diagnostic result
             storeDiagnosticResult({
