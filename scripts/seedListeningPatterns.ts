@@ -139,8 +139,12 @@ async function seedPatterns(dryRun: boolean = true) {
     )
   }
   
+  // Type assertion: After validation, we know these are defined
+  const SUPABASE_URL_VALIDATED = SUPABASE_URL as string
+  const SUPABASE_SERVICE_ROLE_KEY_VALIDATED = SUPABASE_SERVICE_ROLE_KEY as string
+  
   // Initialize Supabase client
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  const supabase = createClient(SUPABASE_URL_VALIDATED, SUPABASE_SERVICE_ROLE_KEY_VALIDATED, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
