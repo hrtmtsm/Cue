@@ -294,6 +294,7 @@ export default function DiagnosisPage() {
             transcript: currentClip.transcript,
             userText: skipped ? '' : userInput,
             skipped: skipped || undefined,
+            clipId: currentClip.id, // Add clipId for variant-specific feedback
           }),
         })
       } catch (err: any) {
@@ -352,13 +353,34 @@ export default function DiagnosisPage() {
       let errorCategories: FeedbackCategory[] = []
 
       if (!skipped) {
+        // Load patterns from API (with variants) for pattern matching
+        let patternsForMatching: any[] | undefined = undefined
+        try {
+          const patternsResponse = await fetch('/api/listening-patterns')
+          if (patternsResponse.ok) {
+            const patternsData = await patternsResponse.json()
+            if (Array.isArray(patternsData) && patternsData.length > 0) {
+              patternsForMatching = patternsData
+              if (IS_DEV) {
+                console.log('✅ [Diagnosis] Loaded patterns for matching:', {
+                  patternsCount: patternsForMatching.length,
+                  gonnaPattern: patternsForMatching.find((p: any) => p.id === 'gonna' || (p as any).patternKey === 'gonna'),
+                })
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('⚠️ [Diagnosis] Failed to load patterns, will use fallback:', err)
+        }
+        
         practiceSteps = extractPracticeSteps(
           alignmentResult.events || [],
           alignmentResult.refTokens || [],
           alignmentResult.userTokens || [],
           10, // maxSteps
           currentClip.transcript,
-          undefined // patterns - will use default
+          patternsForMatching, // patterns with variants from API
+          alignmentResult.patternFeedback // variant-specific feedback from clip_pattern_spans
         )
 
         // Extract categories from error steps only (missing/substitution)

@@ -34,6 +34,9 @@ interface SupabasePattern {
 }
 
 interface ListeningPattern {
+  patternKey?: string
+  explanationShort?: string
+  explanationMedium?: string
   id: string
   words: string[]
   chunkDisplay: string
@@ -47,6 +50,20 @@ interface ListeningPattern {
   parentPatternKey?: string
   parentChunkDisplay?: string
   parentMeaningGeneral?: string
+  // NEW: Pattern-first fields (optional for backward compatibility)
+  category?: 'weak_form' | 'linking' | 'elision' | 'contraction' | 'similar_words' | 'spelling' | 'missed' | 'speed_chunking'
+  spokenForm?: string
+  heardAs?: string
+  examples?: { sentence: string; heardAs?: string }[]
+  // NEW: Variants array from listening_pattern_variants
+  variants?: Array<{
+    id: string
+    written_form: string
+    spoken_form: string
+    explanation_short: string
+    explanation_medium: string | null
+    examples: { sentence: string }[] | null
+  }>
 }
 
 /**
@@ -75,6 +92,7 @@ function convertSupabasePattern(pattern: any): ListeningPattern {
   
   return {
     id: pattern.pattern_key || pattern.id,
+    patternKey: pattern.pattern_key || undefined,
     words,
     chunkDisplay: pattern.chunk_display,
     reducedForm: pattern.reduced_form || undefined,
@@ -87,6 +105,24 @@ function convertSupabasePattern(pattern: any): ListeningPattern {
     parentPatternKey: pattern.parent_pattern_key || undefined,
     parentChunkDisplay: parent?.chunk_display || undefined,
     parentMeaningGeneral: parent?.meaning_general || undefined,
+    // NEW: Pattern-first fields (optional - will be undefined if not in DB)
+    category: (pattern as any).category || undefined,
+    spokenForm: (pattern as any).spoken_form || pattern.reduced_form || undefined,
+    heardAs: (pattern as any).heard_as || undefined,
+    explanationShort: (pattern as any).explanation_short || undefined,
+    explanationMedium: (pattern as any).explanation_medium || undefined,
+    examples: (pattern as any).examples || undefined,
+    // NEW: Variants array (from JOIN with listening_pattern_variants)
+    variants: Array.isArray(pattern.listening_pattern_variants) && pattern.listening_pattern_variants.length > 0
+      ? pattern.listening_pattern_variants.map((v: any) => ({
+          id: v.id,
+          written_form: v.written_form,
+          spoken_form: v.spoken_form,
+          explanation_short: v.explanation_short,
+          explanation_medium: v.explanation_medium || null,
+          examples: v.examples || null,
+        }))
+      : undefined,
   }
 }
 
@@ -100,7 +136,7 @@ export async function GET() {
     const supabase = getSupabaseAdminClient()
 
     // Step 1: Fetch all active patterns
-    const { data: patterns, error } = await supabase
+    const { data: patterns, error: patternsError } = await supabase
       .from('listening_patterns')
       .select(`
         id,
@@ -119,18 +155,24 @@ export async function GET() {
         focus,
         left1,
         right1,
-        right2
+        right2,
+        category,
+        spoken_form,
+        heard_as,
+        examples,
+        explanation_short,
+        explanation_medium
       `)
       .eq('is_active', true)
       .order('priority', { ascending: false })
 
-    if (error) {
-      console.error('❌ [listening-patterns] Supabase error:', error)
+    if (patternsError) {
+      console.error('❌ [listening-patterns] Supabase error:', patternsError)
       console.error('❌ [listening-patterns] Error details:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code,
+        message: patternsError.message,
+        details: patternsError.details,
+        hint: patternsError.hint,
+        code: patternsError.code,
       })
       // Fallback to local patterns
       return NextResponse.json(LISTENING_PATTERNS, {
@@ -150,13 +192,33 @@ export async function GET() {
       })
     }
 
-    // Step 2: Fetch parent chunk_display and meaning_general for patterns that have a parent
-    const patternsWithParent = patterns.filter(p => p.parent_pattern_key)
+    // Step 2: Fetch ALL variants from listening_pattern_variants
+    const { data: variants, error: variantsError } = await supabase
+      .from('listening_pattern_variants')
+      .select('*')
+
+    if (variantsError) {
+      console.warn('⚠️ [listening-patterns] Failed to fetch variants:', variantsError)
+      // Continue without variants (non-fatal - patterns will work without variants)
+    }
+
+    // Step 3: Manually join variants to patterns by pattern_key
+    const patternsWithVariants = patterns.map((pattern: any) => {
+      const patternVariants = variants?.filter((v: any) => v.pattern_key === pattern.pattern_key) || []
+      return {
+        ...pattern,
+        listening_pattern_variants: patternVariants.length > 0 ? patternVariants : undefined,
+      }
+    })
+
+    // Step 4: Fetch parent chunk_display and meaning_general for patterns that have a parent
+    // (Keep this for backward compatibility, but variants are the primary source now)
+    const patternsWithParent = patternsWithVariants.filter((p: any) => p.parent_pattern_key)
     
     if (patternsWithParent.length > 0) {
       // Extract unique parent keys (filter out null/undefined)
       const parentKeySet = new Set<string>()
-      patternsWithParent.forEach(p => {
+      patternsWithParent.forEach((p: any) => {
         if (p.parent_pattern_key) {
           parentKeySet.add(p.parent_pattern_key)
         }
@@ -175,7 +237,7 @@ export async function GET() {
         )
         
         // Attach parent data to each pattern (using type assertion for dynamic property)
-        patterns.forEach((pattern: any) => {
+        patternsWithVariants.forEach((pattern: any) => {
           if (pattern.parent_pattern_key) {
             const parentData = parentMap.get(pattern.parent_pattern_key)
             if (parentData) {
@@ -190,8 +252,8 @@ export async function GET() {
       }
     }
 
-    // Step 3: Convert Supabase patterns to client format
-    const convertedPatterns = patterns.map(convertSupabasePattern)
+    // Step 5: Convert Supabase patterns to client format
+    const convertedPatterns = patternsWithVariants.map(convertSupabasePattern)
 
     // Debug: Log sample pattern with parent (e.g., 'gonna')
     if (process.env.NODE_ENV === 'development') {
@@ -199,21 +261,33 @@ export async function GET() {
       if (gonnaPattern) {
         console.log('🔍 [listening-patterns] Sample pattern (gonna):', {
           id: gonnaPattern.id,
+          patternKey: (gonnaPattern as any).patternKey || '(none)',
           chunkDisplay: gonnaPattern.chunkDisplay,
-          parentPatternKey: gonnaPattern.parentPatternKey || '(none)',
-          parentChunkDisplay: gonnaPattern.parentChunkDisplay || '(none)',
-          parentMeaningGeneral: gonnaPattern.parentMeaningGeneral || '(none)',
+          reducedForm: gonnaPattern.reducedForm || '(none)',
+          words: gonnaPattern.words,
+          howItSounds: gonnaPattern.howItSounds || '(none)',
+          tip: gonnaPattern.tip || '(none)',
+          variantsCount: gonnaPattern.variants?.length || 0,
+          variants: gonnaPattern.variants?.map((v: any) => ({
+            written_form: v.written_form,
+            spoken_form: v.spoken_form,
+            explanation_short: v.explanation_short?.substring(0, 50) + '...' || '(none)',
+          })) || [],
         })
       }
       
-      // Also log raw pattern before conversion
-      const rawGonna = patterns.find((p: any) => p.pattern_key === 'gonna') as any
+      // Also log raw pattern with variants before conversion
+      const rawGonna = patternsWithVariants.find((p: any) => p.pattern_key === 'gonna') as any
       if (rawGonna) {
-        console.log('🔍 [listening-patterns] Raw pattern before conversion (gonna):', {
+        console.log('🔍 [listening-patterns] Raw pattern with variants (gonna):', {
           pattern_key: rawGonna.pattern_key,
-          parent_pattern_key: rawGonna.parent_pattern_key || '(none)',
-          parent: rawGonna.parent || '(none)',
-          parent_chunk_display: rawGonna.parent?.chunk_display || '(none)',
+          chunk_display: rawGonna.chunk_display,
+          variants_count: rawGonna.listening_pattern_variants?.length || 0,
+          variants: rawGonna.listening_pattern_variants?.map((v: any) => ({
+            written_form: v.written_form,
+            spoken_form: v.spoken_form,
+            explanation_short: v.explanation_short?.substring(0, 50) + '...' || '(none)',
+          })) || [],
         })
       }
     }
