@@ -221,7 +221,7 @@ export function evaluateSemanticUnderstanding(
           
           // Fuzzy match
           if (unitToken.length >= 4) {
-            for (const userToken of userTokens) {
+            for (const userToken of Array.from(userTokens)) {
               if (userToken.length >= 4) {
                 const maxDiff = unitToken.length <= 5 ? 1 : 2
                 const diff = levenshteinDistance(unitToken, userToken)
