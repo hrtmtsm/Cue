@@ -1008,6 +1008,7 @@ export function extractPracticeSteps(
           
           // Check for variant-specific feedback (from clip_pattern_spans)
           const variantFeedback = patternFeedback?.find(f => 
+            matchedPattern &&
             f.pattern_key === matchedPattern.id &&
             f.ref_start <= phraseStart &&
             f.ref_end >= phraseEnd
