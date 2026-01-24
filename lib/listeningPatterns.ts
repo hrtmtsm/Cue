@@ -17,6 +17,11 @@ export interface ListeningPattern {
   parentPatternKey?: string  // Parent pattern reference (for fallback meanings)
   parentChunkDisplay?: string // Parent's chunk_display (for fallback explanation)
   parentMeaningGeneral?: string // Parent's meaning_general (for fallback)
+  // NEW: Pattern-first fields (optional for backward compatibility)
+  category?: 'weak_form' | 'linking' | 'elision' | 'contraction' | 'similar_words' | 'spelling' | 'missed' | 'speed_chunking' // Category from pattern
+  spokenForm?: string        // Phonetic representation (alternative to reducedForm)
+  heardAs?: string           // How it sounds (alternative to reducedForm/spokenForm)
+  examples?: { sentence: string; heardAs?: string }[] // Example sentences
 }
 
 export const LISTENING_PATTERNS: ListeningPattern[] = [

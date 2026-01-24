@@ -3,6 +3,7 @@ import { expandContraction, isContraction } from './contractionNormalizer'
 import { matchListeningPattern, isEligibleForPatternMatching, matchListeningPatternBackward, isEligibleForBackwardPatternMatching } from './listeningPatternMatcher'
 import { shouldSynthesizeChunk, isEligibleForChunkSynthesis, synthesizeChunk } from './chunkSynthesizer'
 import type { ListeningPattern } from './listeningPatterns'
+import type { PatternFeedback } from './types/patternFeedback'
 
 export type FeedbackCategory = 
   | 'weak_form'      // Function words reduced (the, to, and → thuh, ta, n)
@@ -398,7 +399,8 @@ export function extractPracticeSteps(
   userTokens: string[],
   maxSteps: number = 5,
   fullTranscript?: string, // Optional: full sentence for context
-  patterns?: ListeningPattern[] // Optional: patterns from Supabase, falls back to local
+  patterns?: ListeningPattern[], // Optional: patterns from Supabase, falls back to local
+  patternFeedback?: PatternFeedback[] // Optional: variant-specific feedback from clip_pattern_spans
 ): PracticeStep[] {
   const steps: PracticeStep[] = []
   const fullSentence = fullTranscript || refTokens.join(' ')
@@ -447,80 +449,228 @@ export function extractPracticeSteps(
       })
     }
     
-    let category = detectCategory(target, actualSpan)
-    
-    // Debug log after category detection
-    if (target.toLowerCase() === 'gonna' || actualSpan?.toLowerCase() === 'gona') {
-      console.log('🔴 [practiceSteps] Category after detectCategory:', {
-        target,
-        actualSpan: actualSpan || '(none)',
-        detectedCategory: category,
-      })
-    }
-    
-    const heardAs = generateHeardAs(target, category)
-    const extraExample = generateExtraExample(target, category)
-    let tip = generateTip(category, target, actualSpan)
-    let soundRule = generateSoundRule(target, category, heardAs)
+    // PATTERN-FIRST: Try pattern matching FIRST (regardless of category)
+    let category: FeedbackCategory
+    let heardAs: string
+    let extraExample: { sentence: string; heardAs?: string } | undefined
+    let tip: string | undefined
+    let soundRule: string
     let chunkDisplay: string | undefined = undefined
     let reducedForm: string | undefined = undefined
     let matchedPattern: ListeningPattern | undefined = undefined
 
-    // Pattern-based matching: if category is 'weak_form', 'missed', or 'spelling' AND target is eligible
-    // Include 'spelling' so we can get parentChunkDisplay for parent fallback explanations
-    if ((category === 'weak_form' || category === 'missed' || category === 'spelling') && isEligibleForPatternMatching(target, patterns)) {
-      // SAFETY GUARD: Only allow weak-form/chunk explanations if target contains ONLY function words
-      // If content words are missed, do not show weak-form/chunk explanations (trust > coverage)
-      const targetHasContentWord = !containsOnlyFunctionWords(target)
-      
-      // Find target index in refTokens
-      // For multi-word spans, use the first token
+    // Find target index in refTokens for pattern matching
       const targetTokens = target.split(' ').filter(t => t.length > 0)
       const firstTargetToken = targetTokens[0]?.toLowerCase()
+    let targetIndex = -1
       
         if (firstTargetToken) {
           // Find index of first token in refTokens
-          let targetIndex = -1
           for (let i = span.spanRefStart; i <= span.spanRefEnd && i < refTokens.length; i++) {
             if (refTokens[i]?.toLowerCase() === firstTargetToken) {
               targetIndex = i
               break
-            }
+        }
+      }
+    }
+
+    // Try pattern matching FIRST (pattern-first approach)
+    // DEBUG: Log pattern matching attempt
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 [practiceSteps] Pattern matching attempt (phraseHintEvents):', {
+        target,
+        firstTargetToken: firstTargetToken || '(none)',
+        targetIndex,
+        patternsAvailable: patterns?.length || 0,
+        patternsSample: patterns?.slice(0, 3).map(p => ({
+          id: p.id,
+          patternKey: (p as any).patternKey || '(none)',
+          words: p.words,
+          chunkDisplay: p.chunkDisplay,
+        })) || [],
+        isEligible: isEligibleForPatternMatching(firstTargetToken || target, patterns),
+        refTokensSample: refTokens.slice(Math.max(0, targetIndex - 2), targetIndex + 5),
+      })
+    }
+    
+    if (targetIndex >= 0 && isEligibleForPatternMatching(firstTargetToken || target, patterns)) {
+      const patternMatch = matchListeningPattern(firstTargetToken || target, refTokens, targetIndex, patterns)
+      
+      // DEBUG: Log match result
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 [practiceSteps] Pattern match result:', {
+          target,
+          patternMatchFound: !!patternMatch,
+          matchedPatternId: patternMatch?.pattern.id || '(none)',
+          matchedPatternKey: patternMatch?.pattern ? ((patternMatch.pattern as any).patternKey || '(none)') : '(none)',
+          matchedWords: patternMatch?.pattern.words || '(none)',
+        })
+      }
+      
+            if (patternMatch) {
+        matchedPattern = patternMatch.pattern
+        
+        // DEBUG: Log matched pattern details
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔍 [practiceSteps] Pattern matched (phraseHintEvents):', {
+            target,
+            matchedPatternId: matchedPattern.id,
+            matchedPatternKey: (matchedPattern as any).patternKey || '(none)',
+            matchedChunkDisplay: matchedPattern.chunkDisplay,
+            matchedReducedForm: matchedPattern.reducedForm || '(none)',
+            matchedWords: matchedPattern.words,
+            matchedCategory: matchedPattern.category || '(none)',
+            matchedParentPatternKey: matchedPattern.parentPatternKey || '(none)',
+            matchedParentChunkDisplay: matchedPattern.parentChunkDisplay || '(none)',
+            matchedHowItSounds: matchedPattern.howItSounds || '(none)',
+            matchedTip: matchedPattern.tip || '(none)',
+            matchedSpokenForm: matchedPattern.spokenForm || '(none)',
+            matchedHeardAs: matchedPattern.heardAs || '(none)',
+          })
+        }
+        
+        // Use pattern category if available, else fall back to detectCategory
+        category = matchedPattern.category || detectCategory(target, actualSpan)
+        
+        // Check for variant-specific feedback (from clip_pattern_spans)
+        const variantFeedback = patternFeedback?.find(f => 
+          f.pattern_key === matchedPattern.id &&
+          f.ref_start <= span.spanRefStart &&
+          f.ref_end >= span.spanRefEnd
+        )
+        
+        if (variantFeedback) {
+          // Use variant's written_form as the canonical form (set FIRST so we can use it in soundRule)
+          chunkDisplay = variantFeedback.written_form
+          heardAs = variantFeedback.spoken_form
+          reducedForm = variantFeedback.spoken_form // Use spoken_form as reduced form
+          
+          // Use variant-specific explanation (clip-specific, not generic)
+          // IMPORTANT: Use chunkDisplay (written_form) instead of target for soundRule generation
+          // This prevents tautological text like "gonna can sound like gonna"
+          const phraseForSoundRule = chunkDisplay // Use "going to" instead of "gonna"
+          soundRule = variantFeedback.explanation_short || variantFeedback.explanation_medium || patternMatch.tip || patternMatch.soundRule || generateSoundRule(phraseForSoundRule, category, heardAs)
+          tip = patternMatch.tip || generateTip(category, target, actualSpan)
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log('✅ [practiceSteps] Using variant-specific feedback:', {
+              pattern_key: variantFeedback.pattern_key,
+              written_form: variantFeedback.written_form,
+              spoken_form: variantFeedback.spoken_form,
+            })
+          }
+        } else {
+          // Check if pattern has variants (from listening_pattern_variants)
+          const variants = (matchedPattern as any).variants
+          const variant = Array.isArray(variants) && variants.length > 0 ? variants[0] : null
+          
+          // DEBUG: Log variant check
+          if (process.env.NODE_ENV === 'development') {
+            console.log('🔍 [practiceSteps] Checking for variants:', {
+              target,
+              patternId: matchedPattern.id,
+              hasVariants: !!variants,
+              variantsIsArray: Array.isArray(variants),
+              variantsLength: Array.isArray(variants) ? variants.length : 0,
+              firstVariant: variant ? {
+                written_form: variant.written_form,
+                spoken_form: variant.spoken_form,
+              } : '(none)',
+            })
           }
           
-          // If found, try pattern matching
-          if (targetIndex >= 0) {
-            const patternMatch = matchListeningPattern(firstTargetToken, refTokens, targetIndex, patterns)
-            if (patternMatch) {
-              matchedPattern = patternMatch.pattern
-              
-              // Debug log to verify matchedPattern has parentChunkDisplay
-              if (process.env.NODE_ENV === 'development' && (target.toLowerCase() === 'gonna' || category === 'spelling')) {
-                console.log('🔍 [practiceSteps] Pattern match found:', {
-                  target,
-                  category,
-                  patternId: matchedPattern.id,
-                  patternParentChunkDisplay: matchedPattern.parentChunkDisplay || '(none)',
-                  patternParentPatternKey: matchedPattern.parentPatternKey || '(none)',
-                })
-              }
-              
-              // SAFETY: If target contains content words and category was 'weak_form', 
-              // do NOT apply pattern-based chunk/weak-form explanations
-              if (targetHasContentWord && category === 'weak_form') {
-                // Force category to 'missed' to avoid incorrect weak-form explanations
-                category = 'missed'
-                // Do NOT override soundRule/tip/chunkDisplay for content word phrases
-              } else {
-                // Safe to apply pattern-based feedback (only function words or not weak_form category)
-              soundRule = patternMatch.soundRule
-              tip = patternMatch.tip ?? tip // Preserve original tip if patternMatch.tip is null/undefined
+          if (variant && variant.written_form && variant.spoken_form) {
+            // Use variant's written_form as chunkDisplay and spoken_form as heardAs (set FIRST so we can use it in soundRule)
+            chunkDisplay = variant.written_form // e.g., "going to"
+            heardAs = variant.spoken_form // e.g., "gonna"
+            reducedForm = variant.spoken_form
+            
+            // Use variant's explanation if available
+            // IMPORTANT: Use chunkDisplay (written_form) instead of target for soundRule generation
+            // This prevents tautological text like "gonna can sound like gonna"
+            const phraseForSoundRule = chunkDisplay // Use "going to" instead of "gonna"
+            soundRule = variant.explanation_short || variant.explanation_medium || patternMatch.tip || patternMatch.soundRule || generateSoundRule(phraseForSoundRule, category, heardAs)
+            tip = patternMatch.tip || generateTip(category, target, actualSpan)
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log('✅ [practiceSteps] Using pattern variant:', {
+                pattern_key: matchedPattern.id,
+                written_form: variant.written_form,
+                spoken_form: variant.spoken_form,
+                chunkDisplay,
+                heardAs,
+                highlightedWillBe: chunkDisplay, // This will be used for highlighted
+              })
+            }
+          } else {
+            // Fallback to pattern-provided explanation fields (no variants available)
+            // soundRule: prefer pattern.tip (short) else pattern.howItSounds
+            soundRule = patternMatch.tip || patternMatch.soundRule || generateSoundRule(target, category, '')
+            tip = patternMatch.tip || generateTip(category, target, actualSpan)
               chunkDisplay = patternMatch.chunkDisplay
-                reducedForm = patternMatch.reducedForm
-              }
+            reducedForm = patternMatch.reducedForm
+            
+            // heardAs: prefer pattern.spokenForm / reducedForm / pattern.heardAs
+            if (matchedPattern.spokenForm) {
+              heardAs = matchedPattern.spokenForm
+            } else if (matchedPattern.heardAs) {
+              heardAs = matchedPattern.heardAs
+            } else if (patternMatch.reducedForm) {
+              heardAs = patternMatch.reducedForm
+            } else {
+              heardAs = generateHeardAs(target, category)
             }
           }
         }
+        
+        // extraExample: use pattern.examples[0] if available
+        if (matchedPattern.examples && matchedPattern.examples.length > 0) {
+          extraExample = matchedPattern.examples[0]
+        } else {
+          extraExample = generateExtraExample(target, category)
+        }
+        
+        // DEBUG: Log chosen values for explanation fields
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔍 [practiceSteps] Explanation fields chosen:', {
+            target,
+            phrase: target, // What will be shown as the phrase
+            heardAs,
+            soundRule,
+            tip: tip || '(none)',
+            chunkDisplay: chunkDisplay || '(none)',
+            reducedForm: reducedForm || '(none)',
+            category,
+            inSentenceHighlighted: target, // What will be highlighted
+            source: 'matchedPattern', // Where values came from
+            hasParent: !!matchedPattern.parentPatternKey,
+            parentChunkDisplay: matchedPattern.parentChunkDisplay || '(none)',
+          })
+        }
+        
+        // SAFETY: If target contains content words and category is 'weak_form', 
+        // do NOT apply pattern-based chunk/weak-form explanations
+        const targetHasContentWord = !containsOnlyFunctionWords(target)
+        if (targetHasContentWord && category === 'weak_form') {
+          // Force category to 'missed' to avoid incorrect weak-form explanations
+          category = 'missed'
+          // Keep pattern data but category is now 'missed'
+        }
+      } else {
+        // No pattern match - fall back to existing behavior
+        category = detectCategory(target, actualSpan)
+        heardAs = generateHeardAs(target, category)
+        extraExample = generateExtraExample(target, category)
+        tip = generateTip(category, target, actualSpan)
+        soundRule = generateSoundRule(target, category, heardAs)
+      }
+    } else {
+      // Not eligible for pattern matching - fall back to existing behavior
+      category = detectCategory(target, actualSpan)
+      heardAs = generateHeardAs(target, category)
+      extraExample = generateExtraExample(target, category)
+      tip = generateTip(category, target, actualSpan)
+      soundRule = generateSoundRule(target, category, heardAs)
     }
     
     // For spelling errors: if pattern wasn't matched yet, look up pattern by TARGET word directly
@@ -548,6 +698,23 @@ export function extractPracticeSteps(
       })
       
       if (matchedPattern) {
+        // Apply pattern data for spelling case (pattern-first)
+        // Use pattern-provided explanation fields
+        soundRule = matchedPattern.tip || matchedPattern.howItSounds || soundRule
+        tip = matchedPattern.tip || tip
+        chunkDisplay = matchedPattern.chunkDisplay
+        reducedForm = matchedPattern.reducedForm
+        
+        // heardAs: prefer pattern.spokenForm / reducedForm / pattern.heardAs
+        if (matchedPattern.spokenForm) {
+          heardAs = matchedPattern.spokenForm
+        } else if (matchedPattern.heardAs) {
+          heardAs = matchedPattern.heardAs
+        } else if (matchedPattern.reducedForm) {
+          heardAs = matchedPattern.reducedForm
+        }
+        // else: keep existing heardAs from generateHeardAs()
+        
         console.log('✅ [practiceSteps] Found pattern for spelling target:', {
           target,
           patternId: matchedPattern.id,
@@ -673,16 +840,18 @@ export function extractPracticeSteps(
       explainAllowed = false // Default: don't explain if uncertain
     }
     
-    // Debug log RIGHT BEFORE creating step (for 'gonna' or spelling)
-    console.log('🔍 [practiceSteps] Matched pattern for feedback:', {
-      target,
-      category,
-      'matchedPattern?.chunkDisplay': matchedPattern?.chunkDisplay || '(none)',
-      'matchedPattern?.parentChunkDisplay': matchedPattern?.parentChunkDisplay || '(none)',
-      'matchedPattern?.parentPatternKey': matchedPattern?.parentPatternKey || '(none)',
-      'matchedPattern exists': !!matchedPattern,
-      parentChunkDisplay_var: parentChunkDisplay || '(none)',
-    })
+    // DEBUG: Log matched pattern for feedback (guarded by NODE_ENV)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 [practiceSteps] Matched pattern for feedback (phraseHintEvents):', {
+        target,
+        category,
+        'matchedPattern?.chunkDisplay': matchedPattern?.chunkDisplay || '(none)',
+        'matchedPattern?.parentChunkDisplay': matchedPattern?.parentChunkDisplay || '(none)',
+        'matchedPattern?.parentPatternKey': matchedPattern?.parentPatternKey || '(none)',
+        'matchedPattern exists': !!matchedPattern,
+        parentChunkDisplay_var: parentChunkDisplay || '(none)',
+      })
+    }
     
     if (process.env.NODE_ENV === 'development' && (target.toLowerCase() === 'gonna' || category === 'spelling')) {
       console.log('🔍 [practiceSteps] RIGHT BEFORE step creation:', {
@@ -707,6 +876,22 @@ export function extractPracticeSteps(
       })
     }
     
+    // Determine highlighted text: use chunkDisplay if from variant, otherwise use target
+    // When variant is used, chunkDisplay = written_form (e.g., "going to"), so use that for highlighted
+    // This ensures we show "going to" → "gonna" instead of "gonna" → "gonna"
+    const highlightedText = chunkDisplay && chunkDisplay !== target ? chunkDisplay : target
+    
+    // DEBUG: Log highlighted text decision
+    if (process.env.NODE_ENV === 'development' && (target.toLowerCase() === 'gonna' || chunkDisplay !== target)) {
+      console.log('🔍 [practiceSteps] Highlighted text decision:', {
+        target,
+        chunkDisplay: chunkDisplay || '(none)',
+        highlightedText,
+        heardAs,
+        hasVariant: !!(matchedPattern && (matchedPattern as any).variants?.[0]),
+      })
+    }
+    
     const step: PracticeStep = {
       id: event.eventId,
       target,
@@ -723,7 +908,7 @@ export function extractPracticeSteps(
       howItSounds: soundRule, // Legacy compatibility
       inSentence: {
         original: fullSentence,
-        highlighted: target,
+        highlighted: highlightedText, // Use chunkDisplay (written_form) when variant is used
         heardAs,
         chunkDisplay,
         reducedForm,
@@ -795,45 +980,166 @@ export function extractPracticeSteps(
         expandedTarget = refTokens.slice(phraseStart, phraseEnd).join(' ')
       }
       
-      let category = detectCategory(expandedTarget, actualSpan)
-      const heardAs = generateHeardAs(expandedTarget, category)
-      const extraExample = generateExtraExample(expandedTarget, category)
-      let tip = generateTip(category, expandedTarget, actualSpan)
-      let soundRule = generateSoundRule(expandedTarget, category, heardAs)
+      // PATTERN-FIRST: Try pattern matching FIRST (regardless of category)
+      let category: FeedbackCategory
+      let heardAs: string
+      let extraExample: { sentence: string; heardAs?: string } | undefined
+      let tip: string | undefined
+      let soundRule: string
       let chunkDisplay: string | undefined = undefined
       let reducedForm: string | undefined = undefined
       let matchedPattern: ListeningPattern | undefined = undefined
 
-      // Pattern-based matching: if category is 'weak_form', 'missed', or 'spelling' AND target is eligible
-      // Include 'spelling' so we can get parentChunkDisplay for parent fallback explanations
-      if ((category === 'weak_form' || category === 'missed' || category === 'spelling') && isEligibleForPatternMatching(expandedTarget, patterns)) {
-        // SAFETY GUARD: Only allow weak-form/chunk explanations if target contains ONLY function words
-        const expandedTargetHasContentWord = !containsOnlyFunctionWords(expandedTarget)
-        
-        // Find target index in refTokens (use phraseStart as starting point)
+      // Find target index in refTokens for pattern matching
         const targetTokens = expandedTarget.split(' ').filter(t => t.length > 0)
         const firstTargetToken = targetTokens[0]?.toLowerCase()
         
-        if (firstTargetToken && phraseStart >= 0) {
-          // Try pattern matching starting at phraseStart
+      // Try pattern matching FIRST (pattern-first approach)
+      if (firstTargetToken && phraseStart >= 0 && isEligibleForPatternMatching(firstTargetToken, patterns)) {
           const patternMatch = matchListeningPattern(firstTargetToken, refTokens, phraseStart, patterns)
           if (patternMatch) {
-            matchedPattern = patternMatch.pattern
-            // SAFETY: If expandedTarget contains content words and category was 'weak_form',
-            // do NOT apply pattern-based chunk/weak-form explanations
-            if (expandedTargetHasContentWord && category === 'weak_form') {
-              // Force category to 'missed' to avoid incorrect weak-form explanations
-              category = 'missed'
-              // Do NOT override soundRule/tip/chunkDisplay for content word phrases
+          matchedPattern = patternMatch.pattern
+          
+          // Use pattern category if available, else fall back to detectCategory
+          category = matchedPattern.category || detectCategory(expandedTarget, actualSpan)
+          
+          // Check for variant-specific feedback (from clip_pattern_spans)
+          const variantFeedback = patternFeedback?.find(f => 
+            f.pattern_key === matchedPattern.id &&
+            f.ref_start <= phraseStart &&
+            f.ref_end >= phraseEnd
+          )
+          
+          if (variantFeedback) {
+            // Use variant's written_form as the canonical form (set FIRST so we can use it in soundRule)
+            chunkDisplay = variantFeedback.written_form
+            heardAs = variantFeedback.spoken_form
+            reducedForm = variantFeedback.spoken_form // Use spoken_form as reduced form
+            
+            // Use variant-specific explanation (clip-specific, not generic)
+            // IMPORTANT: Use chunkDisplay (written_form) instead of expandedTarget for soundRule generation
+            // This prevents tautological text like "gonna can sound like gonna"
+            const phraseForSoundRule = chunkDisplay // Use "going to" instead of "gonna"
+            soundRule = variantFeedback.explanation_short || variantFeedback.explanation_medium || patternMatch.tip || patternMatch.soundRule || generateSoundRule(phraseForSoundRule, category, heardAs)
+            tip = patternMatch.tip || generateTip(category, expandedTarget, actualSpan)
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log('✅ [practiceSteps] Using variant-specific feedback (otherEvents):', {
+                pattern_key: variantFeedback.pattern_key,
+                written_form: variantFeedback.written_form,
+                spoken_form: variantFeedback.spoken_form,
+              })
+            }
+          } else {
+            // Check if pattern has variants (from listening_pattern_variants)
+            const variant = (matchedPattern as any).variants?.[0]
+            
+            if (variant && variant.written_form && variant.spoken_form) {
+              // Use variant's written_form as chunkDisplay and spoken_form as heardAs (set FIRST so we can use it in soundRule)
+              chunkDisplay = variant.written_form // e.g., "going to"
+              heardAs = variant.spoken_form // e.g., "gonna"
+              reducedForm = variant.spoken_form
+              
+              // Use variant's explanation if available
+              // IMPORTANT: Use chunkDisplay (written_form) instead of expandedTarget for soundRule generation
+              // This prevents tautological text like "gonna can sound like gonna"
+              const phraseForSoundRule = chunkDisplay // Use "going to" instead of "gonna"
+              soundRule = variant.explanation_short || variant.explanation_medium || patternMatch.tip || patternMatch.soundRule || generateSoundRule(phraseForSoundRule, category, heardAs)
+              tip = patternMatch.tip || generateTip(category, expandedTarget, actualSpan)
+              
+              if (process.env.NODE_ENV === 'development') {
+                console.log('✅ [practiceSteps] Using pattern variant (otherEvents):', {
+                  pattern_key: matchedPattern.id,
+                  written_form: variant.written_form,
+                  spoken_form: variant.spoken_form,
+                })
+              }
             } else {
-              // Safe to apply pattern-based feedback
-            soundRule = patternMatch.soundRule
-              tip = patternMatch.tip ?? tip
+              // Fallback to pattern-provided explanation fields (no variants available)
+              // soundRule: prefer pattern.tip (short) else pattern.howItSounds
+              soundRule = patternMatch.tip || patternMatch.soundRule || generateSoundRule(expandedTarget, category, '')
+              tip = patternMatch.tip || generateTip(category, expandedTarget, actualSpan)
             chunkDisplay = patternMatch.chunkDisplay
               reducedForm = patternMatch.reducedForm
+              
+              // heardAs: prefer pattern.spokenForm / reducedForm / pattern.heardAs
+              if (matchedPattern.spokenForm) {
+                heardAs = matchedPattern.spokenForm
+              } else if (matchedPattern.heardAs) {
+                heardAs = matchedPattern.heardAs
+              } else if (patternMatch.reducedForm) {
+                heardAs = patternMatch.reducedForm
+              } else {
+                heardAs = generateHeardAs(expandedTarget, category)
+              }
             }
           }
+          
+          // extraExample: use pattern.examples[0] if available
+          if (matchedPattern.examples && matchedPattern.examples.length > 0) {
+            extraExample = matchedPattern.examples[0]
+          } else {
+            extraExample = generateExtraExample(expandedTarget, category)
+          }
+          
+          // SAFETY: If expandedTarget contains content words and category is 'weak_form',
+          // do NOT apply pattern-based chunk/weak-form explanations
+          const expandedTargetHasContentWord = !containsOnlyFunctionWords(expandedTarget)
+          if (expandedTargetHasContentWord && category === 'weak_form') {
+            // Force category to 'missed' to avoid incorrect weak-form explanations
+            category = 'missed'
+            // Keep pattern data but category is now 'missed'
+          }
+        } else {
+          // No pattern match - fall back to existing behavior
+          category = detectCategory(expandedTarget, actualSpan)
+          heardAs = generateHeardAs(expandedTarget, category)
+          extraExample = generateExtraExample(expandedTarget, category)
+          tip = generateTip(category, expandedTarget, actualSpan)
+          soundRule = generateSoundRule(expandedTarget, category, heardAs)
         }
+        
+        // DEBUG: Log matched pattern details (otherEvents)
+        if (process.env.NODE_ENV === 'development' && matchedPattern) {
+          console.log('🔍 [practiceSteps] Pattern matched (otherEvents):', {
+            target: expandedTarget,
+            matchedPatternId: matchedPattern.id,
+            matchedPatternKey: (matchedPattern as any).patternKey || '(none)',
+            matchedChunkDisplay: matchedPattern.chunkDisplay,
+            matchedReducedForm: matchedPattern.reducedForm || '(none)',
+            matchedWords: matchedPattern.words,
+            matchedCategory: matchedPattern.category || '(none)',
+            matchedParentPatternKey: matchedPattern.parentPatternKey || '(none)',
+            matchedParentChunkDisplay: matchedPattern.parentChunkDisplay || '(none)',
+            matchedHowItSounds: matchedPattern.howItSounds || '(none)',
+            matchedTip: matchedPattern.tip || '(none)',
+            matchedSpokenForm: matchedPattern.spokenForm || '(none)',
+            matchedHeardAs: matchedPattern.heardAs || '(none)',
+          })
+          
+          // DEBUG: Log chosen values for explanation fields (otherEvents)
+          console.log('🔍 [practiceSteps] Explanation fields chosen (otherEvents):', {
+            target: expandedTarget,
+            phrase: expandedTarget,
+            heardAs,
+            soundRule,
+            tip: tip || '(none)',
+            chunkDisplay: chunkDisplay || '(none)',
+            reducedForm: reducedForm || '(none)',
+            category,
+            inSentenceHighlighted: expandedTarget,
+            source: 'matchedPattern',
+            hasParent: !!matchedPattern.parentPatternKey,
+            parentChunkDisplay: matchedPattern.parentChunkDisplay || '(none)',
+          })
+        }
+      } else {
+        // Not eligible for pattern matching - fall back to existing behavior
+        category = detectCategory(expandedTarget, actualSpan)
+        heardAs = generateHeardAs(expandedTarget, category)
+        extraExample = generateExtraExample(expandedTarget, category)
+        tip = generateTip(category, expandedTarget, actualSpan)
+        soundRule = generateSoundRule(expandedTarget, category, heardAs)
       }
       
       // For spelling errors: if pattern wasn't matched yet, look up pattern by TARGET word directly
@@ -850,6 +1156,23 @@ export function extractPracticeSteps(
         })
         
         if (matchedPattern) {
+          // Apply pattern data for spelling case (pattern-first)
+          // Use pattern-provided explanation fields
+          soundRule = matchedPattern.tip || matchedPattern.howItSounds || soundRule
+          tip = matchedPattern.tip || tip
+          chunkDisplay = matchedPattern.chunkDisplay
+          reducedForm = matchedPattern.reducedForm
+          
+          // heardAs: prefer pattern.spokenForm / reducedForm / pattern.heardAs
+          if (matchedPattern.spokenForm) {
+            heardAs = matchedPattern.spokenForm
+          } else if (matchedPattern.heardAs) {
+            heardAs = matchedPattern.heardAs
+          } else if (matchedPattern.reducedForm) {
+            heardAs = matchedPattern.reducedForm
+          }
+          // else: keep existing heardAs from generateHeardAs()
+          
           console.log('🔍 [practiceSteps] Found pattern for spelling target (otherEvents):', {
             target: expandedTarget,
             patternId: matchedPattern.id,
@@ -966,6 +1289,22 @@ export function extractPracticeSteps(
         explainAllowed = false // Default: don't explain if uncertain
       }
       
+      // Determine highlighted text: use chunkDisplay if from variant, otherwise use expandedTarget
+      // When variant is used, chunkDisplay = written_form (e.g., "going to"), so use that for highlighted
+      // This ensures we show "going to" → "gonna" instead of "gonna" → "gonna"
+      const highlightedText = chunkDisplay && chunkDisplay !== expandedTarget ? chunkDisplay : expandedTarget
+      
+      // DEBUG: Log highlighted text decision
+      if (process.env.NODE_ENV === 'development' && (expandedTarget.toLowerCase().includes('gonna') || chunkDisplay !== expandedTarget)) {
+        console.log('🔍 [practiceSteps] Highlighted text decision (otherEvents):', {
+          expandedTarget,
+          chunkDisplay: chunkDisplay || '(none)',
+          highlightedText,
+          heardAs,
+          hasVariant: !!(matchedPattern && (matchedPattern as any).variants?.[0]),
+        })
+      }
+      
       const step: PracticeStep = {
         id: event.eventId,
         target: expandedTarget,
@@ -982,7 +1321,7 @@ export function extractPracticeSteps(
         howItSounds: soundRule, // Legacy compatibility
         inSentence: {
           original: fullSentence,
-          highlighted: expandedTarget,
+          highlighted: highlightedText, // Use chunkDisplay (written_form) when variant is used
           heardAs,
           chunkDisplay,
           reducedForm,

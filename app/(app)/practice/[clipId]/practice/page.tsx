@@ -79,7 +79,8 @@ export default function PracticeChunkPage() {
         alignmentData.userTokens,
         5, // Max 5 steps
         alignmentData.transcript, // Pass full transcript for context
-        patterns // Pass patterns from Supabase (or undefined for local fallback)
+        patterns, // Pass patterns from Supabase (or undefined for local fallback)
+        alignmentData.patternFeedback // variant-specific feedback from clip_pattern_spans (if available)
       )
     }
     

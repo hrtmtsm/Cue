@@ -391,6 +391,7 @@ function ReviewPageContent() {
           body: JSON.stringify({
             transcript: transcript,
             userText: userAnswer,
+            clipId: clipId || storyClipId, // Add clipId for variant-specific feedback
           }),
         })
         
@@ -411,6 +412,26 @@ function ReviewPageContent() {
         // If in diagnostic mode, extract categories and store result
         if (isDiagnosticMode && diagnosticClipId) {
           try {
+            // Load patterns from API (with variants) for pattern matching
+            let patternsForMatching: any[] | undefined = undefined
+            try {
+              const patternsResponse = await fetch('/api/listening-patterns')
+              if (patternsResponse.ok) {
+                const patternsData = await patternsResponse.json()
+                if (Array.isArray(patternsData) && patternsData.length > 0) {
+                  patternsForMatching = patternsData
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log('✅ [Review] Loaded patterns for matching:', {
+                      patternsCount: patternsForMatching.length,
+                      gonnaPattern: patternsForMatching.find((p: any) => p.id === 'gonna' || (p as any).patternKey === 'gonna'),
+                    })
+                  }
+                }
+              }
+            } catch (err) {
+              console.warn('⚠️ [Review] Failed to load patterns, will use fallback:', err)
+            }
+            
             // Generate practiceSteps from alignment events
             const practiceSteps = extractPracticeSteps(
               data.events || [],
@@ -418,7 +439,8 @@ function ReviewPageContent() {
               data.userTokens || [],
               10, // maxSteps
               data.transcript,
-              undefined // patterns - will use default from practiceSteps
+              patternsForMatching, // patterns with variants from API
+              data.patternFeedback // variant-specific feedback from clip_pattern_spans
             )
             
             // Extract categories from error steps only (missing/substitution)

@@ -45,12 +45,63 @@ export function matchListeningPattern(
   // Use provided patterns or fallback to local patterns
   const patternsToUse = (patterns && patterns.length > 0) ? patterns : LISTENING_PATTERNS
   
+  // DEBUG: Log pattern matching attempt
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🔍 [PatternMatch] Attempting to match:', {
+      focus: focusLower,
+      targetIndex,
+      tokensAtTarget: tokens.slice(Math.max(0, targetIndex - 1), targetIndex + 3),
+      patternsCount: patternsToUse.length,
+      patternsSample: patternsToUse.slice(0, 5).map(p => ({
+        id: p.id,
+        patternKey: (p as any).patternKey || '(none)',
+        words: p.words,
+        firstWord: p.words[0]?.toLowerCase() || '(none)',
+      })),
+    })
+  }
+  
   // Find all patterns that start with the focus word
-  const candidatePatterns = patternsToUse.filter(pattern => 
-    pattern.words.length > 0 && pattern.words[0].toLowerCase() === focusLower
-  )
+  // Also check pattern_key and variants for matching
+  const candidatePatterns = patternsToUse.filter(pattern => {
+    // Primary: match by first word in words array
+    if (pattern.words.length > 0 && pattern.words[0].toLowerCase() === focusLower) {
+      return true
+    }
+    // Fallback: match by pattern_key
+    const patternKey = (pattern as any).patternKey || pattern.id
+    if (patternKey && patternKey.toLowerCase() === focusLower) {
+      return true
+    }
+    // Fallback: match by variants' spoken_form
+    const variants = (pattern as any).variants
+    if (variants && Array.isArray(variants)) {
+      return variants.some((v: any) => v.spoken_form?.toLowerCase() === focusLower)
+    }
+    return false
+  })
+  
+  // DEBUG: Log candidate patterns
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🔍 [PatternMatch] Candidate patterns found:', {
+      focus: focusLower,
+      candidateCount: candidatePatterns.length,
+      candidates: candidatePatterns.map(p => ({
+        id: p.id,
+        patternKey: (p as any).patternKey || '(none)',
+        words: p.words,
+        variants: (p as any).variants?.map((v: any) => v.spoken_form) || [],
+      })),
+    })
+  }
   
   if (candidatePatterns.length === 0) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('⚠️ [PatternMatch] No candidate patterns found for:', {
+        focus: focusLower,
+        patternsChecked: patternsToUse.length,
+      })
+    }
     return null
   }
   
@@ -90,7 +141,13 @@ export function matchListeningPattern(
           pattern_key: pattern.id,
           focus: focusLower,
           chunkDisplay: pattern.chunkDisplay,
+          reducedForm: pattern.reducedForm || '(none)',
           words: pattern.words,
+          parentPatternKey: pattern.parentPatternKey || '(none)',
+          parentChunkDisplay: pattern.parentChunkDisplay || '(none)',
+          howItSounds: pattern.howItSounds || '(none)',
+          tip: pattern.tip || '(none)',
+          category: pattern.category || '(none)',
         })
       }
       
@@ -202,15 +259,29 @@ export function matchListeningPatternBackward(
 
 /**
  * Check if a word is eligible for pattern matching
- * Currently: any word that is the start of a pattern in the patterns array
+ * Checks multiple fields: words[0], patternKey/id, and variants' spoken_form
  * @param patterns - Optional array of patterns. If not provided or empty, uses local fallback.
  */
 export function isEligibleForPatternMatching(word: string, patterns?: ListeningPattern[]): boolean {
   const lowerWord = word.toLowerCase()
   const patternsToUse = (patterns && patterns.length > 0) ? patterns : LISTENING_PATTERNS
-  return patternsToUse.some(pattern => 
-    pattern.words.length > 0 && pattern.words[0].toLowerCase() === lowerWord
-  )
+  return patternsToUse.some(pattern => {
+    // Primary: match by first word in words array
+    if (pattern.words.length > 0 && pattern.words[0].toLowerCase() === lowerWord) {
+      return true
+    }
+    // Fallback: match by pattern_key
+    const patternKey = (pattern as any).patternKey || pattern.id
+    if (patternKey && patternKey.toLowerCase() === lowerWord) {
+      return true
+    }
+    // Fallback: match by variants' spoken_form
+    const variants = (pattern as any).variants
+    if (variants && Array.isArray(variants)) {
+      return variants.some((v: any) => v.spoken_form?.toLowerCase() === lowerWord)
+    }
+    return false
+  })
 }
 
 /**
