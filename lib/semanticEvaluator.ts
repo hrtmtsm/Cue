@@ -111,7 +111,7 @@ function isFuzzyMatch(keyword: string, userInput: string, userTokens: Set<string
   }
   
   // Check each user token for similarity
-  for (const userToken of userTokens) {
+  for (const userToken of Array.from(userTokens)) {
     // Allow 1-2 character differences for words 4+ chars
     if (keyword.length >= 4 && userToken.length >= 4) {
       const maxDiff = keyword.length <= 5 ? 1 : 2
