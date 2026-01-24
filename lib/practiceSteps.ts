@@ -547,9 +547,10 @@ export function extractPracticeSteps(
           reducedForm = variantFeedback.spoken_form // Use spoken_form as reduced form
           
           // Use variant-specific explanation (clip-specific, not generic)
-          // IMPORTANT: Use chunkDisplay (written_form) instead of target for soundRule generation
+          // IMPORTANT: Prefer chunkDisplay (written_form) when available, otherwise
+          // fall back to the original target to avoid undefined.
           // This prevents tautological text like "gonna can sound like gonna"
-          const phraseForSoundRule = chunkDisplay // Use "going to" instead of "gonna"
+          const phraseForSoundRule = chunkDisplay || target // Prefer "going to" over "gonna"
           soundRule = variantFeedback.explanation_short || variantFeedback.explanation_medium || patternMatch.tip || patternMatch.soundRule || generateSoundRule(phraseForSoundRule, category, heardAs)
           tip = patternMatch.tip || generateTip(category, target, actualSpan)
           
@@ -587,9 +588,10 @@ export function extractPracticeSteps(
             reducedForm = variant.spoken_form
             
             // Use variant's explanation if available
-            // IMPORTANT: Use chunkDisplay (written_form) instead of target for soundRule generation
+            // IMPORTANT: Prefer chunkDisplay (written_form) when available, otherwise
+            // fall back to the original target to avoid undefined.
             // This prevents tautological text like "gonna can sound like gonna"
-            const phraseForSoundRule = chunkDisplay // Use "going to" instead of "gonna"
+            const phraseForSoundRule = chunkDisplay || target // Prefer "going to" over "gonna"
             soundRule = variant.explanation_short || variant.explanation_medium || patternMatch.tip || patternMatch.soundRule || generateSoundRule(phraseForSoundRule, category, heardAs)
             tip = patternMatch.tip || generateTip(category, target, actualSpan)
             
@@ -1018,9 +1020,10 @@ export function extractPracticeSteps(
             reducedForm = variantFeedback.spoken_form // Use spoken_form as reduced form
             
             // Use variant-specific explanation (clip-specific, not generic)
-            // IMPORTANT: Use chunkDisplay (written_form) instead of expandedTarget for soundRule generation
+            // IMPORTANT: Prefer chunkDisplay (written_form) when available, otherwise
+            // fall back to expandedTarget to avoid undefined.
             // This prevents tautological text like "gonna can sound like gonna"
-            const phraseForSoundRule = chunkDisplay // Use "going to" instead of "gonna"
+            const phraseForSoundRule = chunkDisplay || expandedTarget // Prefer "going to" over "gonna"
             soundRule = variantFeedback.explanation_short || variantFeedback.explanation_medium || patternMatch.tip || patternMatch.soundRule || generateSoundRule(phraseForSoundRule, category, heardAs)
             tip = patternMatch.tip || generateTip(category, expandedTarget, actualSpan)
             
@@ -1042,9 +1045,10 @@ export function extractPracticeSteps(
               reducedForm = variant.spoken_form
               
               // Use variant's explanation if available
-              // IMPORTANT: Use chunkDisplay (written_form) instead of expandedTarget for soundRule generation
+              // IMPORTANT: Prefer chunkDisplay (written_form) when available, otherwise
+              // fall back to expandedTarget to avoid undefined.
               // This prevents tautological text like "gonna can sound like gonna"
-              const phraseForSoundRule = chunkDisplay // Use "going to" instead of "gonna"
+              const phraseForSoundRule = chunkDisplay || expandedTarget // Prefer "going to" over "gonna"
               soundRule = variant.explanation_short || variant.explanation_medium || patternMatch.tip || patternMatch.soundRule || generateSoundRule(phraseForSoundRule, category, heardAs)
               tip = patternMatch.tip || generateTip(category, expandedTarget, actualSpan)
               
