@@ -11,6 +11,8 @@ interface ClipTopBarProps {
   // Optional: override for cases where we don't have lesson progress yet
   fallbackStep?: number
   fallbackTotalSteps?: number
+  // Optional: override percent (0-100) for simple flows like per-clip progress
+  overridePercent?: number
 }
 
 // Debug flag for progress logging (can be disabled via NEXT_PUBLIC_DEBUG_PROGRESS=false)
@@ -21,6 +23,7 @@ export default function ClipTopBar({
   rightSlot,
   fallbackStep,
   fallbackTotalSteps = 5, // Default to 5 (will be 6 if detail steps exist)
+  overridePercent,
 }: ClipTopBarProps) {
   const pathname = usePathname()
   
@@ -146,9 +149,11 @@ export default function ClipTopBar({
     totalScreensDisplay = fallbackTotalSteps
   }
   
-  const percent = progress?.percent ?? (fallbackStep 
-    ? Math.round((fallbackStep / fallbackTotalSteps) * 100)
-    : 0)
+  const percent = overridePercent !== undefined
+    ? overridePercent
+    : progress?.percent ?? (fallbackStep 
+        ? Math.round((fallbackStep / fallbackTotalSteps) * 100)
+        : 0)
   
   // Calculate step display (current screen / total screens for clip)
   // Screen counter: base screens (5) + 1 for all practice steps combined = 5 or 6

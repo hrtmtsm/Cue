@@ -37,7 +37,13 @@ export default function OnboardingLayout({
     }
   }, [router, pathname])
 
-  return <>{children}</>
+  return (
+    <div className="min-h-screen">
+      <div className="max-w-2xl mx-auto">
+        {children}
+      </div>
+    </div>
+  )
 }
 
 

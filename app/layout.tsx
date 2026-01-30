@@ -1,5 +1,12 @@
 import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
 import './globals.css'
+
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter',
+})
 
 export const metadata: Metadata = {
   title: 'Cue - English Listening Practice',
@@ -13,7 +20,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="overflow-x-hidden">
-      <body className="bg-gray-50 antialiased overflow-x-hidden">
+      <body className={`${inter.className} bg-gray-50 antialiased overflow-x-hidden`}>
         <div className="min-h-dvh w-full">
           {children}
         </div>

@@ -9,3 +9,5 @@ COMMENT ON COLUMN listening_patterns.reduced_form IS
 'Phonetic reduction of the pattern (e.g., "wanna" for "want to")';
 
 
+
+

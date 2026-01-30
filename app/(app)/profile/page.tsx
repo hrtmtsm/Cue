@@ -74,7 +74,7 @@ export default function ProfilePage() {
         <div className="pt-4">
           <button 
             onClick={handleSignOut}
-            className="w-full py-3 px-6 rounded-xl font-medium text-lg border-2 border-red-200 text-red-600 hover:bg-red-50 active:bg-red-100 transition-colors"
+            className="w-full md:w-auto md:min-w-[200px] py-3 px-6 rounded-xl font-medium text-lg border-2 border-red-200 text-red-600 hover:bg-red-50 active:bg-red-100 transition-colors"
           >
             Sign out
           </button>

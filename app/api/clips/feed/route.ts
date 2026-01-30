@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdminClient } from '@/lib/supabase/server'
 
-type CefrLevel = 'A1' | 'A2' | 'B1' | 'B2'
+type CefrLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2'
 
 interface FeedRequest {
   cefr: CefrLevel
@@ -30,13 +30,15 @@ const cefrToDifficulty: Record<CefrLevel, string> = {
   'A2': 'easy',
   'B1': 'medium',
   'B2': 'hard',
+  'C1': 'hard', // Advanced level
+  'C2': 'hard', // Native level
 }
 
 /**
  * Get allowed CEFR levels (same or one step easier)
  */
 function getAllowedCefrLevels(userCefr: CefrLevel): CefrLevel[] {
-  const cefrOrder: CefrLevel[] = ['A1', 'A2', 'B1', 'B2']
+  const cefrOrder: CefrLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']
   const userIndex = cefrOrder.indexOf(userCefr)
   if (userIndex === -1) return [userCefr]
   
@@ -64,6 +66,7 @@ function formatClips(clips: any[], limit: number, defaultCefr: CefrLevel): Clip[
         'easy': 'A2',
         'medium': 'B1',
         'hard': 'B2',
+        // Note: Advanced levels (C1, C2) should have explicit cefr column
       }
       difficultyCefr = difficultyToCefr[clip.difficulty] || defaultCefr
     }
@@ -106,12 +109,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json() as FeedRequest
 
     // Validation
-    if (!body.cefr || !['A1', 'A2', 'B1', 'B2'].includes(body.cefr)) {
+    if (!body.cefr || !['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].includes(body.cefr)) {
       return NextResponse.json(
         {
           error: 'Invalid or missing cefr',
           code: 'VALIDATION_ERROR',
-          message: 'cefr must be one of: A1, A2, B1, B2',
+          message: 'cefr must be one of: A1, A2, B1, B2, C1, C2',
         },
         { status: 400 }
       )
@@ -150,6 +153,8 @@ export async function POST(request: NextRequest) {
             'A2': 'easy',
             'B1': 'medium',
             'B2': 'hard',
+            'C1': 'hard',
+            'C2': 'hard',
           }
           const difficulty = cefrToDifficulty[body.cefr]
           
@@ -252,17 +257,20 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const cefrParam = searchParams.get('cefr')
-    const situationParam = searchParams.get('situation')
+    const situationsParam = searchParams.get('situations')
     const limitParam = searchParams.get('limit')
 
     // Note: weakness parameter removed for MVP - categories only for explanation UI
 
     const cefr = cefrParam as CefrLevel | null
-    const situation = situationParam || undefined
+    // Accept multiple situations (comma-separated)
+    const situations = situationsParam 
+      ? situationsParam.split(',').map(s => s.trim().toLowerCase())
+      : undefined
     const limit = limitParam ? parseInt(limitParam, 10) : 10
 
     // Validation
-    if (!cefr || !['A1', 'A2', 'B1', 'B2'].includes(cefr)) {
+    if (!cefr || !['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].includes(cefr)) {
       // Fallback: return default practice clips (no filtering)
       if (IS_DEV) {
         console.log('⚠️ [Clips Feed GET] Invalid/missing cefr, returning default clips')
@@ -292,12 +300,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Validation
-    if (!cefr || !['A1', 'A2', 'B1', 'B2'].includes(cefr)) {
+    if (!cefr || !['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].includes(cefr)) {
       return NextResponse.json(
         {
           error: 'Invalid or missing cefr',
           code: 'VALIDATION_ERROR',
-          message: 'cefr must be one of: A1, A2, B1, B2',
+          message: 'cefr must be one of: A1, A2, B1, B2, C1, C2',
         },
         { status: 400 }
       )
@@ -309,7 +317,8 @@ export async function GET(request: NextRequest) {
     if (IS_DEV) {
       console.log('🔍 [Clips Feed GET] Request (dev only):', {
         cefr,
-        situation,
+        situations,
+        situationCount: situations?.length || 0,
         allowedCefrLevels,
         limit,
       })
@@ -373,14 +382,18 @@ export async function GET(request: NextRequest) {
         return { clip, score: -1 }
       }
 
-      // Priority 1: situation match (weakness-based ranking removed for MVP)
-      if (situation && clip.situation) {
+      // Priority 1: situation match - check if clip matches ANY of the user's situations
+      if (situations && situations.length > 0 && clip.situation) {
         const clipSituation = String(clip.situation).toLowerCase()
-        const requestedSituation = String(situation).toLowerCase()
         
-        if (clipSituation === requestedSituation || 
-            clipSituation.includes(requestedSituation) || 
-            requestedSituation.includes(clipSituation)) {
+        // Check if clip matches any user situation
+        const hasMatch = situations.some(userSituation => {
+          return clipSituation === userSituation || 
+                 clipSituation.includes(userSituation) ||
+                 userSituation.includes(clipSituation)
+        })
+        
+        if (hasMatch) {
           score += 500 // High priority for situation match
         }
       }
@@ -404,14 +417,24 @@ export async function GET(request: NextRequest) {
     const formattedClips = formatClips(topClips, limit, cefr)
 
     if (IS_DEV) {
+      // Calculate situation breakdown
+      const situationBreakdown = topClips.reduce((acc, clip) => {
+        const sit = clip.situation || 'unknown'
+        acc[sit] = (acc[sit] || 0) + 1
+        return acc
+      }, {} as Record<string, number>)
+
       console.log('📊 [Clips Feed GET] Results (dev only):', {
         cefr,
-        situation,
+        requestedSituations: situations,
+        situationCount: situations?.length || 0,
         totalClipsFetched: allClips.length,
         validClips: validClips.length,
         returnedCount: formattedClips.length,
+        clipsBySituation: situationBreakdown,
         topScores: validClips.slice(0, 5).map(item => ({
           clipId: item.clip.id,
+          situation: item.clip.situation,
           score: item.score,
         })),
         firstIds: formattedClips.slice(0, 5).map(c => c.id),

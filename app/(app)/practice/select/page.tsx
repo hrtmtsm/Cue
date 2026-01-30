@@ -14,6 +14,8 @@ import { loadUserStories, saveUserStories } from '@/lib/storyClient'
 import { loadDiagnosticSummary, type DiagnosticSummary } from '@/lib/diagnosticSummary'
 import { loadQuickStartSummary, getFeedStartDifficulty } from '@/lib/quickStartSummary'
 import { getOnboardingData } from '@/lib/onboardingStore'
+import { mapSituationKeyToClipSituation } from '@/lib/situationMapping'
+import { getNextUncompletedStory, getCompletedStories, getStoryProgress } from '@/lib/storyRotation'
 import ClipsReadyModal from '@/components/ClipsReadyModal'
 
 // Helper to get icon for story based on situation
@@ -57,6 +59,34 @@ export default function PracticeSelectPage() {
   const [isHydrated, setIsHydrated] = useState(false)
   const [summary, setSummary] = useState<DiagnosticSummary | null>(null)
   const [showClipsReadyModal, setShowClipsReadyModal] = useState(false)
+  const [dailyStory, setDailyStory] = useState<Story | null>(null)
+  const [completedToday, setCompletedToday] = useState(false)
+  const [streak, setStreak] = useState(0)
+  const [userName, setUserName] = useState<string | null>(null)
+
+  // Helper: has the user completed today's free session?
+  function hasCompletedToday(): boolean {
+    if (typeof window === 'undefined') return false
+    const lastSession = localStorage.getItem('lastSessionCompleted')
+    const today = new Date().toDateString()
+    return lastSession === today
+  }
+
+  // Helper: time remaining until midnight local time
+  function getTimeUntilMidnight(): string {
+    const now = new Date()
+    const midnight = new Date()
+    midnight.setHours(24, 0, 0, 0)
+
+    const diff = midnight.getTime() - now.getTime()
+    const hours = Math.max(0, Math.floor(diff / (1000 * 60 * 60)))
+    const minutes = Math.max(
+      0,
+      Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+    )
+
+    return `${hours}h ${minutes}m`
+  }
 
   // Load quick start summary on mount and check for popup
   useEffect(() => {
@@ -80,9 +110,66 @@ export default function PracticeSelectPage() {
     setShowClipsReadyModal(false)
   }
 
+  // Select daily story and check completion status when stories are loaded
+  useEffect(() => {
+    if (!isHydrated || stories.length === 0) return
+
+    // ✅ NEW: Select first uncompleted story (rotation logic)
+    const daily = getNextUncompletedStory(stories)
+    
+    if (!daily) {
+      console.warn('⚠️ [SELECT PAGE] No stories available')
+      return
+    }
+
+    // Check daily completion
+    const today = new Date().toISOString().split('T')[0]
+    const lastPracticeDate = localStorage.getItem('lastPracticeDate')
+    const completed = lastPracticeDate === today
+
+    setDailyStory(daily)
+    setCompletedToday(completed)
+
+    // Log rotation info
+    const completedStories = getCompletedStories()
+    const progress = getStoryProgress(stories)
+    
+    console.log('📅 [SELECT PAGE] Daily session selected:', {
+      storyId: daily.id,
+      title: daily.title,
+      completedToday: completed,
+      lastPracticeDate,
+      today,
+      totalStories: stories.length,
+      completedCount: completedStories.length,
+      remainingCount: progress.remaining,
+      progressPercent: progress.percentComplete + '%',
+    })
+  }, [isHydrated, stories])
+
   useEffect(() => {
     // Only run on client
     if (typeof window === 'undefined') return
+
+    // Load userName from localStorage or onboardingData
+    const storedUserName = localStorage.getItem('userName')
+    if (storedUserName) {
+      setUserName(storedUserName)
+    } else {
+      const onboardingData = getOnboardingData()
+      // Note: onboardingData.name doesn't exist in the type, but check anyway per user request
+      const nameFromOnboarding = (onboardingData as any).name
+      if (nameFromOnboarding) {
+        setUserName(nameFromOnboarding)
+      }
+    }
+
+    // Load streak from localStorage (optional motivation element)
+    const storedStreak = localStorage.getItem('streak')
+    const parsedStreak = storedStreak ? parseInt(storedStreak, 10) : 0
+    if (!Number.isNaN(parsedStreak) && parsedStreak > 0) {
+      setStreak(parsedStreak)
+    }
 
     // Check if user has completed signup/login
     const hasCompletedSignup = !!localStorage.getItem('userFirstName')
@@ -115,25 +202,37 @@ export default function PracticeSelectPage() {
         try {
           // Get preferences from onboarding data
           const onboardingData = getOnboardingData()
-          // Use situations[0] as primary situation, or fallback to 'general'
-          const situation = onboardingData.situations && onboardingData.situations.length > 0
-            ? onboardingData.situations[0]
-            : 'general' // Fallback to general if no situations selected
+          
+          // ✅ NEW: Map ALL selected situations (not just first one)
+          const situationKeys = onboardingData.situations && onboardingData.situations.length > 0
+            ? onboardingData.situations
+            : ['general' as const] // Fallback to general if no situations selected
+          
+          // Map all situation keys to clip situation format
+          const mappedSituations = situationKeys.map(key => 
+            mapSituationKeyToClipSituation(key)
+          )
+          
+          console.log('🎯 [SELECT PAGE] Fetching feed for situations:', mappedSituations)
 
           // Calculate feed start difficulty: max(0, startingDifficulty - 20)
           const feedStartDifficulty = getFeedStartDifficulty(quickStartSummary)
           
           // Map feedStartDifficulty to CEFR for API (ensures feed starts easier)
-          // 0-14 -> A1, 15-24 -> A2, 25-34 -> B1, 35+ -> B2
+          // 0-9 -> A1, 10-19 -> A2, 20-29 -> B1, 30-39 -> B2, 40-49 -> C1, 50+ -> C2
           let cefr: string
-          if (feedStartDifficulty <= 14) {
+          if (feedStartDifficulty < 10) {
             cefr = 'A1'
-          } else if (feedStartDifficulty <= 24) {
+          } else if (feedStartDifficulty < 20) {
             cefr = 'A2'
-          } else if (feedStartDifficulty <= 34) {
+          } else if (feedStartDifficulty < 30) {
             cefr = 'B1'
-          } else {
+          } else if (feedStartDifficulty < 40) {
             cefr = 'B2'
+          } else if (feedStartDifficulty < 50) {
+            cefr = 'C1'
+          } else {
+            cefr = 'C2'
           }
 
           // Debug log at feed selection entry point (dev-only)
@@ -151,8 +250,9 @@ export default function PracticeSelectPage() {
             feedStartDifficulty,
             missedRate: (quickStartSummary.missedRate * 100).toFixed(1) + '%',
             attemptAccuracy: quickStartSummary.attemptAccuracy.toFixed(1) + '%',
-            situation,
-            situations: onboardingData.situations,
+            mappedSituations,
+            situationCount: mappedSituations.length,
+            userSituations: onboardingData.situations,
           })
           
           // Build query params for GET request
@@ -160,8 +260,8 @@ export default function PracticeSelectPage() {
             cefr,
           })
           
-          // Add situation (from situations[0]) - always provide at least 'general'
-          params.append('situation', situation)
+          // ✅ Add all situations (comma-separated)
+          params.append('situations', mappedSituations.join(','))
           
           const response = await fetch(`/api/clips/feed?${params.toString()}`, {
             method: 'GET',
@@ -196,6 +296,8 @@ export default function PracticeSelectPage() {
               'A2': 'easy',
               'B1': 'medium',
               'B2': 'hard',
+              'C1': 'hard', // Advanced level
+              'C2': 'hard', // Native level
             }
             
             // Generate a simple title from transcript (first few words)
@@ -401,6 +503,13 @@ export default function PracticeSelectPage() {
     }
   }, [])
 
+  const handleStartPractice = () => {
+    // Respect daily free-tier limit
+    if (!dailyStory || hasCompletedToday()) return
+    // Go directly to the first clip in the story (skip intermediate list)
+    router.push(`/practice/story/${dailyStory.id}?clipIndex=0`)
+  }
+
 
   // Prevent rendering until hydrated to avoid flash
   if (!isHydrated) {
@@ -415,17 +524,31 @@ export default function PracticeSelectPage() {
   }
 
   return (
-    <main className="flex min-h-dvh flex-col py-6">
+    <main className="flex min-h-dvh flex-col py-8 px-6 bg-gradient-to-b from-blue-50/60 via-white to-white">
       {/* Clips Ready Modal */}
       <ClipsReadyModal 
         isOpen={showClipsReadyModal}
         onClose={handleCloseClipsReadyModal}
       />
 
-      {/* Header */}
+      {/* Greeting section */}
+      <div className="mb-8">
+        <h1 className="text-heading-2 text-gray-900 mb-2">
+          👋 Hi {userName || 'there'}
+        </h1>
+        
+        {streak > 0 && (
+          <div className="inline-flex items-center gap-2 bg-orange-100 px-4 py-2 rounded-full">
+            <span className="text-xl">🔥</span>
+            <span className="text-sm font-semibold text-orange-900">{streak} day streak</span>
+          </div>
+        )}
+      </div>
+
+      {/* Back button (if needed) */}
       {showBackButton && (
-        <div className="mb-8">
-          <Link 
+        <div className="mb-6">
+          <Link
             href="/practice"
             className="text-blue-600 font-medium text-lg py-2 px-1 -ml-1 inline-flex items-center gap-1"
           >
@@ -437,67 +560,147 @@ export default function PracticeSelectPage() {
 
       {/* Content */}
       <div className="flex-1 space-y-8">
-        <div className="space-y-2">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Pick a story to practice
-          </h1>
-          <p className="text-gray-600">
-            Practice with complete conversations, clip by clip
-          </p>
-        </div>
+        {dailyStory ? (
+          <>
+            {/* Main Daily Session Card - with free-tier limit */}
+            <div className="mb-6">
+              {hasCompletedToday() ? (
+                // Locked state: session already completed today
+                <div className="rounded-2xl border-2 border-gray-200 bg-gray-50 p-8 text-center space-y-4">
+                  <div className="mb-4 text-4xl">✅</div>
+                  <h2 className="text-heading-2 text-gray-900">
+                    Great work today!
+                  </h2>
+                  <p className="text-body text-gray-600">
+                    You completed your daily practice session.
+                    Come back tomorrow for more!
+                  </p>
 
-        {/* Story Cards */}
-        <div className="space-y-3">
-          {stories.map((story) => (
-            <Link
-              key={story.id}
-              href={`/practice/story/${story.id}`}
-              className="w-full text-left p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-blue-200 hover:border-2 active:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all block"
-            >
-              <div className="flex items-start gap-3">
-                {/* Story Icon */}
-                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600">
-                  {getStoryIcon(story.situation)}
-                </div>
-
-                {/* Story Info */}
-                <div className="flex-1 min-w-0 space-y-2">
-                  <div>
-                    <h3 className="font-semibold text-gray-900 text-lg">{story.title}</h3>
-                    <p className="text-sm text-gray-600 mt-1 line-clamp-2">{story.context}</p>
+                  <div className="text-sm text-gray-500">
+                    Next session available in {getTimeUntilMidnight()}
                   </div>
 
-                  {/* Metadata */}
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <div className="flex items-center gap-1 text-xs text-gray-500">
-                      <Layers className="w-4 h-4" />
-                      <span>{story.clips.length} clips</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-xs text-gray-500">
-                      <Clock className="w-4 h-4" />
-                      <span>{formatDuration(story.durationSec)}</span>
-                    </div>
-                    {story.situation && (
-                      <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
-                        {story.situation}
-                      </span>
-                    )}
-                    <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
-                      {formatDifficulty(story.difficulty)}
-                    </span>
+                  <div className="rounded-xl bg-gradient-to-r from-amber-100 to-orange-100 p-4 text-left space-y-1">
+                    <p className="text-base font-medium text-gray-900">
+                      💎 Want to practice more?
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      Upgrade to Pro for unlimited daily sessions.
+                    </p>
                   </div>
-                </div>
 
-                {/* CTA Arrow */}
-                <div className="flex-shrink-0 pt-1">
-                  <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+                  <button
+                    onClick={() => router.push('/pro')}
+                    className="w-full md:w-auto md:min-w-[300px] bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold py-3 px-6 rounded-xl transition-all"
+                  >
+                    Learn About Pro →
+                  </button>
+                </div>
+              ) : (
+                // Unlocked: user can start today's practice
+                <div className="rounded-3xl border border-blue-200 bg-gradient-to-br from-blue-50 via-white to-blue-100 p-6 md:p-7 shadow-sm space-y-4">
+                  <div className="flex items-start sm:items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl text-2xl flex-shrink-0">
+                      <span>🎯</span>
+                    </div>
+                    <div className="text-left flex-1">
+                      <h2 className="text-heading-2 text-gray-900">
+                        Today's Practice
+                      </h2>
+                      <p className="text-body text-gray-600">
+                        Build your ear, one clip at a time.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-body-small text-gray-500">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                      <span>Quick session • ~1 minute</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                      <span>3 short clips</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      onClick={handleStartPractice}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white text-body-large font-semibold py-3.5 px-6 rounded-xl transition-colors shadow-md"
+                    >
+                      Start Practice →
+                    </button>
+                  </div>
+
+                  {/* Story Progress Indicator */}
+                  {(() => {
+                    const progress = getStoryProgress(stories)
+                    const onboardingData = getOnboardingData()
+                    const situationKeys = onboardingData.situations || []
+                    const activeSituations = situationKeys.map(key => 
+                      mapSituationKeyToClipSituation(key)
+                    )
+                    
+                    return (
+                      <div className="pt-2 text-center space-y-1">
+                        {progress.total > 0 && progress.completed > 0 && (
+                          <p className="text-body-small text-gray-500">
+                            {progress.completed} of {progress.total} stories completed
+                          </p>
+                        )}
+                        {activeSituations.length > 0 && activeSituations[0] !== 'general' && (
+                          <p className="text-body-small text-gray-500">
+                            Clips from: {activeSituations.map(s => 
+                              s.charAt(0).toUpperCase() + s.slice(1)
+                            ).join(', ')}
+                          </p>
+                        )}
+                      </div>
+                    )
+                  })()}
+                </div>
+              )}
+            </div>
+
+            {/* Simple progress section (optional, lightweight) */}
+            <div className="mt-6 p-6 bg-gray-50 rounded-2xl border border-gray-100 space-y-3">
+              <h3 className="text-heading-3 mb-3 text-gray-900">
+                Your Progress
+              </h3>
+              <p className="text-body-small text-gray-600 mb-4">
+                Keep showing up. A few minutes a day adds up quickly.
+              </p>
+              <div className="space-y-3">
+                <div className="flex justify-between text-body-small">
+                  <span className="text-gray-600">This week</span>
+                  <span className="text-body font-bold">
+                    {/* Placeholder progress; wire real stats later */}
+                    3/7 days
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                  <div
+                    className="bg-blue-600 h-full rounded-full"
+                    style={{ width: '43%' }}
+                  />
                 </div>
               </div>
-            </Link>
-          ))}
-        </div>
+            </div>
+          </>
+        ) : (
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold text-gray-900">
+              Pick a story to practice
+            </h1>
+            <p className="text-gray-600">
+              Practice with complete conversations, clip by clip
+            </p>
+            <p className="text-sm text-gray-500 mt-4">
+              No stories available. Please complete onboarding to get started.
+            </p>
+          </div>
+        )}
       </div>
     </main>
   )

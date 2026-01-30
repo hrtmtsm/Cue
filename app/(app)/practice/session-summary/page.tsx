@@ -1,12 +1,19 @@
 'use client'
 
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Suspense } from 'react'
+import { Suspense, useEffect } from 'react'
 
 function SessionSummaryPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const sessionId = searchParams.get('session') || ''
+
+  // Mark today's session as complete (for free tier daily limit)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const today = new Date().toDateString()
+    localStorage.setItem('lastSessionCompleted', today)
+  }, [])
 
   return (
     <main className="flex min-h-screen flex-col px-6 py-6">
@@ -17,12 +24,23 @@ function SessionSummaryPageContent() {
         <p className="text-lg text-gray-600">
           Great work practicing your listening skills.
         </p>
-        <div className="pt-8 space-y-4 w-full max-w-sm">
+        {/* Daily limit messaging */}
+        <div className="w-full max-w-sm space-y-4">
+          <div className="bg-blue-50 rounded-xl p-4 space-y-2">
+            <p className="text-sm font-medium text-blue-900">
+              ✅ You completed your free practice for today!
+            </p>
+            <p className="text-xs text-blue-700">
+              Come back tomorrow for another session, or upgrade to Pro for unlimited practice.
+            </p>
+          </div>
+
+          {/* Pro upsell */}
           <button
-            onClick={() => router.push('/practice')}
-            className="w-full py-4 px-6 rounded-xl font-semibold text-lg bg-blue-600 text-white active:bg-blue-700 shadow-lg transition-colors"
+            onClick={() => router.push('/pro')}
+            className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold py-4 px-6 rounded-xl transition-all"
           >
-            Practice another clip
+            Unlock Unlimited Practice with Pro →
           </button>
         </div>
       </div>

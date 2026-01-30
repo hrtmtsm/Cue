@@ -20,8 +20,9 @@ export default function IntroPage() {
   const ctaHref = isAuthenticated ? '/practice' : '/auth'
 
   return (
-    <main className="flex min-h-screen flex-col px-6 py-12">
-      <div className="flex flex-col justify-center flex-1 space-y-8">
+    <main className="flex min-h-screen flex-col items-center justify-center px-4 py-12">
+      {/* Max-width container for centering */}
+      <div className="max-w-2xl mx-auto w-full space-y-8">
         <div className="space-y-4 text-center">
           <div className="mb-8">
             <h2 className="text-5xl font-bold text-blue-600 tracking-tight">
@@ -35,23 +36,23 @@ export default function IntroPage() {
             Train your ear to hear fast, natural speech — one short clip at a time.
           </p>
         </div>
-      </div>
 
-      <div className="pt-8 pb-6 space-y-3">
-        <Link
-          href={ctaHref}
-          className="block w-full bg-blue-600 text-white text-center font-semibold py-4 px-6 rounded-xl shadow-lg active:bg-blue-700 transition-colors"
-        >
-          {ctaText}
-        </Link>
-        {!isAuthenticated && (
+        <div className="pt-8 pb-6 space-y-3">
           <Link
-            href="/auth/login"
-            className="block w-full text-center font-medium py-3 px-6 text-gray-600 hover:text-gray-900 transition-colors"
+            href={ctaHref}
+            className="block w-full bg-blue-600 text-white text-center font-semibold py-4 px-6 rounded-xl shadow-lg active:bg-blue-700 transition-colors"
           >
-            I already have an account
+            {ctaText}
           </Link>
-        )}
+          {!isAuthenticated && (
+            <Link
+              href="/auth/login"
+              className="block w-full text-center font-medium py-3 px-6 text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              I already have an account
+            </Link>
+          )}
+        </div>
       </div>
     </main>
   )

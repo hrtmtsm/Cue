@@ -112,3 +112,5 @@ npm run seed:patterns
 - All existing functionality remains intact (no UI changes)
 
 
+
+

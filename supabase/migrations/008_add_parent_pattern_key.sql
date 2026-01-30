@@ -29,3 +29,5 @@ COMMENT ON COLUMN listening_patterns.parent_pattern_key IS
 'References the canonical pattern_key this reduction comes from (e.g., "gonna" → "going-to")';
 
 
+
+

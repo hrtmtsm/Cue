@@ -2,13 +2,16 @@
 
 import { useState, useRef, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { ChevronLeft, AlertCircle } from 'lucide-react'
+import { ChevronLeft, AlertCircle, Mic } from 'lucide-react'
 import Link from 'next/link'
 import AudioWaveLine from '@/components/AudioWaveLine'
 import Snackbar from '@/components/Snackbar'
 import FullScreenLoader from '@/components/FullScreenLoader'
 import TopStatusSnackbar from '@/components/TopStatusSnackbar'
 import ClipTopBar from '@/components/ClipTopBar'
+import VoiceRecorder from '@/components/VoiceRecorder'
+import MicPermissionModal from '@/components/MicPermissionModal'
+import ExitPracticeModal from '@/components/ExitPracticeModal'
 import { getStoryByIdClient } from '@/lib/storyClient'
 import { getAudioMetadata, generateAudio } from '@/lib/audioApi'
 import { useClipLessonProgress } from '@/lib/clipLessonProgress'
@@ -47,6 +50,7 @@ function RespondPageContent() {
   const clipId = searchParams.get('clip')
   const storyId = searchParams.get('storyId')
   const storyClipId = searchParams.get('clipId') // Clip ID within a story
+  const clipIndex = parseInt(searchParams.get('clipIndex') || '0', 10)
   const sessionId = searchParams.get('session') || 'quick'
   const phraseIndex = parseInt(searchParams.get('index') || '0', 10)
   const phraseId = searchParams.get('phraseId')
@@ -56,7 +60,6 @@ function RespondPageContent() {
   const { initialize, completeStep } = useClipLessonProgress()
   const hasEnteredScreenRef = useRef(false) // Track if we've marked this screen entry
   
-  const [inputMode, setInputMode] = useState<'type' | 'speak'>('type')
   const [userInput, setUserInput] = useState('')
   const [inputError, setInputError] = useState<string | null>(null)
   const MIN_INPUT_CHARS = 3
@@ -79,11 +82,64 @@ function RespondPageContent() {
   const userPlayToastTimerRef = useRef<NodeJS.Timeout | null>(null)
   const objectUrlRef = useRef<string | null>(null) // Track object URLs for cleanup
   const userInitiatedPlayRef = useRef<boolean>(false) // Track if user actually attempted playback
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const [practiceData, setPracticeData] = useState<PracticeData & { audioStatus?: 'ready' | 'needs_generation' | 'error' | 'generating' }>({
     audioUrl: '',
     transcript: 'Loading...',
     audioStatus: 'needs_generation',
   })
+  const [showMicPermissionModal, setShowMicPermissionModal] = useState(false)
+  const [showExitModal, setShowExitModal] = useState(false)
+  const [speechError, setSpeechError] = useState<string | null>(null)
+  const [audioLevels, setAudioLevels] = useState<number[]>(new Array(40).fill(0))
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const updateIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Auto-focus textarea on mount so the keyboard appears immediately on mobile.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      textareaRef.current?.focus()
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [])
+
+  // Cleanup audio analysis on unmount
+  useEffect(() => {
+    return () => {
+      if (updateIntervalRef.current) {
+        clearInterval(updateIntervalRef.current)
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close()
+      }
+    }
+  }, [])
+
+  // Map low-level/technical errors into user-friendly messages suitable for end users.
+  const getUserFriendlyError = (error: any): string => {
+    const errorText: string =
+      typeof error === 'string'
+        ? error
+        : error?.message || error?.toString?.() || ''
+
+    const lower = errorText.toLowerCase()
+
+    if (lower.includes('too short') || lower.includes('0.1 seconds')) {
+      return 'Recording was too short. Please try again.'
+    }
+    if (lower.includes('notallowederror') || lower.includes('permission')) {
+      return 'Please allow microphone access to use speech input.'
+    }
+    if (lower.includes('network') || lower.includes('fetch')) {
+      return 'Connection issue. Please check your internet and try again.'
+    }
+    if (lower.includes('transcription') || lower.includes('recognize') || lower.includes('recognise')) {
+      return "Couldn't understand the audio. Please speak clearly and try again."
+    }
+
+    return 'Something went wrong. Please try again.'
+  }
   
   // Single source of truth for audioStatus
   const audioStatus = practiceData?.audioStatus ?? 'needs_generation'
@@ -1489,7 +1545,6 @@ function RespondPageContent() {
     console.log('🔍 [DEBUG] Current search:', typeof window !== 'undefined' ? window.location.search : 'SSR')
     console.log('🔍 [DEBUG] userInput:', userInput?.substring(0, 50) + (userInput?.length > 50 ? '...' : ''))
     console.log('🔍 [DEBUG] userInput length:', userInput?.length || 0)
-    console.log('🔍 [DEBUG] inputMode:', inputMode)
     
     // Prevent any default behavior or event bubbling
     if (e) {
@@ -1498,18 +1553,16 @@ function RespondPageContent() {
       console.log('🔍 [DEBUG] Prevented default and stopped propagation')
     }
 
-    if (inputMode === 'type') {
-      const trimmedInput = userInput.trim()
-      // Validate minimum input length
-      if (!trimmedInput || trimmedInput.length < MIN_INPUT_CHARS) {
-        setInputError(`Please type at least ${MIN_INPUT_CHARS} characters`)
-        const inputElement = document.getElementById('answer-input') as HTMLTextAreaElement
-        inputElement?.focus()
-        return
-      }
-      // Clear error if valid
-      setInputError(null)
+    const trimmedInput = userInput.trim()
+    // Validate minimum input length
+    if (!trimmedInput || trimmedInput.length < MIN_INPUT_CHARS) {
+      setInputError(`Please type at least ${MIN_INPUT_CHARS} characters`)
+      const inputElement = document.getElementById('answer-input') as HTMLTextAreaElement
+      inputElement?.focus()
+      return
     }
+    // Clear error if valid
+    setInputError(null)
 
     // Don't complete steps here - progress advances when Review page loads (screen entry)
     // Progress only advances on screen entry, not button clicks
@@ -1533,7 +1586,9 @@ function RespondPageContent() {
     
     if (storyId && storyClipId) {
       // Story-based routing - mark as done and navigate to review
-      reviewUrl = `/practice/review?storyId=${storyId}&clipId=${storyClipId}&userText=${encodeURIComponent(userInput)}`
+      reviewUrl = `/practice/review?storyId=${storyId}&clipId=${storyClipId}&clipIndex=${clipIndex}&userText=${encodeURIComponent(
+        userInput
+      )}`
       console.log('✅ [RespondPage] Navigating to review (story-based):', reviewUrl)
     } else if (clipId) {
       // Clip-based routing (single phrase session - Quick Practice)
@@ -1574,31 +1629,71 @@ function RespondPageContent() {
   }
 
   const handleBack = () => {
-    // Navigate back to story page if from story, otherwise to practice select
-    if (storyId) {
-      router.push(`/practice/story/${storyId}`)
-    } else {
-      router.push('/practice/select')
-    }
+    // Show exit confirmation modal instead of navigating directly
+    setShowExitModal(true)
+  }
+
+  const handleConfirmExit = () => {
+    console.log('handleConfirmExit called - navigating to practice select')
+    
+    // Always navigate to practice select page when exiting
+    router.push('/practice/select')
   }
 
   return (
     <main className="flex min-h-screen flex-col">
+      <MicPermissionModal
+        isOpen={showMicPermissionModal}
+        onClose={() => setShowMicPermissionModal(false)}
+      />
+
+      <ExitPracticeModal
+        isOpen={showExitModal}
+        onClose={() => setShowExitModal(false)}
+        onConfirmExit={handleConfirmExit}
+      />
+
+      {/* Global speech/recording error modal (for user-friendly messages) */}
+      {speechError && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
+            <p className="text-lg font-semibold mb-2 text-gray-900">Oops!</p>
+            <p className="text-gray-700 mb-4">{speechError}</p>
+            <button
+              type="button"
+              onClick={() => setSpeechError(null)}
+              className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold active:bg-blue-700 transition-colors"
+            >
+              Try again
+        </button>
+      </div>
+        </div>
+      )
+      }
       {/* Top Bar - Progress bar at very top (Duolingo style) */}
       {/* Progress now managed by shared ClipLessonProgress context */}
       <ClipTopBar 
         onBack={handleBack}
+        // Override percent to show cumulative per-clip progress (3-clip session)
+        overridePercent={(() => {
+          const totalClips = 3
+          const safeIndex = Number.isNaN(clipIndex) ? 0 : Math.max(0, clipIndex)
+          const progress = ((safeIndex + 1) / totalClips) * 100
+          return Math.max(0, Math.min(100, progress))
+        })()}
       />
 
       {/* Content with padding */}
-      <div className="flex-1 px-6 py-6 space-y-6">
+      <div className="flex-1 px-6 py-6">
+        {/* Max-width container for centered content */}
+        <div className="max-w-2xl mx-auto space-y-6">
         {/* Missing clipId error */}
         {!effectiveClipId && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-lg space-y-3">
             <div className="flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="text-sm text-red-800 font-medium">No clip selected</p>
+                <p className="text-body-small text-red-800 font-medium">No clip selected</p>
                 <p className="text-xs text-red-700 mt-1">Please select a clip from the practice list.</p>
               </div>
             </div>
@@ -1655,19 +1750,16 @@ function RespondPageContent() {
         )}
 
         <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Listen first
+          <h1 className="text-heading-2 text-gray-900" style={{ fontFamily: 'Poppins' }}>
+            Enter what you hear
           </h1>
-          <p className="text-gray-600">
-            No text shown yet
-          </p>
         </div>
 
         {/* Audio Controls - Always accessible (single Play button, Spotify-like) */}
-        <div className="relative flex flex-col items-center justify-center py-6 min-h-[140px] -mx-6 px-6">
+        <div className="relative flex flex-col items-center justify-center py-6 min-h-[140px]">
           {/* Continuous waveform line - full width behind controls (only if using generated audio) */}
           {voiceMode === 'generated' && (
-          <div className="absolute inset-x-6 top-1/2 -translate-y-1/2 h-12 z-0">
+          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-12 z-0">
             <AudioWaveLine audioRef={audioRef} isPlaying={isPlaying} side="full" height={48} />
           </div>
           )}
@@ -1714,88 +1806,219 @@ function RespondPageContent() {
           </div>
         </div>
 
-        {/* Input mode toggle */}
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={() => setInputMode('type')}
-            className={`flex-1 py-3 rounded-lg font-medium transition-colors ${
-              inputMode === 'type'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-600'
-            }`}
-          >
-            Type
-          </button>
-          <button
-            onClick={() => setInputMode('speak')}
-            className={`flex-1 py-3 rounded-lg font-medium transition-colors ${
-              inputMode === 'speak'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-600'
-            }`}
-          >
-            Speak
-          </button>
-        </div>
+        {/* Unified input area with optional speech input (Duolingo-style) */}
+        <div className="space-y-4">
+          <div className="relative space-y-2">
+            <textarea
+              id="answer-input"
+              ref={textareaRef}
+              value={userInput}
+              onChange={(e) => {
+                setUserInput(e.target.value)
+                // Clear error when user starts typing
+                if (inputError) {
+                  setInputError(null)
+                }
+              }}
+              placeholder="Type what you heard..."
+              className={`w-full h-[200px] p-4 pr-14 border-2 rounded-xl resize-none focus:outline-none text-lg ${
+                inputError 
+                  ? 'border-red-300 focus:border-red-500' 
+                  : 'border-gray-200 focus:border-blue-600'
+              }`}
+            />
 
-        {/* Input area */}
-        {inputMode === 'type' ? (
-          <div className="space-y-4">
-            <label htmlFor="answer-input" className="block text-sm font-medium text-gray-700">
-              Type what you heard
-            </label>
-            <div className="space-y-2">
-              <textarea
-                id="answer-input"
-                value={userInput}
-                onChange={(e) => {
-                  setUserInput(e.target.value)
-                  // Clear error when user starts typing
-                  if (inputError) {
-                    setInputError(null)
+            {/* Microphone button + waveform inside the textarea */}
+            <VoiceRecorder
+              onTranscript={(text) => {
+                setUserInput(text)
+                if (inputError) {
+                  setInputError(null)
+                }
+              }}
+              onError={(error) => {
+                const friendly = getUserFriendlyError(error)
+                setSpeechError(friendly)
+              }}
+              onPermissionDenied={() => {
+                setShowMicPermissionModal(true)
+                // Focus the textarea since Type is the only input mode
+                setTimeout(() => {
+                  textareaRef.current?.focus()
+                }, 0)
+              }}
+            >
+              {({ state, startRecording, stopRecording, stream }) => {
+                console.log('🎨 [RespondPage] Rendering mic button, recorder state =', state)
+                
+                // Analyze audio stream for real-time waveform visualization
+                useEffect(() => {
+                  if (state === 'recording' && stream) {
+                    // Create audio context and analyser
+                    const audioContext = new AudioContext()
+                    const analyser = audioContext.createAnalyser()
+                    const source = audioContext.createMediaStreamSource(stream)
+                    
+                    source.connect(analyser)
+                    analyser.fftSize = 128  // More detail for better response
+                    analyser.smoothingTimeConstant = 0.5  // Faster response to changes
+                    
+                    audioContextRef.current = audioContext
+                    analyserRef.current = analyser
+                    
+                    const dataArray = new Uint8Array(analyser.frequencyBinCount)
+                    
+                    // Update every 100ms (10 times per second) for slower timeline scroll
+                    const interval = setInterval(() => {
+                      analyser.getByteFrequencyData(dataArray)
+                      
+                      // Focus on speech frequencies (300-3400 Hz range)
+                      // This makes it more responsive to human voice
+                      const speechStart = Math.floor(dataArray.length * 0.1)
+                      const speechEnd = Math.floor(dataArray.length * 0.5)
+                      const speechData = dataArray.slice(speechStart, speechEnd)
+                      const average = speechData.reduce((sum, val) => sum + val, 0) / speechData.length
+                      
+                      // Amplify by 2x for natural dynamic range (quiet to loud)
+                      let normalizedLevel = Math.min(1, (average / 255) * 2)
+                      
+                      // Scroll the waveform: remove leftmost, add rightmost (timeline effect)
+                      setAudioLevels(prev => {
+                        const newLevels = [...prev]
+                        newLevels.shift()  // Remove first (leftmost) bar
+                        newLevels.push(normalizedLevel)  // Add new level at end (rightmost)
+                        return newLevels
+                      })
+                    }, 100)
+                    
+                    updateIntervalRef.current = interval
+                  } else {
+                    // Stop analysis and reset levels
+                    if (updateIntervalRef.current) {
+                      clearInterval(updateIntervalRef.current)
+                      updateIntervalRef.current = null
+                    }
+                    if (audioContextRef.current) {
+                      audioContextRef.current.close()
+                      audioContextRef.current = null
+                    }
+                    setAudioLevels(new Array(40).fill(0))
                   }
-                }}
-                placeholder="Type what you heard..."
-                className={`w-full h-40 p-4 border-2 rounded-xl resize-none focus:outline-none text-lg ${
-                  inputError 
-                    ? 'border-red-300 focus:border-red-500' 
-                    : 'border-gray-200 focus:border-blue-600'
-                }`}
-              />
-              {inputError && (
-                <p className="text-sm text-red-600">{inputError}</p>
-              )}
+                }, [state, stream])
+                
+                const handleMicClick = async () => {
+                  console.log('🔵 [RespondPage] Mic button clicked! Current state:', state)
+                  
+                  if (state === 'recording') {
+                    // Stop recording
+                    console.log('⏸️ [RespondPage] Stopping recording...')
+                    stopRecording()
+                  } else if (state === 'idle' || state === 'error') {
+                    // Start recording
+                    console.log('▶️ [RespondPage] Starting recording...')
+                    try {
+                      await startRecording()
+                      console.log('✅ [RespondPage] Recording started successfully')
+                    } catch (err) {
+                      console.error('❌ [RespondPage] Failed to start recording:', err)
+                    }
+                  } else {
+                    console.log('⏳ [RespondPage] Busy (transcribing), ignoring click')
+                  }
+                }
+                
+                return (
+                  <div className="absolute bottom-4 right-4 left-4 flex items-center justify-end gap-2 pointer-events-none">
+                    {/* Waveform timeline - shows recording history */}
+                    {state === 'recording' && (
+                      <div className="flex items-center gap-px h-10 py-1 px-2 bg-gray-50 rounded-lg pointer-events-none">
+                        {audioLevels.map((level, i) => (
+                          <div
+                            key={i}
+                            className="w-1 rounded-sm transition-all duration-100"
+                            style={{
+                              height: `${Math.min(50, Math.max(8, level * 100))}%`,
+                              backgroundColor: level > 0.1 ? '#3b82f6' : '#d1d5db',
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Mic/Stop button */}
+                    <button
+                      type="button"
+                      className={`p-3 rounded-full border transition-all active:scale-95 z-10 pointer-events-auto ${
+                        state === 'recording'
+                          ? 'bg-white border-blue-600'
+                          : 'bg-white border-blue-600'
+                      }`}
+                      onClick={handleMicClick}
+                      disabled={state === 'transcribing'}
+                      aria-label={
+                        state === 'recording' 
+                          ? 'Tap to stop recording' 
+                          : state === 'transcribing'
+                          ? 'Transcribing...'
+                          : 'Tap to record'
+                      }
+                    >
+                      {state === 'recording' ? (
+                        // Stop icon (square)
+                        <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                          <rect x="6" y="6" width="12" height="12" rx="2" />
+                        </svg>
+                      ) : state === 'transcribing' ? (
+                        <svg
+                          className="animate-spin h-6 w-6 text-blue-600"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
+                        </svg>
+                      ) : (
+                        <Mic className="w-6 h-6 text-blue-600" />
+                      )}
+                    </button>
             </div>
+                )
+              }}
+            </VoiceRecorder>
+
+            {inputError && (
+              <p className="text-body-small text-red-600">{inputError}</p>
+            )}
           </div>
-        ) : (
-          <div className="space-y-4">
-            <label className="block text-sm font-medium text-gray-700">
-              Speak what you heard
-            </label>
-            <div className="w-full h-40 p-4 border-2 border-gray-200 rounded-xl flex items-center justify-center bg-gray-50">
-              <p className="text-gray-500 text-center">
-                Speak functionality coming soon
-                <br />
-                <span className="text-sm">Switch to Type mode to continue</span>
-              </p>
-            </div>
-          </div>
-        )}
-        
+      </div>
+
         {/* Sticky bottom button */}
-        <div className="pt-6 pb-6">
+        <div className="pt-6 pb-6 flex justify-center">
           <button
-            type="button"
+              type="button"
             onClick={handleCheckAnswer}
-            disabled={inputMode === 'type' && (!userInput.trim() || userInput.trim().length < MIN_INPUT_CHARS)}
-            className={`w-full py-4 px-6 rounded-xl font-semibold text-lg transition-colors ${
-              inputMode === 'type' && userInput.trim() && userInput.trim().length >= MIN_INPUT_CHARS
+              disabled={!userInput.trim() || userInput.trim().length < MIN_INPUT_CHARS}
+              className={`w-full md:w-auto md:min-w-[320px] py-4 px-6 rounded-xl font-semibold text-body-large transition-colors ${
+                userInput.trim() && userInput.trim().length >= MIN_INPUT_CHARS
                 ? 'bg-blue-600 text-white active:bg-blue-700 shadow-lg'
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             }`}
           >
             Check answer
           </button>
+        </div>
         </div>
       </div>
     </main>

@@ -1,0 +1,129 @@
+# CLIPS TO REMOVE - Action List
+# Total to remove: ~100 clips
+# Reason: Overrepresentation, redundancy, unnatural length
+
+## PRIORITY 1: REMOVE IMMEDIATELY (Unnatural B2 clips)
+# These are too long and don't sound like natural speech
+
+clip-practice-293  # 20 words - unnatural run-on
+clip-practice-295  # 18 words - too complex
+clip-practice-296  # 20 words - run-on
+clip-practice-297  # 20 words - run-on
+clip-practice-298  # 20 words - unnatural
+clip-practice-299  # 19 words - run-on
+clip-practice-300  # 25 words - WORST OFFENDER
+
+## PRIORITY 2: REDUCE "gonna" CLIPS (Remove ~70 clips)
+# Currently 157 clips (52%), target: 80 clips (27%)
+
+### Work Meetings A1 (Remove 30 of these)
+clip-practice-102  # "I'm gonna order some pizza" - also wrong category
+clip-practice-103  # "You're gonna enjoy the party" - also wrong category
+clip-practice-104  # "We're gonna watch the game" - also wrong category
+clip-practice-105  # "He's gonna park the car"
+clip-practice-106  # "They're gonna join us later"
+clip-practice-107  # "I'm gonna prepare the presentation" - formal
+clip-practice-108  # "You're gonna attend the conference" - formal
+clip-practice-109  # "We're gonna discuss the project"
+clip-practice-110  # "She's gonna submit the report"
+clip-practice-111  # "He's gonna approve the budget"
+clip-practice-112  # "They're gonna schedule the meeting"
+clip-practice-113  # "I'm gonna sign the contract"
+clip-practice-114  # "You're gonna handle the client"
+# Keep: 001-007 (original 7 clips) as they're more natural
+
+### Daily A1 (Remove 25 of these)
+clip-practice-116  # "You're gonna clean the house"
+clip-practice-117  # "We're gonna visit the park"
+clip-practice-119  # "He's gonna fix the bike"
+clip-practice-120  # "They're gonna play outside"
+clip-practice-121  # "I'm gonna wash the dishes"
+clip-practice-122  # "You're gonna feed the cat"
+clip-practice-123  # "We're gonna study together"
+clip-practice-124  # "She's gonna call her friend"
+clip-practice-125  # "He's gonna exercise this morning" - formal verb
+clip-practice-126  # "They're gonna have breakfast"
+clip-practice-127  # "I'm gonna relax this evening"
+clip-practice-128  # "You're gonna help with chores"
+clip-practice-009  # "You're gonna need some food"
+clip-practice-010  # "We're gonna buy some milk"
+clip-practice-011  # "She's gonna find some time"
+clip-practice-012  # "He's gonna make some lunch"
+clip-practice-013  # "They're gonna take some photos"
+clip-practice-014  # "I'm gonna read some books"
+# Keep: 008 ("grab coffee"), 115 ("cook dinner"), 118 ("walk the dog")
+
+### Travel A1 (Remove 15 of these)
+clip-practice-129  # "We're gonna visit the museum"
+clip-practice-130  # "You're gonna explore the city"
+clip-practice-131  # "They're gonna rent a car"
+clip-practice-132  # "I'm gonna book the hotel"
+clip-practice-133  # "She's gonna pack her suitcase"
+clip-practice-134  # "He's gonna check the weather"
+clip-practice-135  # "We're gonna take some photos"
+clip-practice-136  # "I'm gonna try local food"
+clip-practice-137  # "You're gonna see the sights"
+clip-practice-138  # "They're gonna learn the language"
+clip-practice-139  # "I'm gonna meet new people"
+clip-practice-140  # "She's gonna enjoy the trip"
+clip-practice-141  # "He's gonna remember this vacation"
+clip-practice-142  # "We're gonna have a great time"
+clip-practice-021  # "He's gonna move to the gate"
+# Keep: 015-020 (original 6 clips)
+
+## PRIORITY 3: REDUCE "It's kind of" CLIPS (Remove 9 clips)
+# Currently 21 clips (7%), target: 12 clips (4%)
+
+clip-practice-231  # "It's kind of necessary to practice" - "necessary" too formal
+clip-practice-232  # "It's kind of important to remember"
+clip-practice-233  # "It's kind of useful to know"
+clip-practice-234  # "It's kind of helpful to ask"
+clip-practice-235  # "It's kind of better to wait"
+clip-practice-237  # "It's kind of smarter to plan"
+clip-practice-238  # "It's kind of faster to drive"
+clip-practice-239  # "It's kind of cheaper to walk"
+clip-practice-240  # "It's kind of easier to understand" - double comparative
+
+## PRIORITY 4: REDUCE "should've/could've/would've" (Remove 10-12 clips)
+# Currently 53 clips (18%), target: 35-40 clips (12-13%)
+
+clip-practice-172  # "I should've brought my jacket"
+clip-practice-173  # "You could've taken the bus"
+clip-practice-175  # "They could've helped with the project"
+clip-practice-177  # "You could've asked for help"
+clip-practice-180  # "He could've sent it earlier"
+clip-practice-183  # "You could've shared your ideas"
+clip-practice-192  # "You could've reminded me"
+clip-practice-195  # "He could've saved some money"
+clip-practice-198  # "You could've been more careful"
+clip-practice-202  # "You could've packed lighter"
+clip-practice-207  # "You could've taken more photos"
+clip-practice-213  # "You could've saved more money"
+
+## PRIORITY 5: REDUNDANT "gotta" CLIPS (Remove 4 clips)
+# Currently 28 clips (9%), target: 24 clips (8%)
+
+clip-practice-160  # "She's gotta study harder" - redundant with 161
+clip-practice-161  # "He's gotta practice more" - redundant with 160
+clip-practice-167  # "He's gotta make a decision" - formal
+clip-practice-168  # "They gotta understand this"
+
+## TOTAL CLIPS TO REMOVE: ~95 clips
+# Current: 300 clips
+# After removal: ~205 clips
+# Need to ADD: 50-70 new clips with missing patterns
+# Final target: 250-280 clips with better variety
+
+## NEXT STEP: ADD NEW PATTERNS
+# After removing these clips, add clips with these missing patterns:
+# - "lemme" (let me) - 10 clips
+# - "gimme" (give me) - 10 clips
+# - "dunno" (don't know) - 10 clips
+# - "hafta" (have to) - 10 clips
+# - "whaddya/whatcha" - 10 clips
+# - "outta" (out of) - 5 clips
+# - "betcha" (bet you) - 5 clips
+# - "kinda/sorta" (kind of/sort of) - 10 clips
+# Total new clips: 70
+
+

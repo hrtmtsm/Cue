@@ -357,3 +357,5 @@ RENAME COLUMN chunk_display TO written_form;
 - `app/api/listening-patterns/route.ts` (map new fields)
 - `lib/practiceSteps.ts` (use category from pattern instead of regex detection)
 
+
+

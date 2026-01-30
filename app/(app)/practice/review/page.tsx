@@ -72,6 +72,8 @@ function ReviewPageContent() {
   const storyClipId = searchParams.get('clipId') // Clip ID within a story
   const sessionId = searchParams.get('session')
   let phraseIndex = parseInt(searchParams.get('index') || '0', 10)
+  const clipIndexParam = searchParams.get('clipIndex')
+  const clipIndex = parseInt(clipIndexParam || '0', 10)
   const userText = searchParams.get('userText') || ''
   
   // Check if we're in diagnostic mode (clipId starts with 'diagnostic-')
@@ -90,8 +92,38 @@ function ReviewPageContent() {
     search: typeof window !== 'undefined' ? window.location.search : 'SSR',
   })
   
+  // Type for diff result with semantic evaluation and pattern feedback
+  interface DiffResult {
+    accuracyPercent?: number
+    refTokens?: any[]
+    userTokens?: any[]
+    tokens?: any[]
+    events?: any[]
+    stats?: any
+    transcript?: string
+    userText?: string
+    semanticEval?: {
+      understood: boolean
+      semanticScore: number
+      missingUnits: string[]
+      missingKeywords: string[]
+      capturedKeywords?: string[]
+    }
+    patternFeedback?: Array<{
+      patternKey: string
+      writtenForm: string
+      spokenForm: string
+      listeningStrategy?: string
+      whatToFocusOn?: string
+      explanationShort?: string
+      explanationMedium?: string
+      affectedUnit?: string | null
+      affectedKeyword?: string | null
+    }>
+  }
+  
   // State for word-level diff
-  const [diffResult, setDiffResult] = useState<any>(null)
+  const [diffResult, setDiffResult] = useState<DiffResult | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(true)
   
   // State for word popover
@@ -110,6 +142,7 @@ function ReviewPageContent() {
   const [redirectTo, setRedirectTo] = useState<string | null>(null)
   // State for showing/hiding details section
   const [showDetails, setShowDetails] = useState(false)
+  const [showInsightsModal, setShowInsightsModal] = useState(false)
   
   // Shared clip lesson progress
   const { completeStep, initialize } = useClipLessonProgress()
@@ -375,6 +408,10 @@ function ReviewPageContent() {
       const transcript = currentPhrase.text
       const userAnswer = userText
       
+      // Determine the correct database clip ID
+      // Priority: storyClipId (from story) > clipId (from URL) > currentPhrase.id
+      const dbClipId = (storyClipId || clipId || currentPhrase?.id || '').trim()
+      
       if (!transcript || !userAnswer) {
         console.warn('Missing transcript or userText for answer checking', {
           hasTranscript: !!transcript,
@@ -384,15 +421,34 @@ function ReviewPageContent() {
         return
       }
       
+      console.log('📝 [ReviewPage] Calling /api/check-answer with:', {
+        transcriptLength: transcript.length,
+        userTextLength: userAnswer.length,
+        dbClipId: dbClipId || '(none)',
+        clipId: clipId || '(none)',
+        storyClipId: storyClipId || '(none)',
+        currentPhraseId: currentPhrase?.id || '(none)',
+      })
+      
       try {
+        const requestBody: {
+          transcript: string
+          userText: string
+          clipId?: string
+        } = {
+          transcript: transcript,
+          userText: userAnswer,
+        }
+        
+        // Only include clipId if it's a valid non-empty string
+        if (dbClipId && dbClipId.length > 0) {
+          requestBody.clipId = dbClipId
+        }
+        
         const response = await fetch('/api/check-answer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            transcript: transcript,
-            userText: userAnswer,
-            clipId: clipId || storyClipId, // Add clipId for variant-specific feedback
-          }),
+          body: JSON.stringify(requestBody),
         })
         
         if (!response.ok) {
@@ -400,13 +456,30 @@ function ReviewPageContent() {
         }
         
         const data = await response.json()
-        setDiffResult(data)
+        
+        // Map API response to DiffResult with semantic evaluation
+        const diffResult: DiffResult = {
+          ...data,
+          semanticEval: data.understood !== undefined ? {
+            understood: data.understood,
+            semanticScore: data.semanticScore ?? 0,
+            missingUnits: data.missingUnits ?? [],
+            missingKeywords: data.missingKeywords ?? [],
+            capturedKeywords: data.capturedKeywords ?? [],
+          } : undefined,
+          patternFeedback: data.patternFeedback ?? [],
+        }
+        
+        setDiffResult(diffResult)
         console.log('✅ Answer checked, accuracy:', data.accuracyPercent + '%', {
           accuracy: data.accuracy,
           wer: data.wer,
           stats: data.stats,
           topMistakes: data.topMistakes?.length || 0,
           summary: data.summary,
+          understood: data.understood,
+          semanticScore: data.semanticScore,
+          patternFeedbackCount: data.patternFeedback?.length || 0,
         })
         
         // If in diagnostic mode, extract categories and store result
@@ -637,61 +710,48 @@ function ReviewPageContent() {
     )
   }, [diffResult, currentPhrase.text, userText])
 
-  const isLastPhrase = phraseIndex >= session.phrases.length - 1
-
   const handleContinue = () => {
-    // Navigate to practice flow with alignment data
-    const practiceId = storyClipId || clipId || currentPhrase?.id
-    if (!practiceId) {
-      // Fallback: continue to next step in session
-    if (storyId && storyClipId && typeof window !== 'undefined') {
-      const key = `cue_done_${storyId}_${storyClipId}`
-      localStorage.setItem(key, 'true')
+    // Story-based flow with explicit clipIndex: go to next clip in same story,
+    // but when all clips are finished, go to completion screen.
+    if (storyId && clipIndexParam !== null) {
+      const currentIndex = parseInt(clipIndexParam, 10)
+      const safeCurrentIndex = Number.isNaN(currentIndex) ? 0 : currentIndex
+
+      // Look up how many clips this story has
+      const { story } = getStoryByIdClient(storyId)
+      const totalClips = story?.clips?.length || 3
+
+      const nextClipIndex = safeCurrentIndex + 1
+
+      console.log('🔁 [Review] Continue clicked (story flow)', {
+        storyId,
+        currentIndex: safeCurrentIndex,
+        nextClipIndex,
+        totalClips,
+      })
+
+      // If we've finished the last clip, end the session and go to completion screen
+      if (nextClipIndex >= totalClips) {
+        console.log('✅ [Review] Session complete, redirecting to /practice/complete')
+        router.push(`/practice/complete?storyId=${storyId}`)
+        return
+      }
+
+      // Otherwise, continue to the next clip in this story
+      router.push(`/practice/story/${storyId}?clipIndex=${nextClipIndex}`)
+      return
+    }
+
+    // Story-based flow without clipIndex: return to story page (it decides what to show next)
+    if (storyId) {
+      console.log('🔁 [Review] Continue → back to story page (no clipIndex)', { storyId })
       router.push(`/practice/story/${storyId}`)
       return
     }
-    if (isLastPhrase) {
-      const finalSessionId = clipId ? `clip-${clipId}` : sessionId
-      router.push(`/practice/session-summary?session=${finalSessionId}`)
-      } else if (clipId) {
-        router.push(`/practice/session-summary?session=clip-${clipId}`)
-      } else {
-        router.push(
-          `/practice/respond?session=${sessionId}&index=${phraseIndex + 1}&phraseId=${session.phrases[phraseIndex + 1].id}`
-        )
-      }
-      return
-    }
     
-    // Store alignment data in sessionStorage for Practice page
-    if (typeof window !== 'undefined' && diffResult) {
-      try {
-        sessionStorage.setItem(`alignment_${practiceId}`, JSON.stringify({
-          events: diffResult.events || [],
-          refTokens: diffResult.refTokens || [],
-          userTokens: diffResult.userTokens || [],
-          transcript: diffResult.transcript || currentPhrase.text,
-          userText: diffResult.userText || userText,
-        }))
-      } catch (e) {
-        console.error('Failed to store alignment data:', e)
-      }
-    }
-    
-    // Extract phrases to practice (fallback if alignment data not available)
-    const phrasesToPractice = reviewSummary?.phrasesToPractice || []
-    const phrasesParam = encodeURIComponent(JSON.stringify(phrasesToPractice))
-    const returnTo = typeof window !== 'undefined' 
-      ? window.location.pathname + window.location.search 
-      : '/practice/review'
-    
-    // Don't complete steps here - progress advances when Practice page loads (screen entry)
-    // Progress only advances on screen entry, not button clicks
-    
-    // Navigate to practice page
-    router.push(
-      `/practice/${encodeURIComponent(practiceId)}/practice?phrases=${phrasesParam}&returnTo=${encodeURIComponent(returnTo)}`
-    )
+    // No story context: go back to practice select
+    console.log('🔁 [Review] Continue → practice select (no story context)')
+    router.push('/practice/select')
   }
 
   const handleBack = () => {
@@ -702,7 +762,16 @@ function ReviewPageContent() {
     <main className="flex min-h-screen flex-col">
       {/* Top Bar - Progress bar at very top (Duolingo style) */}
       {/* Progress now managed by shared ClipLessonProgress context */}
-      <ClipTopBar onBack={handleBack} />
+      <ClipTopBar
+        onBack={handleBack}
+        // Override percent to show cumulative per-clip progress (3-clip session)
+        overridePercent={(() => {
+          const totalClips = 3
+          const safeIndex = Number.isNaN(clipIndex) ? 0 : Math.max(0, clipIndex)
+          const progress = ((safeIndex + 1) / totalClips) * 100
+          return Math.max(0, Math.min(100, progress))
+        })()}
+      />
 
       {/* Content with padding */}
       <div className="flex-1 px-6 py-6 pb-20">
@@ -723,13 +792,14 @@ function ReviewPageContent() {
           
           return (
             <>
-              {/* Accuracy % + Label (Figma Make style) */}
+              {/* Accuracy % + Label - Only show if NO semantic evaluation exists */}
+              {!diffResult?.semanticEval && (
               <div className="mb-4">
                 <div className="flex items-baseline justify-between mb-2">
                   <div className="text-5xl font-bold text-blue-600">
                   {accuracyPercent}%
                   </div>
-                  <div className="text-sm font-medium text-gray-600">
+                  <div className="text-body-small font-medium text-gray-600">
                     accuracy
                   </div>
                 </div>
@@ -741,8 +811,53 @@ function ReviewPageContent() {
                   />
                 </div>
               </div>
+              )}
 
-              {/* Summary Card with Icon */}
+              {/* Summary Card - Semantic Evaluation Based */}
+              {diffResult.semanticEval ? (
+                diffResult.semanticEval.understood ? (
+                  <div className="mb-6 p-5 bg-green-50 rounded-xl border border-green-200">
+                    <div className="flex items-start gap-3">
+                      {/* Success Icon */}
+                      <div className="flex-shrink-0 mt-0.5">
+                        <div className="w-5 h-5 text-green-600 text-xl font-bold">✓</div>
+                      </div>
+                      {/* Summary text */}
+                      <div className="flex-1 space-y-2">
+                        <div className="text-body font-medium text-green-900 leading-relaxed">
+                          Great! You got the meaning
+                        </div>
+                        {diffResult.semanticEval.missingKeywords.length > 0 && (
+                          <div className="text-sm text-green-700 leading-relaxed">
+                            Minor corrections: {diffResult.semanticEval.missingKeywords.join(', ')}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mb-6 p-5 bg-orange-50 rounded-xl border border-orange-200">
+                    <div className="flex items-start gap-3">
+                      {/* Warning Icon */}
+                      <div className="flex-shrink-0 mt-0.5">
+                        <div className="w-5 h-5 text-orange-600 text-xl">⚠️</div>
+                      </div>
+                      {/* Summary text */}
+                      <div className="flex-1 space-y-2">
+                        <div className="text-body font-medium text-orange-900 leading-relaxed">
+                          Not quite - you missed key information
+                        </div>
+                        {diffResult.semanticEval.missingUnits.length > 0 && (
+                          <div className="text-sm text-orange-700 leading-relaxed">
+                            You missed: {diffResult.semanticEval.missingUnits.join(', ')}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              ) : (
+                // Fallback to old summary if semanticEval not available
               <div className="mb-6 p-5 bg-blue-50 rounded-xl border border-blue-200">
               <div className="flex items-start gap-3">
                   {/* Icon */}
@@ -753,9 +868,10 @@ function ReviewPageContent() {
                 </div>
                   {/* Summary text */}
                   <div className="flex-1 space-y-2">
-                    <div className="text-base font-medium text-blue-900 leading-relaxed">
-                      {reviewSummary.title}
+                    <div className="text-body font-medium text-blue-900 leading-relaxed">
+                        {reviewSummary?.title || 'Review your answer'}
                     </div>
+                      {reviewSummary && (
                     <div className="text-sm text-blue-700 leading-relaxed">
                       {reviewSummary.categoryId === 'words_blended' && (
                         <>For example, "{reviewSummary.examplePhrase}" sounded like one word.</>
@@ -773,13 +889,15 @@ function ReviewPageContent() {
                         <>For example, "{reviewSummary.examplePhrase}" went by too quickly.</>
                       )}
                     </div>
+                      )}
                   </div>
                 </div>
               </div>
+              )}
 
-              {/* Compared to what you heard (REQUIRED) */}
+              {/* Result + Compared to what you heard (minimal diff view) */}
             <div className="mb-6 p-6 bg-white border border-gray-200 rounded-xl">
-              <h2 className="text-lg font-semibold mb-4 text-gray-900">Compared to what you heard</h2>
+              <h2 className="text-heading-3 mb-4 text-gray-900">Compared to what you heard</h2>
               
                 {/* Diff rendering with color rules */}
               <div className="text-lg leading-relaxed mb-4 text-gray-900">
@@ -855,36 +973,122 @@ function ReviewPageContent() {
               )}
             </div>
 
-              {/* Why this was hard (Collapsible) */}
-              <div className="mb-6">
+              {/* Minimal primary actions */}
+              <div className="mt-4 space-y-3">
                 <button
-                  onClick={() => setShowDetails(!showDetails)}
-                  className="w-full py-2 px-4 text-sm text-gray-600 hover:text-gray-900 flex items-start justify-center gap-1 transition-colors mb-2"
+                  type="button"
+                  onClick={() => setShowInsightsModal(true)}
+                  className="w-full py-3 px-4 rounded-xl border-2 border-blue-200 bg-blue-50 text-blue-900 font-semibold text-base flex items-center justify-center gap-2 active:bg-blue-100 transition-colors"
                 >
-                  {showDetails ? (
-                    <>
-                      <ChevronUp className="w-4 h-4" />
-                      <span>Hide details</span>
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown className="w-4 h-4" />
-                      <span>See details</span>
-                    </>
-                  )}
+                  <span>💡 Why did I miss this?</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={handleContinue}
+                  className="w-full py-4 px-6 rounded-xl font-semibold text-lg bg-blue-600 text-white active:bg-blue-700 shadow-lg transition-colors"
+                >
+                  Continue →
+                </button>
+              </div>
+            </>
+          )
+        })() : !isAnalyzing && !diffResult && (
+          <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <div className="text-sm text-gray-600 text-center">
+              Unable to analyze your answer. Please try again.
+            </div>
+          </div>
+        )}
 
-                {showDetails && (
-                  <div className="p-5 bg-white border border-gray-200 rounded-xl space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <h2 className="text-lg font-semibold text-gray-900">Why this was hard</h2>
-                    
-                    {/* Generate 1-3 bullets from actual mistakes */}
+        {/* Word tap modals hidden in Step 1 - only show in details if needed */}
+        {false && (
+        <WordPopover
+          isOpen={popoverOpen}
+          onClose={() => setPopoverOpen(false)}
+          token={popoverToken}
+          onReplay={handleReplayWord}
+        />
+        )}
+      </div>
+      </div>
+
+      {/* Insights modal (pattern feedback + detailed bullets) */}
+      {showInsightsModal && diffResult && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/30">
+          <div className="w-full max-w-md mx-4 bg-white rounded-2xl shadow-xl max-h-[80vh] overflow-y-auto p-5 space-y-4">
+            <div className="flex items-center justify-between">
+                    <h2 className="text-heading-3 text-gray-900">Why this was hard</h2>
+              <button
+                type="button"
+                onClick={() => setShowInsightsModal(false)}
+                className="text-gray-400 hover:text-gray-600 text-sm"
+              >
+                Close
+              </button>
+            </div>
+
+            {/* Helpful message when no pattern feedback available */}
+            {!diffResult?.semanticEval?.understood && 
+             (!diffResult?.patternFeedback || diffResult.patternFeedback.length === 0) && (
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h3 className="text-body-small font-semibold mb-2 text-gray-900">💡 Listening Tip</h3>
+                <p className="text-sm text-gray-700 mb-2">
+                  You stopped listening partway through the sentence. In natural speech, 
+                  the most important information often comes at the end.
+                </p>
+                <p className="text-sm text-gray-700">
+                  <strong>Try this:</strong> Stay focused through the entire sentence, 
+                  even after you catch the main idea. The details matter!
+                </p>
+              </div>
+            )}
+
+            {/* Pattern Feedback Section - Only show if not understood and pattern feedback exists */}
+            {diffResult.semanticEval && !diffResult.semanticEval.understood && diffResult.patternFeedback && diffResult.patternFeedback.length > 0 && (
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h3 className="text-body-small font-semibold mb-3 text-gray-900">💡 What happened here</h3>
+                {(() => {
+                  const pattern = diffResult.patternFeedback![0]
+                  return (
+                    <>
+                      <div className="mb-3">
+                        <div className="text-xs text-gray-600 mb-1">Written form:</div>
+                        <div className="text-sm font-medium text-gray-900">{pattern.writtenForm}</div>
+                        <div className="text-xs text-gray-600 mt-2 mb-1">Sounds like:</div>
+                        <div className="text-sm font-medium text-blue-700">{pattern.spokenForm}</div>
+                      </div>
+                      
+                      {pattern.whatToFocusOn && (
+                        <div className="mb-3 p-3 bg-white rounded border border-blue-100">
+                          <div className="text-xs font-semibold text-blue-900 mb-1">
+                            🎯 What to focus on
+                          </div>
+                          <p className="text-xs text-gray-700">{pattern.whatToFocusOn}</p>
+                        </div>
+                      )}
+                      
+                      {pattern.listeningStrategy && (
+                        <div className="p-3 bg-white rounded border border-blue-100">
+                          <div className="text-xs font-semibold text-blue-900 mb-1">
+                            💡 Listening strategy
+                          </div>
+                          <p className="text-xs text-gray-700">{pattern.listeningStrategy}</p>
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
+              </div>
+            )}
+
+            {/* Detailed bullets (was 'See details') */}
+            <div className="p-4 bg-white border border-gray-200 rounded-xl space-y-3">
+              <h3 className="text-body-small font-semibold text-gray-900">More details</h3>
                     {(() => {
                       const bullets: Array<{ text: string; example: string }> = []
                       const refTokens = diffResult.refTokens || []
                       const events = diffResult.events || []
                       
-                      // Group by type and find examples
                       const missingEvents = events.filter((e: any) => e.type === 'missing').slice(0, 1)
                       const substitutionEvents = events.filter((e: any) => e.type === 'substitution').slice(0, 1)
                       const extraEvents = events.filter((e: any) => e.type === 'extra').slice(0, 1)
@@ -918,7 +1122,6 @@ function ReviewPageContent() {
                         })
                       }
                       
-                      // Fallback if no events
                       if (bullets.length === 0 && refTokens.length > 0) {
                         bullets.push({
                           text: 'Fast speech can make it hard to catch every word.',
@@ -930,8 +1133,8 @@ function ReviewPageContent() {
                         <div key={idx} className="flex items-start gap-3">
                           <div className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-blue-600 mt-2" />
                           <div className="flex-1">
-                            <div className="text-base text-gray-900">{bullet.text}</div>
-                            <div className="text-sm text-gray-600 mt-1">
+                      <div className="text-sm text-gray-900">{bullet.text}</div>
+                      <div className="text-xs text-gray-600 mt-1">
                               Example: "{bullet.example}"
                             </div>
                           </div>
@@ -939,41 +1142,9 @@ function ReviewPageContent() {
                       ))
                     })()}
                   </div>
-                )}
-              </div>
-            </>
-          )
-        })() : !isAnalyzing && !diffResult && (
-          <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-            <div className="text-sm text-gray-600 text-center">
-              Unable to analyze your answer. Please try again.
             </div>
           </div>
         )}
-
-        {/* Word tap modals hidden in Step 1 - only show in details if needed */}
-        {false && (
-        <WordPopover
-          isOpen={popoverOpen}
-          onClose={() => setPopoverOpen(false)}
-          token={popoverToken}
-          onReplay={handleReplayWord}
-        />
-        )}
-      </div>
-
-        {/* Fixed bottom actions - only show if we have diffResult */}
-        {diffResult && reviewSummary && (
-      <div className="pt-6 pb-6">
-        <button
-          onClick={handleContinue}
-          className="w-full py-4 px-6 rounded-xl font-semibold text-lg bg-blue-600 text-white active:bg-blue-700 shadow-lg transition-colors"
-        >
-          Continue
-        </button>
-          </div>
-        )}
-      </div>
     </main>
   )
 }

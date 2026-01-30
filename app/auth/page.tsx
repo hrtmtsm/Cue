@@ -23,16 +23,15 @@ export default function AuthChoicePage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col px-6 py-12">
-      <div className="flex flex-col justify-center flex-1 space-y-8">
+    <main className="flex min-h-screen flex-col items-center justify-center px-6 py-12">
+      <div className="max-w-2xl w-full space-y-8">
         <div className="space-y-4 text-center">
           <h1 className="text-3xl font-bold text-gray-900 leading-tight">
             Create your Cue account
           </h1>
         </div>
-      </div>
 
-      <div className="pt-8 pb-6 space-y-3">
+        <div className="space-y-3">
         <button
           onClick={handleGoogle}
           className="w-full bg-white border-2 border-gray-300 text-gray-900 text-center font-semibold py-4 px-6 rounded-xl hover:bg-gray-50 active:bg-gray-100 transition-colors flex items-center justify-center space-x-3"
@@ -63,13 +62,14 @@ export default function AuthChoicePage() {
           Continue with email
         </button>
 
-        <div className="pt-4">
-          <Link
-            href="/auth/login"
-            className="block w-full text-center font-medium py-3 px-6 text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            Already have an account? Sign in
-          </Link>
+          <div className="pt-4">
+            <Link
+              href="/auth/login"
+              className="block w-full text-center font-medium py-3 px-6 text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              Already have an account? Sign in
+            </Link>
+          </div>
         </div>
       </div>
     </main>

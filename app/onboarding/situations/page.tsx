@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, Check } from 'lucide-react'
 import { getOnboardingData, setOnboardingData, type SituationKey } from '@/lib/onboardingStore'
 import { SITUATION_OPTIONS, MAX_SITUATION_SELECTIONS, DEFAULT_SITUATION } from '@/lib/situations'
 
@@ -26,7 +26,7 @@ export default function SituationsPage() {
     if (newSelected.has(situationKey)) {
       newSelected.delete(situationKey)
     } else {
-      // Enforce max 2 selections
+      // Enforce max 3 selections
       if (newSelected.size < MAX_SELECTIONS) {
         newSelected.add(situationKey)
       }
@@ -72,7 +72,7 @@ export default function SituationsPage() {
       <div className="flex-1 space-y-6">
         <div className="space-y-2">
           <h1 className="text-2xl font-bold text-gray-900">
-            What do you want to understand better first?
+            Where do you want to use English?
           </h1>
           <p className="text-sm text-gray-600">
             Choose up to {MAX_SELECTIONS}
@@ -88,20 +88,26 @@ export default function SituationsPage() {
                 key={situation.key}
                 onClick={() => toggleSituation(situation.key)}
                 disabled={isDisabled}
-                className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
+                className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
                   isSelected
-                    ? 'border-blue-600 bg-blue-600 text-white'
+                    ? 'border-blue-600 bg-blue-50'
                     : isDisabled
                     ? 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed'
                     : 'border-gray-200 bg-white hover:border-gray-300'
                 }`}
               >
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{situation.label}</span>
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl flex-shrink-0">{situation.emoji}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-lg text-gray-900">
+                      {situation.label}
+                    </div>
+                    <div className="text-sm text-gray-600 mt-1">
+                      {situation.description}
+                    </div>
+                  </div>
                   {isSelected && (
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
+                    <Check className="w-6 h-6 text-blue-600 flex-shrink-0" />
                   )}
                 </div>
               </button>

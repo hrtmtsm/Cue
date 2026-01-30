@@ -568,3 +568,5 @@ This document maps the complete user journey from first visit through authentica
 4. **Auth Integration:** When will Supabase auth be fully integrated? Currently all auth is localStorage-based.
 5. **Onboarding Data Usage:** `listeningDifficulties` is populated by diagnostic, but traditional questions would populate `topics` and `level` - how are these reconciled?
 
+
+

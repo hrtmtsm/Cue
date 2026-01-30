@@ -48,17 +48,18 @@ export default function EmailSignupPage() {
 
   return (
     <main className="flex min-h-screen flex-col px-6 py-12">
-      <div className="mb-8">
-        <Link
-          href="/auth"
-          className="text-blue-600 font-medium text-lg py-2 px-1 -ml-1 inline-flex items-center gap-1"
-        >
-          <ChevronLeft className="w-5 h-5" />
-          Back
-        </Link>
-      </div>
+      <div className="max-w-2xl w-full mx-auto">
+        <div className="mb-8">
+          <Link
+            href="/auth"
+            className="text-blue-600 font-medium text-lg py-2 px-1 -ml-1 inline-flex items-center gap-1"
+          >
+            <ChevronLeft className="w-5 h-5" />
+            Back
+          </Link>
+        </div>
 
-      <div className="flex flex-col justify-center flex-1 space-y-8">
+        <div className="space-y-8">
         <div className="space-y-4">
           <h1 className="text-3xl font-bold text-gray-900 leading-tight">
             Create your account
@@ -121,6 +122,7 @@ export default function EmailSignupPage() {
             {isLoading ? 'Creating account...' : 'Create account'}
           </button>
         </form>
+        </div>
       </div>
     </main>
   )

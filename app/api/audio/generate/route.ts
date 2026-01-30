@@ -8,6 +8,16 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
+// Voice rotation for variety (6 different voices)
+const VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'] as const
+
+// Speed control based on variant_key
+const SPEED_MAP: Record<string, number> = {
+  'clean_slow': 0.85,
+  'clean_fast': 1.15,
+  'clean_normal': 1.0, // fallback
+}
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
   let clipId: string | undefined
@@ -88,6 +98,14 @@ export async function POST(request: NextRequest) {
     // Compute transcript hash
     const transcriptHash = generateTextHash(transcript)
     console.log('🔐 [Audio Generate] Transcript hash:', transcriptHash.substring(0, 12) + '...')
+    
+    // Select voice based on clip ID for variety (calculate early for use in DB upsert)
+    const clipMatch = clipId.match(/(\d+)$/)
+    const clipNum = clipMatch ? parseInt(clipMatch[1]) : 0
+    const voice = VOICES[clipNum % VOICES.length]
+    
+    // Get speed based on variant_key
+    const speed = SPEED_MAP[variantKey] || 1.0
 
     // Get Supabase admin client
     const supabaseAdmin = getSupabaseAdminClient()
@@ -163,7 +181,7 @@ export async function POST(request: NextRequest) {
         transcript,
         transcript_hash: transcriptHash,
         variant_key: variantKey,
-        voice_profile: 'alloy', // Default, can be made configurable
+        voice_profile: voice, // Use selected voice for this clip
         audio_status: 'generating',
         blob_path: null,
         updated_at: new Date().toISOString(),
@@ -244,7 +262,7 @@ export async function POST(request: NextRequest) {
               transcript,
               transcript_hash: transcriptHash,
               variant_key: variantKey,
-              voice_profile: 'alloy',
+              voice_profile: voice, // Use selected voice for this clip
               audio_status: 'generating',
               blob_path: null,
               updated_at: new Date().toISOString(),
@@ -310,7 +328,14 @@ export async function POST(request: NextRequest) {
     })
 
     // Generate audio using OpenAI TTS
-    console.log('🎤 [Audio Generate] Calling OpenAI TTS...')
+    console.log('🎤 [Audio Generate] Calling OpenAI TTS...', {
+      model: 'tts-1-hd',
+      voice,
+      speed,
+      variantKey,
+      clipNum,
+    })
+    
     let audioArrayBuffer: ArrayBuffer
     try {
       if (!process.env.OPENAI_API_KEY) {
@@ -318,9 +343,10 @@ export async function POST(request: NextRequest) {
       }
       
       const response = await openai.audio.speech.create({
-        model: 'tts-1',
-        voice: 'alloy',
+        model: 'tts-1-hd',
+        voice: voice,
         input: transcript,
+        speed: speed,
       })
 
       audioArrayBuffer = await response.arrayBuffer()
