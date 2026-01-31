@@ -105,8 +105,11 @@ export async function generateCoachingInsight(input: {
   const actualSpan = event.actualSpan ?? '(not heard)'
 
   if (!openai) {
+    console.log('⚠️ [Insight] No OPENAI_API_KEY found - using fallback template')
     return minimalFallback({ event, transcript, userText })
   }
+
+  console.log('✅ [Insight] OpenAI key detected - calling GPT-4o-mini')
 
   // TypeScript now knows openai is not null after the check above
   const openaiClient = openai
@@ -159,6 +162,13 @@ export async function generateCoachingInsight(input: {
         { role: 'user', content: extraNudge ? `${user}\n\n${extraNudge}` : user },
       ],
     })
+    
+    console.log('✅ [Insight] OpenAI response received:', {
+      model: completion.model,
+      tokens: completion.usage,
+      hasContent: !!completion.choices[0]?.message?.content
+    })
+    
     const content = completion.choices?.[0]?.message?.content ?? '{}'
     const parsed = extractJsonObject(content) ?? {}
     return parsed
@@ -167,6 +177,7 @@ export async function generateCoachingInsight(input: {
   // First attempt
   let parsed = await callOnce()
   if (!hasRequiredReference(parsed, actualSpan)) {
+    console.log('⚠️ [Insight] First attempt missing user guess - retrying with stronger nudge')
     // Retry once with stronger nudge
     parsed = await callOnce(
       `Important: In what_you_might_have_heard, you MUST include exactly: "${actualSpan}".`
@@ -174,8 +185,11 @@ export async function generateCoachingInsight(input: {
   }
 
   if (!hasRequiredReference(parsed, actualSpan)) {
+    console.log('❌ [Insight] OpenAI response failed validation - falling back to template')
     return minimalFallback({ event, transcript, userText })
   }
+  
+  console.log('✅ [Insight] OpenAI feedback validated successfully')
 
   const fallback = minimalFallback({ event, transcript, userText })
   return {
