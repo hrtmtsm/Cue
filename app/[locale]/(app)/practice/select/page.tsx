@@ -552,7 +552,7 @@ export default function PracticeSelectPage() {
       {showBackButton && (
         <div className="mb-6">
           <Link
-            href="/practice"
+            href={`/${locale}/practice`}
             className="text-blue-600 font-medium text-lg py-2 px-1 -ml-1 inline-flex items-center gap-1"
           >
             <ChevronLeft className="w-5 h-5" />

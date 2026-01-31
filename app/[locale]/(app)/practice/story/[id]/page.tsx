@@ -2,17 +2,19 @@
 
 import { useEffect } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import { useLocale } from 'next-intl'
 import { getStoryByIdClient } from '@/lib/storyClient'
 
 export default function StoryRedirectPage() {
   const params = useParams()
   const searchParams = useSearchParams()
   const router = useRouter()
+  const locale = useLocale()
   const storyId = params.id as string | undefined
 
   useEffect(() => {
     if (!storyId) {
-      router.replace('/practice/select')
+      router.replace(`/${locale}/practice/select`)
       return
     }
 
@@ -26,7 +28,7 @@ export default function StoryRedirectPage() {
 
       if (!story || clips.length === 0) {
         console.warn('⚠️ [StoryRedirect] Story not found or has no clips:', { storyId })
-        router.replace('/practice/select')
+        router.replace(`/${locale}/practice/select`)
         return
       }
 
@@ -40,13 +42,13 @@ export default function StoryRedirectPage() {
       })
 
       router.replace(
-        `/practice/respond?storyId=${storyId}&clipId=${targetClip.id}&clipIndex=${safeIndex}`
+        `/${locale}/practice/respond?storyId=${storyId}&clipId=${targetClip.id}&clipIndex=${safeIndex}`
       )
     } catch (error) {
       console.error('❌ [StoryRedirect] Error during redirect:', error)
-      router.replace('/practice/select')
+      router.replace(`/${locale}/practice/select`)
     }
-  }, [storyId, searchParams, router])
+  }, [storyId, searchParams, router, locale])
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center px-6">

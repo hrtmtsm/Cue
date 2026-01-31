@@ -1589,22 +1589,22 @@ function RespondPageContent() {
     
     if (storyId && storyClipId) {
       // Story-based routing - mark as done and navigate to review
-      reviewUrl = `/practice/review?storyId=${storyId}&clipId=${storyClipId}&clipIndex=${clipIndex}&userText=${encodeURIComponent(
+      reviewUrl = `/${locale}/practice/review?storyId=${storyId}&clipId=${storyClipId}&clipIndex=${clipIndex}&userText=${encodeURIComponent(
         userInput
       )}`
       console.log('✅ [RespondPage] Navigating to review (story-based):', reviewUrl)
     } else if (clipId) {
       // Clip-based routing (single phrase session - Quick Practice)
-      reviewUrl = `/practice/review?clip=${clipId}&userText=${encodeURIComponent(userInput)}`
+      reviewUrl = `/${locale}/practice/review?clip=${clipId}&userText=${encodeURIComponent(userInput)}`
       console.log('✅ [RespondPage] Navigating to review (clip-based):', reviewUrl)
     } else if (effectiveClipId) {
       // Fallback: use effectiveClipId if available
-      reviewUrl = `/practice/review?clip=${effectiveClipId}&userText=${encodeURIComponent(userInput)}`
+      reviewUrl = `/${locale}/practice/review?clip=${effectiveClipId}&userText=${encodeURIComponent(userInput)}`
       console.log('✅ [RespondPage] Navigating to review (effectiveClipId fallback):', reviewUrl)
     } else {
       // Session-based routing
       const phraseIdParam = phraseId ? `&phraseId=${phraseId}` : ''
-      reviewUrl = `/practice/review?session=${sessionId}&index=${phraseIndex}&userText=${encodeURIComponent(userInput)}${phraseIdParam}`
+      reviewUrl = `/${locale}/practice/review?session=${sessionId}&index=${phraseIndex}&userText=${encodeURIComponent(userInput)}${phraseIdParam}`
       console.log('✅ [RespondPage] Navigating to review (session-based):', reviewUrl)
     }
 
