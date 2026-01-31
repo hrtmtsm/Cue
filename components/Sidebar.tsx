@@ -3,10 +3,13 @@
 import { Play, TrendingUp, User } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useLocale, useTranslations } from 'next-intl'
 import { shouldHideBottomNav } from '@/lib/navigationUtils'
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const locale = useLocale()
+  const t = useTranslations()
   const shouldHide = shouldHideBottomNav(pathname)
   
   // Hide sidebar in story/clip flow (same logic as bottom nav)
@@ -15,16 +18,17 @@ export default function Sidebar() {
   }
   
   const isActive = (path: string) => {
+    const localizedPath = `/${locale}${path}`
     if (path === '/practice') {
-      return pathname === '/practice' || pathname?.startsWith('/practice/select')
+      return pathname === localizedPath || pathname?.startsWith(`/${locale}/practice/select`)
     }
-    return pathname === path || pathname?.startsWith(`${path}/`)
+    return pathname === localizedPath || pathname?.startsWith(`${localizedPath}/`)
   }
   
   const links = [
-    { href: '/practice', icon: Play, label: 'Practice' },
-    { href: '/progress', icon: TrendingUp, label: 'Progress' },
-    { href: '/profile', icon: User, label: 'Profile' },
+    { href: `/${locale}/practice`, icon: Play, label: t('nav.practice') },
+    { href: `/${locale}/progress`, icon: TrendingUp, label: t('nav.progress') },
+    { href: `/${locale}/profile`, icon: User, label: t('nav.profile') },
   ]
   
   return (
@@ -55,7 +59,7 @@ export default function Sidebar() {
       
       <div className="p-4 border-t border-gray-200">
         <p className="text-xs text-gray-500 text-center">
-          Build your listening skills
+          {t('profile.buildListeningSkills')}
         </p>
       </div>
     </aside>

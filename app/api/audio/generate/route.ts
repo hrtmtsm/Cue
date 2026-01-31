@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
     const voice = VOICES[clipNum % VOICES.length]
     
     // Get speed based on variant_key
-    const speed = SPEED_MAP[variantKey] || 1.0
+    const speed = variantKey ? (SPEED_MAP[variantKey] || 1.0) : 1.0
 
     // Get Supabase admin client
     const supabaseAdmin = getSupabaseAdminClient()

@@ -102,7 +102,7 @@ function extractSemanticStructure(transcript: string): SemanticStructure {
   })
   
   if (timingKeywords.length > 0) {
-    structure.timing_keywords = [...new Set(timingKeywords)]
+    structure.timing_keywords = Array.from(new Set(timingKeywords))
     structure.timing = timingKeywords[0] // First timing word as main timing
   }
   
@@ -253,7 +253,7 @@ function extractCriticalKeywords(transcript: string): string[] {
   }
   
   // Remove duplicates and return
-  return [...new Set(keywords)]
+  return Array.from(new Set(keywords))
 }
 
 /**

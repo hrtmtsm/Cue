@@ -1,11 +1,15 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
+
 interface ClipsReadyModalProps {
   isOpen: boolean
   onClose: () => void
 }
 
 export default function ClipsReadyModal({ isOpen, onClose }: ClipsReadyModalProps) {
+  const t = useTranslations('practice')
+  
   if (!isOpen) return null
 
   return (
@@ -19,10 +23,10 @@ export default function ClipsReadyModal({ isOpen, onClose }: ClipsReadyModalProp
       >
         <div className="space-y-3">
           <h2 className="text-2xl font-bold text-gray-900">
-            Your clips are ready
+            {t('clipsReadyTitle')}
           </h2>
           <p className="text-gray-600 leading-relaxed">
-            We picked a few short conversations based on what you listened to and what you want to practice.
+            {t('clipsReadyDesc')}
           </p>
         </div>
         
@@ -30,7 +34,7 @@ export default function ClipsReadyModal({ isOpen, onClose }: ClipsReadyModalProp
           onClick={onClose}
           className="w-full py-3 px-6 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors"
         >
-          Start
+          {t('start')}
         </button>
       </div>
     </div>

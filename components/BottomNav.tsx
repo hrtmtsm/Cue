@@ -2,11 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useLocale, useTranslations } from 'next-intl'
 import { Play, TrendingUp, User } from 'lucide-react'
 import { shouldHideBottomNav } from '@/lib/navigationUtils'
 
 export default function BottomNav() {
   const pathname = usePathname()
+  const locale = useLocale()
+  const t = useTranslations()
   const shouldHide = shouldHideBottomNav(pathname)
 
   // Hide bottom nav in story/clip flow
@@ -15,26 +18,27 @@ export default function BottomNav() {
   }
 
   const isActive = (path: string) => {
+    const localizedPath = `/${locale}${path}`
     if (path === '/practice') {
-      return pathname === '/practice' || pathname?.startsWith('/practice/select')
+      return pathname === localizedPath || pathname?.startsWith(`/${locale}/practice/select`)
     }
-    return pathname === path || pathname?.startsWith(`${path}/`)
+    return pathname === localizedPath || pathname?.startsWith(`${localizedPath}/`)
   }
 
   const tabs = [
     {
-      name: 'Practice',
-      path: '/practice',
+      name: t('nav.practice'),
+      path: `/${locale}/practice`,
       icon: Play,
     },
     {
-      name: 'Progress',
-      path: '/progress',
+      name: t('nav.progress'),
+      path: `/${locale}/progress`,
       icon: TrendingUp,
     },
     {
-      name: 'Profile',
-      path: '/profile',
+      name: t('nav.profile'),
+      path: `/${locale}/profile`,
       icon: User,
     },
   ]

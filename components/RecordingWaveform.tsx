@@ -103,6 +103,7 @@ export default function RecordingWaveform({
       if (!isRecording || !analyser || !dataArray || !path) return
 
       // Get time-domain waveform data
+      // @ts-ignore - Type mismatch between ArrayBufferLike and ArrayBuffer
       analyser.getByteTimeDomainData(dataArray)
 
       // Sample points for smooth waveform (reduce points for performance)
