@@ -639,7 +639,7 @@ function ReviewPageContent() {
                 return false;
               }
               
-              return event.refStart <= pattern.refStart && event.refEnd >= pattern.refEnd;
+              return event.refStart <= (pattern as any).refStart && event.refEnd >= (pattern as any).refEnd;
             })
             
             if (affectedByError) {
