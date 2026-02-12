@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useLocale } from 'next-intl'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { setUserPreferences, getUserPreferences, UserLevel } from '@/lib/userPreferences'
@@ -15,6 +16,7 @@ const levels: { id: UserLevel; name: string }[] = [
 
 export default function LevelSelectPage() {
   const router = useRouter()
+  const locale = useLocale()
   const [selected, setSelected] = useState<UserLevel | null>(null)
 
   useEffect(() => {
@@ -37,11 +39,11 @@ export default function LevelSelectPage() {
         userLevel: selected || undefined,
       })
     }
-    router.push('/onboarding/ready')
+    router.push(`/${locale}/onboarding/ready`)
   }
 
   const handleSkip = () => {
-    router.push('/onboarding/ready')
+    router.push(`/${locale}/onboarding/ready`)
   }
 
   return (
@@ -49,7 +51,7 @@ export default function LevelSelectPage() {
       {/* Header */}
       <div className="mb-8">
         <Link
-          href="/onboarding/genre"
+          href={`/${locale}/onboarding/genre`}
           className="text-blue-600 font-medium text-lg py-2 px-1 -ml-1 inline-flex items-center gap-1"
         >
           <ChevronLeft className="w-5 h-5" />

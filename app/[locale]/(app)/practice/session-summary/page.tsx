@@ -1,11 +1,13 @@
 'use client'
 
 import { useSearchParams, useRouter } from 'next/navigation'
+import { useLocale } from 'next-intl'
 import { Suspense, useEffect } from 'react'
 
 function SessionSummaryPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const locale = useLocale()
   const sessionId = searchParams.get('session') || ''
 
   // Mark today's session as complete (for free tier daily limit)
@@ -37,7 +39,7 @@ function SessionSummaryPageContent() {
 
           {/* Pro upsell */}
           <button
-            onClick={() => router.push('/pro')}
+            onClick={() => router.push(`/${locale}/pro`)}
             className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold py-4 px-6 rounded-xl transition-all"
           >
             Unlock Unlimited Practice with Pro →

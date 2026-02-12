@@ -20,12 +20,14 @@
  */
 
 import { useEffect, useMemo, useState, useRef } from 'react'
-import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import { useParams, useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { useLocale } from 'next-intl'
 import ClipTopBar from '@/components/ClipTopBar'
 import PhraseCard from '@/components/PhraseCard'
 import { extractPracticeSteps, type PracticeStep, type FeedbackCategory } from '@/lib/practiceSteps'
 import { useClipLessonProgress } from '@/lib/clipLessonProgress'
 import { useListeningPatterns } from '@/lib/useListeningPatterns'
+import { saveTip, unsaveTip, type SaveTipData } from '@/lib/savedTips'
 
 export default function PracticeChunkPage() {
   const router = useRouter()
@@ -40,6 +42,7 @@ export default function PracticeChunkPage() {
   const [step, setStep] = useState(0)
   const [alignmentData, setAlignmentData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [savedTips, setSavedTips] = useState<Map<string, string>>(new Map())
   
   // Fetch listening patterns (async, but hook handles fallback)
   const { patterns } = useListeningPatterns()
@@ -214,7 +217,45 @@ export default function PracticeChunkPage() {
       router.push(returnTo)
     } else {
       // Navigate to next clip or session summary
-      router.push('/practice/select')
+      router.push(`/${locale}/practice/select`)
+    }
+  }
+
+  const handleSaveTip = async (tipData: SaveTipData): Promise<boolean> => {
+    try {
+      const result = await saveTip(tipData)
+      if (result.success && result.tip) {
+        setSavedTips(prev => new Map(prev).set(tipData.phrase, result.tip.id))
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error('[PracticeChunkPage] Error saving tip:', error)
+      return false
+    }
+  }
+
+  const handleUnsaveTip = async (phrase: string): Promise<boolean> => {
+    try {
+      const tipId = savedTips.get(phrase)
+      if (!tipId) {
+        console.warn('[PracticeChunkPage] No tip ID found for phrase:', phrase)
+        return false
+      }
+      
+      const result = await unsaveTip(tipId)
+      if (result.success) {
+        setSavedTips(prev => {
+          const newMap = new Map(prev)
+          newMap.delete(phrase)
+          return newMap
+        })
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error('[PracticeChunkPage] Error unsaving tip:', error)
+      return false
     }
   }
   
@@ -259,7 +300,12 @@ export default function PracticeChunkPage() {
           <>
           <div className="flex-1 space-y-4">
             {/* Phrase info card (includes comparison, category badge, and inline play buttons) */}
-            <PhraseCard feedbackItem={current} />
+            <PhraseCard 
+              feedbackItem={current} 
+              onSave={handleSaveTip}
+              onUnsave={handleUnsaveTip}
+              isSaved={savedTips.has(current.target)}
+            />
           </div>
           </>
         )}

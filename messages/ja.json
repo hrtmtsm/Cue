@@ -10,10 +10,74 @@
     "there": "さん"
   },
   "landing": {
-    "hero": "ネイティブが実際に話していることが聞き取れない？",
-    "subtitle": "短いクリップで、速くて自然な話し方を聞き取る訓練をしましょう。",
-    "getStarted": "始める",
-    "alreadyHaveAccount": "アカウントをお持ちの方"
+    "hero": {
+      "headline": "ネイティブの英語が聞き取れない？",
+      "subheadline": "お任せください。",
+      "description": "パーソナライズされた練習とパターンベースのフィードバックで、英語リスニングをマスター。",
+      "cta_primary": "始める",
+      "cta_secondary": "アカウントをお持ちの方"
+    },
+    "nav": {
+      "get_started": "始める"
+    },
+    "selling_points": {
+      "personalized": {
+        "title": "あなたのレベルに合わせて、上達に応じて調整",
+        "description": "Cue はあなたのリスニング能力に合わせてすべてのクリップを調整します。",
+        "bullets": [
+          "現在のレベルからスタート",
+          "上達に応じてコンテンツが調整される",
+          "苦手なパターンに集中",
+          "簡単すぎず、難しすぎない"
+        ],
+        "outro": "あなたと共に成長する、パーソナルリスニングコーチ。"
+      },
+      "pattern_based": {
+        "title": "何を間違えたかではなく、なぜ間違えたかを学ぶ",
+        "description": "ネイティブスピーカーが使うパターンを理解:",
+        "bullets": [
+          "'wanna' (want to)",
+          "'gonna' (going to)",
+          "音の連結と弱化",
+          "発音記号の解説"
+        ],
+        "outro": "教科書では教えないリスニングパターンをマスター。"
+      },
+      "real_time": {
+        "title": "毎回、即座に説明",
+        "description": "待つ必要なし。先生も不要。",
+        "bullets": [
+          "何を聞き逃したかすぐに確認",
+          "なぜ難しかったのか理解",
+          "発音の詳細を取得",
+          "例文で練習"
+        ],
+        "outro": "すべての間違いから、その場で学ぶ。"
+      }
+    },
+    "how_it_works": {
+      "title": "数分で上達を開始",
+      "steps": {
+        "listen": {
+          "title": "聞く",
+          "description": "あなたのレベルに合ったクリップを選択"
+        },
+        "type": {
+          "title": "入力",
+          "description": "聞いた内容を書く"
+        },
+        "learn": {
+          "title": "学ぶ",
+          "description": "パターンについて即座にフィードバックを取得"
+        }
+      }
+    },
+    "final_cta": {
+      "title": "ネイティブ英語を理解する準備はできましたか？",
+      "subtitle": "無料で始められます。",
+      "button": "始める",
+      "alreadyHaveAccount": "アカウントをお持ちの方"
+    }
   },
   "nav": {
     "home": "ホーム",
@@ -56,6 +120,10 @@
     "keepShowing": "継続は力なり。毎日少しずつ積み重ねましょう。",
     "thisWeek": "今週",
     "days": "日",
+    "savedToday": "今日保存した",
+    "vocabulary": "語彙",
+    "listeningTips": "リスニングのコツ",
+    "items": "項目",
     "enterWhatYouHear": "聞こえた通りに入力してください",
     "typeWhatYouHeard": "聞こえた通りに入力...",
     "play": "再生",
@@ -72,16 +140,34 @@
     "listenCarefully": "注意深く聞いてください",
     "replay": "もう一度",
     "submit": "送信",
-    "couldntCatchIt": "聞き取れませんでした"
+    "couldntCatchIt": "聞き取れませんでした",
+    "complete": {
+      "greatWorkToday": "今日もよく頑張りました！",
+      "daysInARow": "{count}日連続",
+      "dayInARow": "{count}日連続",
+      "comeBackIn": "{time}後に戻ってきてください",
+      "done": "完了",
+      "wantMorePractice": "もっと練習したいですか？",
+      "upgradeToPro": "Proにアップグレード →"
+    }
   },
   "feedback": {
     "title": "リスニングのコツ",
     "loading": "フィードバックを生成中...",
-    "perfect": "完璧です！すべて正確に聞き取れました。素晴らしい！🎉"
+    "perfect": "完璧です！すべて正確に聞き取れました。素晴らしい！🎉",
+    "modalTitle": "なぜ難しかったか",
+    "whatYouMissed": "聞き取れなかった部分",
+    "whatYouMightHaveHeard": "聞こえたもの",
+    "whatItActuallyWas": "実際の内容",
+    "whatYouAdded": "追加された言葉",
+    "whatItShouldBe": "正しい内容",
+    "whyThisHappens": "なぜこうなるのか",
+    "tryThis": "試してみよう"
   },
   "progress": {
     "title": "進捗",
     "subtitle": "あなたのリスニング改善を追跡",
+    "yourStats": "あなたの統計",
     "streak": "連続日数",
     "sessions": "セッション数",
     "minutes": "分",
@@ -92,13 +178,48 @@
     "keepGoing": "その調子！",
     "startFirstSession": "最初のセッションを始める",
     "saved": "保存済み",
+    "savedToday": "今日保存した",
+    "vocabulary": "語彙",
+    "listeningTips": "リスニングのコツ",
     "words": "単語",
     "phrases": "フレーズ",
     "tips": "ヒント",
     "noSavedWords": "保存された単語はまだありません",
     "noSavedPhrases": "保存されたフレーズはまだありません",
     "noSavedTips": "保存されたヒントはまだありません",
-    "listeningMinutes": "リスニング時間"
+    "listeningMinutes": "リスニング時間",
+    "listeningLevel": {
+      "title": "リスニングレベル",
+      "around": "およそ",
+      "stability": "安定性",
+      "confidence": "信頼度",
+      "stabilityTooltip": "安定性は、このレベルのクリップをどの程度一貫して理解しているかを測定します。",
+      "confidenceLevels": {
+        "low": "低",
+        "medium": "中",
+        "high": "高",
+        "exploring": "探索中"
+      },
+      "progression": {
+        "from": "から"
+      },
+      "cefrLabels": {
+        "A1": "初級",
+        "A2": "初級上",
+        "B1": "中級",
+        "B2": "中級上",
+        "C1": "上級",
+        "C2": "熟達"
+      },
+      "descriptors": {
+        "A1": "基本的なフレーズや一般的な単語を理解する",
+        "A2": "身近な文脈でシンプルな文を聞き取る",
+        "B1": "日常会話のほとんどを理解する",
+        "B2": "複雑な考えや微妙な議論を理解する",
+        "C1": "アクセントがあってもほとんどすべてを理解する",
+        "C2": "あらゆる形式の話し言葉を楽に理解する"
+      }
+    }
   },
   "complete": {
     "title": "セッション完了！",
@@ -112,7 +233,12 @@
   "auth": {
     "createAccount": "Cueアカウントを作成",
     "signIn": "サインイン",
+    "signUp": "新規登録",
+    "signingIn": "サインイン中...",
+    "signingUp": "登録中...",
     "welcomeBack": "おかえりなさい",
+    "signInToContinue": "学習を続けるためにサインインしてください",
+    "or": "または",
     "continueWithGoogle": "Googleで続ける",
     "continueWithApple": "Appleで続ける",
     "continueWithEmail": "メールアドレスで続ける",
@@ -133,7 +259,12 @@
     "notNow": "後で",
     "name": {
       "title": "お名前を教えてください",
-      "placeholder": "あなたの名前"
+      "subtitle": "あなたの学習体験をパーソナライズします",
+      "label": "お名前",
+      "placeholder": "名前を入力",
+      "continue": "次へ",
+      "loading": "情報を読み込み中...",
+      "googleNameHint": "Googleから名前を取得しました。変更もできます。"
     },
     "situations": {
       "title": "どこで英語を使いたいですか？",
@@ -166,6 +297,29 @@
     "showSubtitles": "字幕を表示",
     "toggle": "切り替え",
     "signOut": "サインアウト",
-    "buildListeningSkills": "リスニングスキルを磨きましょう"
+    "buildListeningSkills": "リスニングスキルを磨きましょう",
+    "subscription": {
+      "title": "サブスクリプション",
+      "proPlan": "Proプラン",
+      "freePlan": "無料プラン",
+      "manage": "管理",
+      "loading": "読み込み中...",
+      "proUntil": "Proプラン（{date}まで）、その後無料プラン",
+      "upgrade": "アップグレード"
+    }
+  },
+  "streak": {
+    "dayInRow": "{count}日連続",
+    "daysInRow": "{count}日連続",
+    "consistencyMessage": "継続は力なり。毎日少しずつ積み重ねましょう。",
+    "days": {
+      "mon": "月",
+      "tue": "火",
+      "wed": "水",
+      "thu": "木",
+      "fri": "金",
+      "sat": "土",
+      "sun": "日"
+    }
   }
 }

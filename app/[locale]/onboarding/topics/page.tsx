@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useLocale } from 'next-intl'
 import { ChevronLeft } from 'lucide-react'
 import { getOnboardingData, setOnboardingData } from '@/lib/onboardingStore'
 
@@ -17,6 +18,7 @@ const topics = [
 export default function TopicsPage() {
   const [selectedTopics, setSelectedTopics] = useState<Set<string>>(new Set())
   const router = useRouter()
+  const locale = useLocale()
 
   useEffect(() => {
     // Load existing selections if any
@@ -42,7 +44,7 @@ export default function TopicsPage() {
       topics: Array.from(selectedTopics),
     })
     // Navigate directly to practice select (skip level/ready pages)
-    router.push('/practice/select')
+    router.push(`/${locale}/practice/select`)
   }
 
   const handleSkip = () => {
@@ -50,7 +52,7 @@ export default function TopicsPage() {
     setOnboardingData({
       topics: [],
     })
-    router.push('/practice/select')
+    router.push(`/${locale}/practice/select`)
   }
 
   return (

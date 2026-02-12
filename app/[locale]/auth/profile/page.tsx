@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import Link from 'next/link'
@@ -13,6 +13,38 @@ export default function ProfilePage() {
   const [firstName, setFirstName] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // Check if user already has a name from OAuth or localStorage
+  useEffect(() => {
+    const checkExistingName = async () => {
+      try {
+        const { getSupabaseClient } = await import('@/lib/supabase/auth-helpers')
+        const supabase = getSupabaseClient()
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        // Check Supabase user metadata first (from OAuth)
+        const userMetadata = session?.user?.user_metadata || {}
+        const oauthName = userMetadata.full_name || userMetadata.name || userMetadata.first_name
+        
+        // Then check localStorage
+        const localName = localStorage.getItem('userFirstName')
+        
+        // Get the name to use
+        const nameToUse = oauthName ? oauthName.split(' ')[0] : localName
+        
+        if (nameToUse) {
+          setFirstName(nameToUse)
+          console.log('👤 [Profile] Pre-filled name from OAuth/localStorage:', nameToUse)
+          // Do NOT auto-submit - user must explicitly click Continue
+        }
+      } catch (err) {
+        // Ignore errors - user can still enter name manually
+        console.log('Could not load existing name:', err)
+      }
+    }
+    
+    checkExistingName()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

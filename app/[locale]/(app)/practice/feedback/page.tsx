@@ -1,6 +1,7 @@
 'use client'
 
 import { useSearchParams, useRouter } from 'next/navigation'
+import { useLocale } from 'next-intl'
 import { Suspense, useState, useRef, useEffect } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import { analyzeFeedback } from '@/lib/feedbackEngine'
@@ -34,6 +35,7 @@ const mockPracticeData: Record<string, PracticeData> = {
 function FeedbackPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const locale = useLocale()
   const clipId = searchParams.get('clip') || ''
   const userInput = searchParams.get('userInput') || ''
   const practiceData = clipId && mockPracticeData[clipId] ? mockPracticeData[clipId] : {
@@ -83,12 +85,12 @@ function FeedbackPageContent() {
 
   const handleRetry = () => {
     // Replay the same clip
-    router.push(`/practice/respond?clip=${clipId}`)
+    router.push(`/${locale}/practice/respond?clip=${clipId}`)
   }
 
   const handleNext = () => {
     // Continue to next clip
-    router.push('/practice')
+    router.push(`/${locale}/practice`)
   }
 
   return (

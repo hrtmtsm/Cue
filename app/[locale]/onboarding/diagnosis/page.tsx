@@ -3,12 +3,15 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
+import { Play, Pause } from '@phosphor-icons/react'
 import AudioWaveLine from '@/components/AudioWaveLine'
 import FullScreenLoader from '@/components/FullScreenLoader'
 import VoiceRecorder from '@/components/VoiceRecorder'
 import MicPermissionModal from '@/components/MicPermissionModal'
 import ClipProgressBar from '@/components/ClipProgressBar'
-import { getAudioMetadata, generateAudio } from '@/lib/audioApi'
+import ClipTopBar from '@/components/ClipTopBar'
+import { Heading } from '@/components/ui/Typography'
+import { getAudioMetadata } from '@/lib/audioApi'
 import { extractPracticeSteps, type FeedbackCategory } from '@/lib/practiceSteps'
 import type { DiagnosticCategory } from '@/lib/diagnosticSummary'
 import {
@@ -59,6 +62,41 @@ export default function DiagnosisPage() {
   const audioContextRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
   const updateIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Polling function for async audio status checks
+  const startPolling = (clipId: string, transcript: string) => {
+    // Clear any existing polling
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current)
+    }
+
+    pollingIntervalRef.current = setInterval(async () => {
+      try {
+        const metadata = await getAudioMetadata(clipId, transcript, 'clean_normal')
+        
+        if (metadata.audioStatus === 'ready' && metadata.audioUrl) {
+          // Stop polling and set audio
+          clearInterval(pollingIntervalRef.current!)
+          pollingIntervalRef.current = null
+          
+          setAudioUrl(metadata.audioUrl)
+          setAudioStatus('ready')
+          
+          if (IS_DEV) {
+            console.log('✅ [Diagnosis] Audio ready after polling:', clipId)
+          }
+        } else if (metadata.audioStatus === 'error') {
+          clearInterval(pollingIntervalRef.current!)
+          pollingIntervalRef.current = null
+          setAudioStatus('error')
+        }
+        // Keep polling if status is 'generating'
+      } catch (error) {
+        console.error('❌ [Diagnosis] Polling error:', error)
+      }
+    }, 2000) // Poll every 2 seconds
+  }
 
   // Load diagnostic clips on mount
   useEffect(() => {
@@ -152,78 +190,49 @@ export default function DiagnosisPage() {
       setAudioStatus('needs_generation')
       
       try {
-      // Check for existing audio
-      let metadata: any
-      try {
-        metadata = await getAudioMetadata(currentClip.id, currentClip.transcript)
-      } catch (err: any) {
-        console.error('[Diagnosis] Error', {
-          message: err?.message || 'Failed to get audio metadata',
-          name: err?.name,
-          stack: err?.stack,
-          err,
-        })
-        setAudioStatus('error')
-        return
-      }
-      
-      if (metadata.audioStatus === 'ready' && metadata.audioUrl) {
-        setAudioUrl(metadata.audioUrl)
-        setAudioStatus('ready')
+        // Check for existing audio (diagnostic clips should have pre-generated shared audio)
+        const metadata = await getAudioMetadata(currentClip.id, currentClip.transcript, 'clean_normal')
         
-        if (IS_DEV) {
-          console.log('✅ [Diagnosis] Audio ready for clip:', {
-            clipId: currentClip.id,
-            audioUrl: metadata.audioUrl.substring(0, 50) + '...',
-          })
-        }
-      } else {
-        // Generate audio
-        setAudioStatus('generating')
-        let result: any
-        try {
-          result = await generateAudio(currentClip.id, currentClip.transcript)
-        } catch (err: any) {
-          console.error('[Diagnosis] Error', {
-            message: err?.message || 'Failed to generate audio',
-            name: err?.name,
-            stack: err?.stack,
-            err,
-          })
-          setAudioStatus('error')
-          return
-        }
-        
-        if (result.success && result.audioUrl) {
-          setAudioUrl(result.audioUrl)
+        if (metadata.audioStatus === 'ready' && metadata.audioUrl) {
+          setAudioUrl(metadata.audioUrl)
           setAudioStatus('ready')
           
           if (IS_DEV) {
-            console.log('✅ [Diagnosis] Generated audio for clip:', {
-              clipId: currentClip.id,
-            })
+            console.log('✅ [Diagnosis] Audio ready for clip:', currentClip.id)
+          }
+        } else if (metadata.audioStatus === 'generating') {
+          // Already generating - start polling
+          setAudioStatus('generating')
+          startPolling(currentClip.id, currentClip.transcript)
+          
+          if (IS_DEV) {
+            console.log('⏳ [Diagnosis] Audio generating, started polling:', currentClip.id)
           }
         } else {
-          console.error('[Diagnosis] Error', {
-            message: result?.error || 'Audio generation failed',
-            code: result?.code,
-            details: result?.details,
-          })
+          // Diagnostic clips should have pre-generated audio
+          // If not found, log warning but don't attempt generation
+          console.warn('⚠️ [Diagnosis] Audio not found for diagnostic clip:', currentClip.id)
           setAudioStatus('error')
+          
+          if (IS_DEV) {
+            console.log('⚠️ [Diagnosis] Diagnostic clips should have pre-generated audio. Run scripts/pregenerateDiagnosticAudio.ts to generate audio.')
+          }
         }
+      } catch (error: any) {
+        console.error('❌ [Diagnosis] Error loading audio:', error)
+        setAudioStatus('error')
       }
-    } catch (error: any) {
-      console.error('[Diagnosis] Error', {
-        message: error?.message || 'Unexpected error loading audio',
-        name: error?.name,
-        stack: error?.stack,
-        err: error,
-      })
-      setAudioStatus('error')
-    }
     }
 
     loadAudio()
+    
+    // Cleanup polling on unmount or clip change
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
+    }
   }, [currentClip])
 
   // Handle audio playback
@@ -549,71 +558,58 @@ export default function DiagnosisPage() {
   const isAudioReady = audioStatus === 'ready' && audioUrl
 
   return (
-    <main className="flex min-h-screen flex-col px-6 py-6">
-      {/* Progress indicator */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between gap-3">
-          {/* Progress bar stretches full width */}
-          <div className="flex-1">
-            <ClipProgressBar 
-              percent={((currentIndex + 1) / clips.length) * 100}
-            />
-          </div>
-          
-          {/* Right: Step counter */}
-          <div className="flex-shrink-0">
-          <span className="text-sm text-gray-600">{progressText}</span>
-      </div>
-        </div>
-        </div>
+    <main className="flex min-h-screen flex-col">
+      <ClipTopBar 
+        onBack={() => router.push(`/${locale}/onboarding/welcome`)}
+        overridePercent={((currentIndex + 1) / clips.length) * 100}
+      />
+      
+      {/* Content with padding */}
+      <div className="flex-1 py-6">
+        <div className="w-full max-w-[640px] mx-auto px-6 space-y-6">
 
       {/* Heading */}
-      <div className="text-center space-y-2 mb-6">
-        <h1 className="text-heading-2 text-gray-900" style={{ fontFamily: 'Poppins' }}>
+      <div className="text-center">
+        <Heading as="h1" size="page" className="text-gray-900">
           {t('enterWhatYouHear')}
-        </h1>
+        </Heading>
       </div>
 
-      {/* Audio player with waveform */}
-      <div className="relative flex flex-col items-center justify-center py-6 min-h-[140px] mb-6">
-        {/* Waveform background */}
-        {isAudioReady && audioUrl && (
-          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-12 z-0">
-            <AudioWaveLine audioRef={audioRef} isPlaying={isPlaying} side="full" height={48} />
-          </div>
-        )}
-        
-        {/* Play button */}
-        <div className="relative z-10">
-              <button
-            onClick={handlePlayPause}
-            disabled={!isAudioReady}
-            className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg ${
-              isAudioReady
-                ? 'bg-blue-600 text-white active:bg-blue-700'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            } transition-colors`}
+      {/* Audio player */}
+      <div className="relative flex flex-col items-center justify-center py-4">
+        <div className="flex items-center justify-center gap-4">
+          <div
+            className={`rounded-2xl ${isPlaying ? 'animate-breathing' : ''}`}
+            style={{ width: '72px', height: '72px' }}
           >
-            {isPlaying ? (
-              <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-              </svg>
-            ) : (
-              <svg className="w-8 h-8 ml-1" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
-                    </svg>
-                  )}
-              </button>
+            <button
+              onClick={handlePlayPause}
+              disabled={!isAudioReady}
+              className={`w-full h-full rounded-2xl flex items-center justify-center transition-all ${
+                isAudioReady
+                  ? 'bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.98] shadow-sm'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
+              aria-label={isPlaying ? 'Pause' : 'Play'}
+              title={isAudioReady ? 'Play audio' : 'Preparing audio...'}
+            >
+              {isPlaying ? (
+                <Pause weight="fill" size={28} />
+              ) : (
+                <Play weight="fill" size={28} />
+              )}
+            </button>
+          </div>
         </div>
 
         {audioStatus === 'generating' && (
-          <div className="absolute bottom-0 text-center text-sm text-gray-600">
+          <div className="mt-2 text-center text-sm text-gray-600">
             Preparing audio...
           </div>
         )}
 
         {audioStatus === 'error' && (
-          <div className="absolute bottom-0 text-center text-sm text-red-600">
+          <div className="mt-2 text-center text-sm text-red-600">
             Audio error. Please try again.
           </div>
         )}
@@ -647,11 +643,11 @@ export default function DiagnosisPage() {
             }
           }}
           placeholder={t('typeWhatYouHeard')}
-            className={`w-full h-40 p-4 pr-14 border-2 rounded-xl resize-none focus:outline-none text-lg ${
-              inputError 
-                ? 'border-red-300 focus:border-red-500' 
-                : 'border-gray-200 focus:border-blue-600'
-            }`}
+          className={`w-full min-h-[160px] md:min-h-[180px] pt-3 pb-5 px-4 pr-14 border-2 rounded-[18px] resize-none focus:outline-none text-lg md:text-xl leading-relaxed bg-white placeholder:text-gray-400 transition-all ${
+            inputError 
+              ? 'border-red-300 focus:border-red-500 focus:shadow-[0_0_0_3px_rgba(239,68,68,0.1)]' 
+              : 'border-gray-200 focus:border-blue-600 focus:shadow-[0_0_0_3px_rgba(37,99,235,0.1)]'
+          }`}
           disabled={isSubmitting}
         />
           
@@ -857,6 +853,9 @@ export default function DiagnosisPage() {
         isOpen={showMicPermissionModal}
         onClose={() => setShowMicPermissionModal(false)}
       />
+
+        </div>
+      </div>
     </main>
   )
 }

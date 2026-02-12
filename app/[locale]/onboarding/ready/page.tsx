@@ -11,6 +11,7 @@ import { saveUserStories } from '@/lib/storyClient'
 
 export default function ReadyPage() {
   const router = useRouter()
+  const locale = useLocale()
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -85,123 +86,12 @@ export default function ReadyPage() {
         
         // Route to diagnostic session
         console.log('✅ [DIAGNOSTIC] Navigating to /onboarding/diagnosis')
-        router.push('/onboarding/diagnosis')
+        router.push(`/${locale}/onboarding/diagnosis`)
       } else {
-        // OLD: Generation flow - generate clips using OpenAI
-        const requestBody = { onboardingData: data }
-        console.log('🔵 Calling API: POST /api/clips/generate')
-        console.log('🔵 Request body:', JSON.stringify(requestBody, null, 2))
-        
-        // Call API once to generate all 3 clips
-        const response = await fetch('/api/clips/generate', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestBody),
-        })
-        
-        console.log('🔵 API response status:', response.status, response.statusText)
-        console.log('🔵 API response headers:', Object.fromEntries(response.headers.entries()))
-        
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.error('🔴 API error response text:', errorText)
-          let errorData: { error?: string; code?: string; details?: string }
-          try {
-            errorData = JSON.parse(errorText)
-          } catch {
-            errorData = { error: errorText || 'Unknown error' }
-          }
-          
-          // Build user-friendly error message
-          let errorMessage = errorData.details || errorData.error || `Failed to generate clips: ${response.statusText}`
-          
-          // Add specific guidance based on error code
-          if (errorData.code === 'MISSING_API_KEY') {
-            errorMessage = 'OpenAI API key is not configured. Please check your .env.local file and restart the server.'
-          } else if (errorData.code === 'QUOTA_EXCEEDED') {
-            errorMessage = 'OpenAI API quota exceeded. Please check your billing or contact support.'
-          } else if (errorData.code === 'CLIENT_INIT_ERROR') {
-            errorMessage = 'Failed to initialize OpenAI client. Please verify your API key is valid.'
-          }
-          
-          throw new Error(errorMessage)
-        }
-        
-        const result = await response.json()
-        console.log('🔵 API returned result:', JSON.stringify(result, null, 2))
-        console.log('🔵 Response keys:', Object.keys(result))
-        console.log('🔵 result.source:', result.source, '(type:', typeof result.source, ')')
-        console.log('🔵 result.clips exists:', !!result.clips)
-        console.log('🔵 result.clips is array:', Array.isArray(result.clips))
-        
-        if (!result.clips || !Array.isArray(result.clips) || result.clips.length === 0) {
-          throw new Error('No clips were generated. Please try again or check server logs.')
-        }
-        
-        // Check if mock clips were used
-        const source = result.source
-        console.log(`🔵 Clip source detected: "${source}" (type: ${typeof source})`)
-        
-        if (!source || source === 'unknown') {
-          console.error('🔴 Missing or unknown source in API response. Full response:', result)
-          throw new Error('API response missing source field. This indicates a server error. Check server logs.')
-        }
-        
-        if (source === 'mock') {
-          // Show warning and do NOT navigate
-          setError('Using mock clips. Check OPENAI_API_KEY / USE_MOCK_CLIPS and restart dev server.')
-          setIsGenerating(false)
-          return // Stop here - don't navigate
-        }
-        
-        const generatedClips: Clip[] = result.clips
-        console.log(`Generated ${generatedClips.length} clips successfully (source: ${source})`)
-        console.log('🔵 [DEBUG] Generated clips:', generatedClips.length)
-        console.log('🔵 [DEBUG] Clip situations:', Array.from(new Set(generatedClips.map(c => c.situation))))
-        
-        // Verify source is 'openai' - if not, something went wrong
-        if (source !== 'openai') {
-          console.warn(`⚠️ Unexpected source: ${source}, expected 'openai'`)
-          setError(`Unexpected clip source: ${source}. Expected 'openai'. Check server logs.`)
-          setIsGenerating(false)
-          return
-        }
-        
-        // Store clips in localStorage (for compatibility / quick practice)
-        localStorage.setItem('userClips', JSON.stringify(generatedClips))
-        localStorage.setItem('hasGeneratedClips', 'true')
-
-        // Convert clips into stories and persist as single source of truth for stories
-        const userStories = convertClipsToStories(generatedClips)
-        console.log('🔵 [DEBUG] Converted stories:', userStories.length)
-        console.log('🔵 [DEBUG] Story titles:', userStories.map(s => s.title))
-        saveUserStories(userStories)
-        
-        // Debug: Check localStorage after save
-        const storedStories = JSON.parse(localStorage.getItem('userStories') || '[]')
-        console.log('🔵 [DEBUG] userStories in localStorage:', storedStories.length)
-
-        console.log('✅ [ONBOARDING] Onboarding result saved:', {
-          clipCount: generatedClips.length,
-          clipIds: generatedClips.map(c => c.id),
-          sampleTranscript: generatedClips[0]?.text?.substring(0, 50) + '...',
-          situations: Array.from(new Set(generatedClips.map(c => c.situation))),
-          storyCount: userStories.length,
-          storyIds: userStories.map(s => s.id),
-          storyTitles: userStories.map(s => s.title),
-        })
-        console.log('✅ [ONBOARDING] Stored clips in localStorage')
-        console.log('✅ [ONBOARDING] Verification - userClips:', localStorage.getItem('userClips') ? 'present' : 'missing')
-        console.log('✅ [ONBOARDING] Verification - hasGeneratedClips:', localStorage.getItem('hasGeneratedClips'))
-        
-        // Small delay to ensure localStorage is committed before navigation
-        await new Promise(resolve => setTimeout(resolve, 50))
-        
-        // Route to practice
-        console.log('Navigating to /practice')
-        router.push('/practice')
+        // All users now go through diagnostic flow
+        // Clips will be fetched from database in practice/select page
+        console.log('✅ [ONBOARDING] Navigating to practice/select (clips will be fetched from DB)')
+        router.push(`/${locale}/practice/select`)
       }
     } catch (err: any) {
       console.error('Error in handleStart:', err)
@@ -218,7 +108,7 @@ export default function ReadyPage() {
       {!isGenerating && (
         <div className="mb-8">
           <Link
-            href="/onboarding/level-select"
+            href={`/${locale}/onboarding/level-select`}
             className="text-blue-600 font-medium text-lg py-2 px-1 -ml-1 inline-flex items-center gap-1"
           >
             <ChevronLeft className="w-5 h-5" />
@@ -255,7 +145,7 @@ export default function ReadyPage() {
               <button
                 onClick={() => {
                   setError(null)
-                  router.push('/practice')
+                  router.push(`/${locale}/practice`)
                 }}
                 className="mt-2 text-xs underline hover:no-underline"
               >

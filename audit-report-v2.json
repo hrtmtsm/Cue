@@ -1,0 +1,1133 @@
+{
+  "timestamp": "2026-02-07T07:11:22.209Z",
+  "summary": {
+    "total_chunks": 1000,
+    "issues_found": 104,
+    "issue_rate": 10,
+    "critical_severity": 61,
+    "high_severity": 43,
+    "medium_severity": 0,
+    "low_severity": 0,
+    "clips_with_issues": 85
+  },
+  "issues": [
+    {
+      "clip_id": "clip-practice-015",
+      "chunk_id": "fb7bb8a4-49d3-4376-874b-f68cb823c94e",
+      "chunk_text": "go to",
+      "ref_start": 12,
+      "ref_end": 17,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-015",
+      "chunk_id": "11063228-27dd-4d86-a8a1-801f7334f37f",
+      "chunk_text": "the airport",
+      "ref_start": 18,
+      "ref_end": 29,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-040",
+      "chunk_id": "c32ef17a-178b-4194-b435-4cf4e07b5d39",
+      "chunk_text": "the schedule",
+      "ref_start": 21,
+      "ref_end": 33,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-050",
+      "chunk_id": "e902ec6b-e91f-4711-8348-f0b2b873662c",
+      "chunk_text": "have to",
+      "ref_start": 12,
+      "ref_end": 19,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-050",
+      "chunk_id": "86370c47-32e9-48f0-aef0-cc82a36d7dac",
+      "chunk_text": "the train",
+      "ref_start": 26,
+      "ref_end": 35,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-051",
+      "chunk_id": "19fcd8a8-de06-4413-bd4f-f5f6d6323a27",
+      "chunk_text": "have to",
+      "ref_start": 13,
+      "ref_end": 20,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-052",
+      "chunk_id": "e48f5ac8-178e-42b8-acb7-1f34a6b4c08c",
+      "chunk_text": "have to",
+      "ref_start": 10,
+      "ref_end": 17,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-053",
+      "chunk_id": "4231ac03-508b-44d9-8f1d-6fabf7fd140b",
+      "chunk_text": "the map",
+      "ref_start": 28,
+      "ref_end": 35,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-054",
+      "chunk_id": "bc099ce1-da56-4e32-bc88-9a8dbb7a873b",
+      "chunk_text": "have to",
+      "ref_start": 12,
+      "ref_end": 19,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-054",
+      "chunk_id": "296b9111-f249-4483-8a1e-c6706aee154f",
+      "chunk_text": "the gate",
+      "ref_start": 25,
+      "ref_end": 33,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-056",
+      "chunk_id": "8eac6be0-d616-4c9b-9659-538742e6c24d",
+      "chunk_text": "have to",
+      "ref_start": 12,
+      "ref_end": 19,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-064",
+      "chunk_id": "19c56e73-045f-4c1b-a35c-9bc56e37363b",
+      "chunk_text": "It's kind of",
+      "ref_start": 0,
+      "ref_end": 12,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-065",
+      "chunk_id": "926f2edb-7a69-4c22-a723-e516e5e07866",
+      "chunk_text": "It's kind of",
+      "ref_start": 0,
+      "ref_end": 12,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-067",
+      "chunk_id": "a8325494-859c-46b8-929e-90d350ed3e79",
+      "chunk_text": "It's kind of",
+      "ref_start": 0,
+      "ref_end": 12,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-070",
+      "chunk_id": "4835ef98-46b8-4af9-8916-2f1c92ff30f1",
+      "chunk_text": "It's kind of",
+      "ref_start": 0,
+      "ref_end": 12,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-079",
+      "chunk_id": "c7b6ca7a-a673-46c3-9a05-ab893ab2178d",
+      "chunk_text": "to check in",
+      "ref_start": 18,
+      "ref_end": 29,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-093",
+      "chunk_id": "de9ac422-fe9d-46ab-a663-9b33a7b9ca05",
+      "chunk_text": "I'm gonna have",
+      "ref_start": 0,
+      "ref_end": 14,
+      "reason": "CRITICAL: Incomplete phrase/idiom (e.g., \"I'm gonna shoot\", \"you an email\")",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-093",
+      "chunk_id": "81f886e0-627b-4e4c-b6ec-9c7230e94d76",
+      "chunk_text": "I'm gonna have to",
+      "ref_start": 0,
+      "ref_end": 17,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-095",
+      "chunk_id": "859448e8-02cf-4c41-b46f-e2f8aa0894b8",
+      "chunk_text": "We're gonna have",
+      "ref_start": 0,
+      "ref_end": 16,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-095",
+      "chunk_id": "27b52d69-6ed2-41d3-a83d-01a684845d2b",
+      "chunk_text": "to check in",
+      "ref_start": 17,
+      "ref_end": 28,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-095",
+      "chunk_id": "bc5999d1-8c9b-4078-ac7e-cc329674ed75",
+      "chunk_text": "before we can",
+      "ref_start": 29,
+      "ref_end": 42,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-097",
+      "chunk_id": "e8848656-12df-4910-b158-2d056e87adc3",
+      "chunk_text": "everyone's talking about",
+      "ref_start": 28,
+      "ref_end": 52,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-100",
+      "chunk_id": "89f725a7-43e0-45fd-8dbc-6e529c3c18e2",
+      "chunk_text": "but we're gonna have",
+      "ref_start": 61,
+      "ref_end": 81,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-100",
+      "chunk_id": "816fd993-ee3a-4181-bf94-1a75d0cef13a",
+      "chunk_text": "have to do it",
+      "ref_start": 77,
+      "ref_end": 90,
+      "reason": "HIGH: Chunk has no content words (all function words)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-149",
+      "chunk_id": "eac484d9-b313-4b37-a2a5-5dc5c02703bc",
+      "chunk_text": "comment on",
+      "ref_start": 8,
+      "ref_end": 18,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-154",
+      "chunk_id": "07a71989-8de9-4a8c-b8d9-53a8046e272a",
+      "chunk_text": "the plot",
+      "ref_start": 19,
+      "ref_end": 27,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-168",
+      "chunk_id": "65bc5b8c-4e19-424c-85a3-8f2e88bf89e0",
+      "chunk_text": "this",
+      "ref_start": 22,
+      "ref_end": 26,
+      "reason": "CRITICAL: Function-word-only chunk (single token like \"the\", \"a\")",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-179",
+      "chunk_id": "5534fbcc-ffaf-4196-91a3-67ec58a4ab50",
+      "chunk_text": "the numbers",
+      "ref_start": 29,
+      "ref_end": 40,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-182",
+      "chunk_id": "bdccc5eb-0f05-4fb3-bc45-a67e682e7189",
+      "chunk_text": "the training",
+      "ref_start": 21,
+      "ref_end": 33,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-193",
+      "chunk_id": "4c237794-bad3-4e95-9dd1-9297223f8d4a",
+      "chunk_text": "We would've had",
+      "ref_start": 0,
+      "ref_end": 15,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-196",
+      "chunk_id": "e668c533-b62d-4071-bbc2-4099c84055c6",
+      "chunk_text": "the party",
+      "ref_start": 22,
+      "ref_end": 31,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-199",
+      "chunk_id": "efad6c85-a36c-4d0f-8762-135f9f6f9967",
+      "chunk_text": "the problem",
+      "ref_start": 20,
+      "ref_end": 31,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-203",
+      "chunk_id": "adfa7d1d-8eea-453f-b0ad-defe0b414edf",
+      "chunk_text": "the weather",
+      "ref_start": 22,
+      "ref_end": 33,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-214",
+      "chunk_id": "1ba3e7c9-6265-4963-b918-15980e8381e7",
+      "chunk_text": "We would've had",
+      "ref_start": 0,
+      "ref_end": 15,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-217",
+      "chunk_id": "8ee05b7b-5c7f-423e-bc2c-1a9793144e59",
+      "chunk_text": "the ending",
+      "ref_start": 17,
+      "ref_end": 27,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-218",
+      "chunk_id": "552bc7bc-e793-4f76-8873-9a65de7a5ef0",
+      "chunk_text": "the soundtrack",
+      "ref_start": 12,
+      "ref_end": 26,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-219",
+      "chunk_id": "66c89183-f9ca-4721-ac2b-8b472b39c4d1",
+      "chunk_text": "the storyline",
+      "ref_start": 13,
+      "ref_end": 26,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-221",
+      "chunk_id": "16f47b23-b3c6-41b5-8ed4-4fc2ebcd5fcb",
+      "chunk_text": "the cinematography",
+      "ref_start": 17,
+      "ref_end": 35,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-224",
+      "chunk_id": "2637fd2b-d322-4ad4-873d-64ecf6e780f3",
+      "chunk_text": "the intro",
+      "ref_start": 11,
+      "ref_end": 20,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-229",
+      "chunk_id": "718ba0df-5ba9-4ad3-a401-ede77ee8eaf1",
+      "chunk_text": "It's kind of",
+      "ref_start": 0,
+      "ref_end": 12,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-230",
+      "chunk_id": "8c1461c0-e6d7-4aff-b1c4-a5735c919484",
+      "chunk_text": "It's kind of",
+      "ref_start": 0,
+      "ref_end": 12,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-232",
+      "chunk_id": "7313e7f9-0b53-4cc0-92a2-c01b6e15d9b7",
+      "chunk_text": "It's kind of",
+      "ref_start": 0,
+      "ref_end": 12,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-241",
+      "chunk_id": "25447e00-1063-4a01-ac80-1ec80beceb66",
+      "chunk_text": "the report",
+      "ref_start": 22,
+      "ref_end": 32,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-241",
+      "chunk_id": "ceaa7cab-2879-4e2f-a689-a70ebc714e3e",
+      "chunk_text": "if we'd had",
+      "ref_start": 33,
+      "ref_end": 44,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-243",
+      "chunk_id": "07293b99-c669-45a5-9eba-5906ea1d7f05",
+      "chunk_text": "the mistake",
+      "ref_start": 21,
+      "ref_end": 32,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-245",
+      "chunk_id": "87522dc7-4efc-4c7b-9fb7-473406b4e906",
+      "chunk_text": "the instructions",
+      "ref_start": 41,
+      "ref_end": 57,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-258",
+      "chunk_id": "b993cd5e-1778-409b-b8b4-ba90304d5f1f",
+      "chunk_text": "I'm gonna have",
+      "ref_start": 0,
+      "ref_end": 14,
+      "reason": "CRITICAL: Incomplete phrase/idiom (e.g., \"I'm gonna shoot\", \"you an email\")",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-260",
+      "chunk_id": "0426c5db-0eb0-48a1-a77f-7fa452b74655",
+      "chunk_text": "She's gonna have",
+      "ref_start": 0,
+      "ref_end": 16,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-261",
+      "chunk_id": "abc1c52a-b3e6-484e-8574-980fea8e9bd2",
+      "chunk_text": "before checking in",
+      "ref_start": 43,
+      "ref_end": 61,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-262",
+      "chunk_id": "3a2c0e53-0661-43ee-9c7d-5a9ca558f9dd",
+      "chunk_text": "They're gonna have",
+      "ref_start": 0,
+      "ref_end": 18,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-264",
+      "chunk_id": "6c70be9c-3d2d-427e-9163-55dc14c372af",
+      "chunk_text": "I'm gonna have",
+      "ref_start": 0,
+      "ref_end": 14,
+      "reason": "CRITICAL: Incomplete phrase/idiom (e.g., \"I'm gonna shoot\", \"you an email\")",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-266",
+      "chunk_id": "d59a1b1e-3e3b-413c-b5a4-5b7bc6157a97",
+      "chunk_text": "when there are",
+      "ref_start": 16,
+      "ref_end": 30,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-270",
+      "chunk_id": "d789f040-b91b-4725-a03c-0af594e2e66e",
+      "chunk_text": "when there are",
+      "ref_start": 16,
+      "ref_end": 30,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-273",
+      "chunk_id": "17c695ec-07bd-4306-be2b-96ce393e4d56",
+      "chunk_text": "the project",
+      "ref_start": 58,
+      "ref_end": 69,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-274",
+      "chunk_id": "3103e4b4-50a3-44cc-a0fc-9393c2d3adee",
+      "chunk_text": "the traffic",
+      "ref_start": 50,
+      "ref_end": 61,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-275",
+      "chunk_id": "3010fff1-7f7a-45f3-955e-8c135d0b686a",
+      "chunk_text": "the deadline",
+      "ref_start": 37,
+      "ref_end": 49,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-280",
+      "chunk_id": "d5f88756-296f-47ec-bff3-ba7a15f18f2a",
+      "chunk_text": "the meeting",
+      "ref_start": 39,
+      "ref_end": 50,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-282",
+      "chunk_id": "ed17ba94-d703-46a9-9ea5-6220afd2f819",
+      "chunk_text": "how urgent it was",
+      "ref_start": 75,
+      "ref_end": 92,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-282",
+      "chunk_id": "43ee4442-75a2-4223-ba33-3a0cb819b087",
+      "chunk_text": "gonna be",
+      "ref_start": 93,
+      "ref_end": 101,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-283",
+      "chunk_id": "b1de34af-0bf7-448c-9099-b01b4e3cf976",
+      "chunk_text": "you were gonna be",
+      "ref_start": 63,
+      "ref_end": 80,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-287",
+      "chunk_id": "e28b90ab-59c6-4978-b96c-56347d025329",
+      "chunk_text": "We're gonna have",
+      "ref_start": 0,
+      "ref_end": 16,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-288",
+      "chunk_id": "1c99052d-00ed-477f-b24b-faaf6e7e99e9",
+      "chunk_text": "the project was gonna be",
+      "ref_start": 79,
+      "ref_end": 103,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-288",
+      "chunk_id": "21832cde-32f5-4b49-bfd5-7a0e22c4d4c0",
+      "chunk_text": "we'd have to do",
+      "ref_start": 126,
+      "ref_end": 141,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-289",
+      "chunk_id": "5c7b504a-475c-4a72-98e6-296d15e9b7b8",
+      "chunk_text": "We're gonna have",
+      "ref_start": 0,
+      "ref_end": 16,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-289",
+      "chunk_id": "12a1867e-0e3b-4884-8e30-1a3ffc6ae200",
+      "chunk_text": "the plane",
+      "ref_start": 56,
+      "ref_end": 65,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-290",
+      "chunk_id": "efffb1e7-5573-464a-a38f-2683851c1398",
+      "chunk_text": "and I had to",
+      "ref_start": 108,
+      "ref_end": 120,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-290",
+      "chunk_id": "2ff4713e-767c-4113-99d6-1a61a5cca031",
+      "chunk_text": "before I could",
+      "ref_start": 144,
+      "ref_end": 158,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-291",
+      "chunk_id": "10bc5687-3c84-42af-bdf1-11f9dad2e423",
+      "chunk_text": "You're gonna have",
+      "ref_start": 0,
+      "ref_end": 17,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-291",
+      "chunk_id": "ca1a1233-56e2-4a06-bee6-de9ffdc53810",
+      "chunk_text": "approved before you can",
+      "ref_start": 35,
+      "ref_end": 58,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-292",
+      "chunk_id": "4230bf82-d01f-455b-bbe2-73f301d81647",
+      "chunk_text": "we were gonna have",
+      "ref_start": 57,
+      "ref_end": 75,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-292",
+      "chunk_id": "da480387-ebf1-4067-b586-85b3d19ff8d1",
+      "chunk_text": "to deal with",
+      "ref_start": 76,
+      "ref_end": 88,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-294",
+      "chunk_id": "fc50c425-7076-4eda-b850-1f0d349e8e19",
+      "chunk_text": "because there's so much going on",
+      "ref_start": 170,
+      "ref_end": 202,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-294",
+      "chunk_id": "16234de6-2c83-4f62-beda-b24f6175c865",
+      "chunk_text": "going on",
+      "ref_start": 194,
+      "ref_end": 202,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-v2-005",
+      "chunk_id": "ab3f6a73-0611-4824-8481-c1f0ca18507f",
+      "chunk_text": "to this",
+      "ref_start": 18,
+      "ref_end": 25,
+      "reason": "HIGH: Chunk has no content words (all function words)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-v2-008",
+      "chunk_id": "cf76ae2f-1156-4b6f-b3c0-6b25f713be26",
+      "chunk_text": "I'm gonna run",
+      "ref_start": 0,
+      "ref_end": 13,
+      "reason": "CRITICAL: Incomplete phrase/idiom (e.g., \"I'm gonna shoot\", \"you an email\")",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-v2-012",
+      "chunk_id": "ab54adc8-2eb3-45b9-9957-7a351bd14916",
+      "chunk_text": "the meeting",
+      "ref_start": 23,
+      "ref_end": 34,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-v2-013",
+      "chunk_id": "64e3937c-45fe-43fd-9911-816cb2d49513",
+      "chunk_text": "to loop you in",
+      "ref_start": 7,
+      "ref_end": 21,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-v2-015",
+      "chunk_id": "594d4e13-04cb-4601-92f4-63e20c9128c8",
+      "chunk_text": "I'm gonna need",
+      "ref_start": 0,
+      "ref_end": 14,
+      "reason": "CRITICAL: Incomplete phrase/idiom (e.g., \"I'm gonna shoot\", \"you an email\")",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-v2-016",
+      "chunk_id": "6f497a7f-3d10-4d65-b1cb-496a53fb6d7c",
+      "chunk_text": "the needle",
+      "ref_start": 20,
+      "ref_end": 30,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-v2-017",
+      "chunk_id": "0d15600e-49cd-4053-97b7-55225de96580",
+      "chunk_text": "on that",
+      "ref_start": 23,
+      "ref_end": 30,
+      "reason": "HIGH: Chunk has no content words (all function words)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-v2-019",
+      "chunk_id": "500eb2d9-09a0-440c-90df-7da8130d80a0",
+      "chunk_text": "They're gonna have",
+      "ref_start": 0,
+      "ref_end": 18,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-v2-021",
+      "chunk_id": "da96a6de-b0a0-4a0c-9fbe-23613be0b216",
+      "chunk_text": "I'm gonna wrap",
+      "ref_start": 0,
+      "ref_end": 14,
+      "reason": "CRITICAL: Incomplete phrase/idiom (e.g., \"I'm gonna shoot\", \"you an email\")",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-v2-023",
+      "chunk_id": "a01166e3-2715-4b65-9971-7bfc02d62b90",
+      "chunk_text": "me in",
+      "ref_start": 13,
+      "ref_end": 18,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-v2-027",
+      "chunk_id": "b8d6817d-26a4-48ea-aad9-2f56f12d714b",
+      "chunk_text": "on this",
+      "ref_start": 19,
+      "ref_end": 26,
+      "reason": "HIGH: Chunk has no content words (all function words)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-v2-030",
+      "chunk_id": "0263af0c-7cf2-4a69-853c-e758e03d2fbc",
+      "chunk_text": "I'm gonna check",
+      "ref_start": 0,
+      "ref_end": 15,
+      "reason": "CRITICAL: Incomplete phrase/idiom (e.g., \"I'm gonna shoot\", \"you an email\")",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-v2-030",
+      "chunk_id": "4b06cea2-ff12-4d4f-9c14-92b501a9bdad",
+      "chunk_text": "in with them",
+      "ref_start": 16,
+      "ref_end": 28,
+      "reason": "HIGH: Chunk has no content words (all function words)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-v2-031",
+      "chunk_id": "def4484b-e0b7-4343-8529-9570314ea161",
+      "chunk_text": "Can we",
+      "ref_start": 0,
+      "ref_end": 6,
+      "reason": "HIGH: Chunk has no content words (all function words)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-v2-035",
+      "chunk_id": "894a78ac-4f6d-42a5-887f-8261d1991437",
+      "chunk_text": "a chance",
+      "ref_start": 44,
+      "ref_end": 52,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-v2-036",
+      "chunk_id": "84f7fe6b-3926-4cdd-a497-155767996d95",
+      "chunk_text": "with them",
+      "ref_start": 41,
+      "ref_end": 50,
+      "reason": "HIGH: Chunk has no content words (all function words)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-v2-037",
+      "chunk_id": "61bec03f-137c-47da-96bf-cd3e1f40ec58",
+      "chunk_text": "have to",
+      "ref_start": 12,
+      "ref_end": 19,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-v2-040",
+      "chunk_id": "ba72b7ad-0f5b-4f60-8447-28c04976f6e2",
+      "chunk_text": "on this",
+      "ref_start": 25,
+      "ref_end": 32,
+      "reason": "HIGH: Chunk has no content words (all function words)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-v2-041",
+      "chunk_id": "f1a8fd41-3a43-4a81-8287-c62bd6efde35",
+      "chunk_text": "I'm gonna shoot",
+      "ref_start": 0,
+      "ref_end": 15,
+      "reason": "CRITICAL: Incomplete phrase/idiom (e.g., \"I'm gonna shoot\", \"you an email\")",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-v2-041",
+      "chunk_id": "46e1dd35-9c32-4111-a764-9ad44096af7b",
+      "chunk_text": "you an email",
+      "ref_start": 16,
+      "ref_end": 28,
+      "reason": "CRITICAL: Incomplete phrase/idiom (e.g., \"I'm gonna shoot\", \"you an email\")",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-v2-041",
+      "chunk_id": "269d1c87-3c3e-42f6-814f-c2d3d7e88ffb",
+      "chunk_text": "about that",
+      "ref_start": 29,
+      "ref_end": 39,
+      "reason": "HIGH: Chunk has no content words (all function words)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-v2-043",
+      "chunk_id": "21fb58b0-e2fd-425e-9e3a-2da41d5ef1e7",
+      "chunk_text": "a call",
+      "ref_start": 17,
+      "ref_end": 23,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-v2-046",
+      "chunk_id": "2a73cf2f-8280-4f08-a435-611e3b563c57",
+      "chunk_text": "for this",
+      "ref_start": 42,
+      "ref_end": 50,
+      "reason": "HIGH: Chunk has no content words (all function words)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-v2-049",
+      "chunk_id": "02d54cf5-b86b-45ab-ad10-2fbc61eef8ba",
+      "chunk_text": "with you",
+      "ref_start": 34,
+      "ref_end": 42,
+      "reason": "HIGH: Chunk has no content words (all function words)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-v2-059",
+      "chunk_id": "93211507-c54f-46e4-a5c5-21fe1ed54515",
+      "chunk_text": "a rock",
+      "ref_start": 32,
+      "ref_end": 38,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-v2-060",
+      "chunk_id": "da9be531-57c2-4da3-b310-660c3fee12dc",
+      "chunk_text": "gonna do",
+      "ref_start": 26,
+      "ref_end": 34,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-v2-068",
+      "chunk_id": "8e261a00-ac57-4ae6-a55c-962ec2d25e9a",
+      "chunk_text": "for that",
+      "ref_start": 23,
+      "ref_end": 31,
+      "reason": "HIGH: Chunk has no content words (all function words)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-v2-069",
+      "chunk_id": "89ce3809-d88a-4cde-b351-594fdea54235",
+      "chunk_text": "posted on",
+      "ref_start": 13,
+      "ref_end": 22,
+      "reason": "CRITICAL: Chunk ends with function word (violates chunking rules)",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-v2-072",
+      "chunk_id": "fa10c158-bab1-40fa-9ad7-d3143e356987",
+      "chunk_text": "about it",
+      "ref_start": 29,
+      "ref_end": 37,
+      "reason": "HIGH: Chunk has no content words (all function words)",
+      "severity": "high"
+    },
+    {
+      "clip_id": "clip-practice-v2-074",
+      "chunk_id": "0065c452-2b99-4f9b-a60d-4ca743ff8b72",
+      "chunk_text": "I'm gonna call",
+      "ref_start": 9,
+      "ref_end": 23,
+      "reason": "CRITICAL: Incomplete phrase/idiom (e.g., \"I'm gonna shoot\", \"you an email\")",
+      "severity": "critical"
+    },
+    {
+      "clip_id": "clip-practice-v2-074",
+      "chunk_id": "7d00d521-8814-4ae2-a340-4d4d98f630cd",
+      "chunk_text": "a night",
+      "ref_start": 27,
+      "ref_end": 34,
+      "reason": "HIGH: Grammatical pattern issue (e.g., \"an email\" without context)",
+      "severity": "high"
+    }
+  ],
+  "top_clips": [
+    {
+      "clip_id": "clip-practice-095",
+      "score": 30,
+      "total_issues": 3,
+      "critical": 3,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    {
+      "clip_id": "clip-practice-v2-041",
+      "score": 23,
+      "total_issues": 3,
+      "critical": 2,
+      "high": 1,
+      "medium": 0,
+      "low": 0
+    },
+    {
+      "clip_id": "clip-practice-093",
+      "score": 20,
+      "total_issues": 2,
+      "critical": 2,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    {
+      "clip_id": "clip-practice-282",
+      "score": 20,
+      "total_issues": 2,
+      "critical": 2,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    {
+      "clip_id": "clip-practice-288",
+      "score": 20,
+      "total_issues": 2,
+      "critical": 2,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    {
+      "clip_id": "clip-practice-290",
+      "score": 20,
+      "total_issues": 2,
+      "critical": 2,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    {
+      "clip_id": "clip-practice-291",
+      "score": 20,
+      "total_issues": 2,
+      "critical": 2,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    {
+      "clip_id": "clip-practice-292",
+      "score": 20,
+      "total_issues": 2,
+      "critical": 2,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    {
+      "clip_id": "clip-practice-294",
+      "score": 20,
+      "total_issues": 2,
+      "critical": 2,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    {
+      "clip_id": "clip-practice-015",
+      "score": 13,
+      "total_issues": 2,
+      "critical": 1,
+      "high": 1,
+      "medium": 0,
+      "low": 0
+    },
+    {
+      "clip_id": "clip-practice-050",
+      "score": 13,
+      "total_issues": 2,
+      "critical": 1,
+      "high": 1,
+      "medium": 0,
+      "low": 0
+    },
+    {
+      "clip_id": "clip-practice-054",
+      "score": 13,
+      "total_issues": 2,
+      "critical": 1,
+      "high": 1,
+      "medium": 0,
+      "low": 0
+    },
+    {
+      "clip_id": "clip-practice-100",
+      "score": 13,
+      "total_issues": 2,
+      "critical": 1,
+      "high": 1,
+      "medium": 0,
+      "low": 0
+    },
+    {
+      "clip_id": "clip-practice-241",
+      "score": 13,
+      "total_issues": 2,
+      "critical": 1,
+      "high": 1,
+      "medium": 0,
+      "low": 0
+    },
+    {
+      "clip_id": "clip-practice-289",
+      "score": 13,
+      "total_issues": 2,
+      "critical": 1,
+      "high": 1,
+      "medium": 0,
+      "low": 0
+    },
+    {
+      "clip_id": "clip-practice-v2-030",
+      "score": 13,
+      "total_issues": 2,
+      "critical": 1,
+      "high": 1,
+      "medium": 0,
+      "low": 0
+    },
+    {
+      "clip_id": "clip-practice-v2-074",
+      "score": 13,
+      "total_issues": 2,
+      "critical": 1,
+      "high": 1,
+      "medium": 0,
+      "low": 0
+    },
+    {
+      "clip_id": "clip-practice-051",
+      "score": 10,
+      "total_issues": 1,
+      "critical": 1,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    {
+      "clip_id": "clip-practice-052",
+      "score": 10,
+      "total_issues": 1,
+      "critical": 1,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    {
+      "clip_id": "clip-practice-056",
+      "score": 10,
+      "total_issues": 1,
+      "critical": 1,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    }
+  ]
+}

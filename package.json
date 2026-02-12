@@ -12,14 +12,23 @@
     "import-clips-v2": "tsx scripts/import-clips-v2.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.72.1",
+    "@phosphor-icons/react": "^2.1.10",
+    "@stripe/stripe-js": "^2.4.0",
+    "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.89.0",
-    "@vercel/blob": "^0.19.0",
+    "@vercel/blob": "^2.2.0",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.33.0",
     "lucide-react": "^0.562.0",
-    "next": "^14.2.0",
+    "next": "^16.1.6",
     "next-intl": "^4.8.1",
     "openai": "^6.15.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "stripe": "^14.21.0",
+    "tailwind-merge": "^3.4.0",
+    "zod": "^4.3.6",
     "zustand": "^5.0.9"
   },
   "devDependencies": {

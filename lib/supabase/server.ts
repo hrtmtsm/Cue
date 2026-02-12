@@ -76,26 +76,25 @@ export async function getAuthUser(request: Request): Promise<{ userId: string } 
 }
 
 /**
- * Resolve userId from auth or dev guest user
+ * Resolve userId from auth or dev guest user (header-based auth only)
  * In dev/preview mode, falls back to DEV_GUEST_USER_ID if not authenticated
  * In production, requires authentication
+ * 
+ * NOTE: This version only checks Authorization headers.
+ * For cookie-based auth (used by browsers), use resolveUserId from './resolveUserId'
  */
 export async function resolveUserId(request: Request): Promise<{ userId: string; source: 'auth' | 'dev_guest' }> {
-  // Try to get authenticated user first
+  // Try header-based authentication
   const auth = await getAuthUser(request)
   if (auth) {
-    const vercelEnv = process.env.VERCEL_ENV || 'development'
-    console.log('✅ [resolveUserId] Authenticated user:', {
+    console.log('✅ [resolveUserId] Authenticated user (header):', {
       userId: auth.userId.substring(0, 8) + '...',
       source: 'auth',
-      VERCEL_ENV: vercelEnv,
-      NODE_ENV: process.env.NODE_ENV,
     })
     return { userId: auth.userId, source: 'auth' }
   }
 
-  // Not authenticated - check if we're in dev/preview mode
-  // Use VERCEL_ENV for Vercel deployments, NODE_ENV for local dev
+  // Dev guest fallback (non-production only)
   const vercelEnv = process.env.VERCEL_ENV || 'development'
   const isProduction = vercelEnv === 'production' && process.env.NODE_ENV === 'production'
   
@@ -104,19 +103,13 @@ export async function resolveUserId(request: Request): Promise<{ userId: string;
     if (!devGuestUserId) {
       throw new Error('DEV_GUEST_USER_ID environment variable is required in development/preview mode when user is not authenticated')
     }
-    console.log('✅ [resolveUserId] Using dev guest user:', {
+    console.log('⚠️  [resolveUserId] Using dev guest user (no auth found):', {
       userId: devGuestUserId.substring(0, 8) + '...',
       source: 'dev_guest',
-      VERCEL_ENV: vercelEnv,
-      NODE_ENV: process.env.NODE_ENV,
     })
     return { userId: devGuestUserId, source: 'dev_guest' }
   }
 
-  // Production mode - require authentication
-  console.error('❌ [resolveUserId] Authentication required in production:', {
-    VERCEL_ENV: vercelEnv,
-    NODE_ENV: process.env.NODE_ENV,
-  })
+  // Production: require authentication
   throw new Error('Authentication required in production mode')
 }

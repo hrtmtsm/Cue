@@ -3,7 +3,12 @@ const withNextIntl = require('next-intl/plugin')(
 )
 
 /** @type {import('next').NextConfig} */
-const nextConfig = {}
+const nextConfig = {
+  // Fix for vendor chunk issues with next-intl
+  experimental: {
+    optimizePackageImports: ['next-intl'],
+  },
+}
 
 module.exports = withNextIntl(nextConfig)
 

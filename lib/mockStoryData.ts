@@ -60,6 +60,7 @@ export const mockStories: Story[] = [
         transcript: 'We need to push the deadline back by a week.',
         audioStatus: 'needs_generation',
         focusSkill: 'speed',
+        dbClipId: 'clip-story-2-1', // DB clip ID for chunk lookup
       },
       {
         id: 'clip-2-2',

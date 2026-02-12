@@ -5,6 +5,8 @@ import { createClipProfiles } from '@/lib/clipProfileMapper'
 import type { OnboardingData } from '@/lib/onboardingStore'
 import { generateTitlesForClips } from '@/lib/clipTitleGenerator'
 import { mapTargetStyleToSituation } from '@/lib/situationMapper'
+import { getSupabaseAdminClient } from '@/lib/supabase/server'
+import { resolveUserId } from '@/lib/supabase/resolveUserId'
 
 // Log API key status at module load (for debugging)
 console.log('🔍 API Route loaded. OPENAI_API_KEY present:', !!process.env.OPENAI_API_KEY)
@@ -14,7 +16,13 @@ function generateId(): string {
   return `clip_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 }
 
-function buildPrompt(profile: ClipProfile): string {
+interface TargetWeakness {
+  type: 'phonological' | 'lexical' | 'syntactic' | 'semantic' | 'processing'
+  description: string
+  patterns?: string[]
+}
+
+function buildPrompt(profile: ClipProfile, targetWeakness?: TargetWeakness | null): string {
   const { focus, targetStyle, lengthSec, difficulty } = profile
   
   let prompt = `Generate a natural, conversational English sentence or two that would take approximately ${lengthSec} seconds to speak. 
@@ -30,6 +38,23 @@ Requirements:
 - No special symbols or formatting
 
 `
+
+  // Phase 3: Weakness-targeted generation
+  if (targetWeakness) {
+    prompt += `\n🎯 IMPORTANT - Target this specific weakness:
+- Weakness type: ${targetWeakness.type}
+- Description: ${targetWeakness.description}
+${targetWeakness.patterns ? `- Include patterns: ${targetWeakness.patterns.join(', ')}\n` : ''}
+
+Examples by weakness type:
+- phonological (function words): Use "want to", "going to", "have to", "got to", "kind of", "sort of"
+- lexical (vocabulary): Use less common words, phrasal verbs, idiomatic expressions
+- syntactic (parsing): Use relative clauses, embedded phrases, complex sentence structures
+- semantic (keywords): Use abstract concepts, implied meaning, context-dependent phrases
+- processing (memory): Use longer sentences with multiple clauses and ideas
+
+`
+  }
 
   // Add focus-specific constraints
   if (focus.includes('connected_speech')) {
@@ -86,12 +111,15 @@ function validateOutput(text: string): boolean {
   return true
 }
 
-async function generateText(profile: ClipProfile, openai: OpenAI): Promise<string> {
-  const prompt = buildPrompt(profile)
+async function generateText(profile: ClipProfile, openai: OpenAI, targetWeakness?: TargetWeakness | null): Promise<string> {
+  const prompt = buildPrompt(profile, targetWeakness)
   const model = 'gpt-4o-mini'
   
   console.log(`🟢 [REAL OPENAI] Making API call for ${profile.difficulty} clip...`)
   console.log(`🟢 [REAL OPENAI] Model: ${model}`)
+  if (targetWeakness) {
+    console.log(`🎯 [WEAKNESS TARGETING] Type: ${targetWeakness.type}, Patterns: ${targetWeakness.patterns?.join(', ') || 'none'}`)
+  }
   
   try {
     const completion = await openai.chat.completions.create({
@@ -256,7 +284,7 @@ async function generateMockClips(profiles: ClipProfile[], openai?: OpenAI | null
 }
 
 export async function POST(request: NextRequest) {
-  console.log('🟢 CLIP GENERATION API ROUTE HIT')
+  console.log('🟢 CLIP GENERATION API ROUTE HIT (Re-enabled for adaptive difficulty system)')
   console.log('🟢 Request method:', request.method)
   console.log('🟢 Request URL:', request.url)
   
@@ -319,14 +347,29 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     console.log('🟢 Request body received:', JSON.stringify(body, null, 2))
     
+    // Phase 3: Extract targetWeakness if provided
+    const targetWeakness: TargetWeakness | null = body.targetWeakness || null
+    if (targetWeakness) {
+      console.log('🎯 [Phase 3] Weakness targeting enabled:', {
+        type: targetWeakness.type,
+        description: targetWeakness.description,
+        patterns: targetWeakness.patterns,
+      })
+    }
+    
     // Support both { profile: ClipProfile } and { onboardingData: OnboardingData }
+    // Also support { profiles: ClipProfile[] } for Phase 2 adaptive generation
     let profiles: ClipProfile[]
     
-    if (body.profile) {
+    if (body.profiles && Array.isArray(body.profiles)) {
+      // Phase 2: Direct profiles array (from adaptiveStoryGenerator)
+      profiles = body.profiles
+      console.log('🟢 [Phase 2] Using provided profiles array:', profiles.length)
+    } else if (body.profile) {
       // Single profile (for backwards compatibility, but we generate 3 anyway)
       profiles = [body.profile]
     } else if (body.onboardingData) {
-      // Onboarding data - create 3 profiles
+      // Onboarding data - create profiles using createClipProfiles
       profiles = createClipProfiles(body.onboardingData)
     } else {
       // Default: generate 3 profiles with default settings
@@ -386,8 +429,8 @@ export async function POST(request: NextRequest) {
             text = body.overrideText
             console.log(`🟢 [REAL OPENAI] Using overrideText for single clip generation`)
           } else {
-            // Generate text using OpenAI
-            text = await generateText(profile, openai)
+            // Generate text using OpenAI (Phase 3: pass targetWeakness)
+            text = await generateText(profile, openai, targetWeakness)
             console.log(`🟢 [REAL OPENAI] Generated text for ${profile.difficulty}:`, text.substring(0, 50) + '...')
           }
           
@@ -578,6 +621,46 @@ export async function POST(request: NextRequest) {
       console.log(`     Match: ${c.audioUrl === `/audio/generated/${c.id}.mp3` ? '✅' : '❌'}`)
       console.log(`     Text: ${c.text.substring(0, 50)}...`)
     })
+    
+    // CRITICAL: Save clips to curated_clips database table
+    try {
+      const userIdResolved = await resolveUserId(request)
+      const userId = userIdResolved.userId
+      const supabaseAdmin = getSupabaseAdminClient()
+      
+      console.log(`💾 [${modeLabel}] Saving ${clips.length} clips to database for user:`, userId.substring(0, 8) + '...')
+      
+      // Prepare clips for database insertion
+      const dbClips = clips.map(clip => ({
+        id: clip.id,
+        user_id: userId,
+        transcript: clip.text,
+        audio_url: clip.audioUrl,
+        title: clip.title || 'Practice Clip',
+        difficulty: clip.difficulty || 'medium',
+        situation: clip.situation || 'Daily Life',
+        target_style: clip.targetStyle || 'Everyday conversations',
+        focus_areas: clip.focus || ['connected_speech'],
+        length_sec: clip.lengthSec || 15,
+        created_at: clip.createdAt || new Date().toISOString(),
+      }))
+      
+      // Insert clips into database (upsert to handle duplicates)
+      const { data: insertedClips, error: insertError } = await supabaseAdmin
+        .from('curated_clips')
+        .upsert(dbClips, { onConflict: 'id' })
+        .select()
+      
+      if (insertError) {
+        console.error(`❌ [${modeLabel}] Failed to save clips to database:`, insertError)
+        // Don't fail the request - clips are still usable from response
+      } else {
+        console.log(`✅ [${modeLabel}] Successfully saved ${insertedClips?.length || clips.length} clips to database`)
+      }
+    } catch (dbError: any) {
+      console.error(`❌ [${modeLabel}] Database save error:`, dbError.message)
+      // Continue - clips are still usable from response
+    }
     
     // Optionally save to filesystem in dev mode only (not relied upon)
     if (process.env.NODE_ENV === 'development') {

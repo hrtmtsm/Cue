@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
-import { ChevronLeft, Check } from 'lucide-react'
+import { ArrowLeft, Check } from 'lucide-react'
 import { getOnboardingData, setOnboardingData, type SituationKey } from '@/lib/onboardingStore'
 import { SITUATION_OPTIONS, MAX_SITUATION_SELECTIONS, DEFAULT_SITUATION } from '@/lib/situations'
+import { Heading, Body, Label, Caption } from '@/components/ui/Typography'
 
 const MAX_SELECTIONS = MAX_SITUATION_SELECTIONS
 
@@ -75,29 +76,32 @@ export default function SituationsPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col px-6 py-6">
-      {/* Header */}
-      <div className="mb-8">
-        <Link 
-          href={`/${locale}/onboarding/diagnosis`}
-          className="text-blue-600 font-medium text-lg py-2 px-1 -ml-1 inline-flex items-center gap-1"
-        >
-          <ChevronLeft className="w-5 h-5" />
-          {tCommon('back')}
-        </Link>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 space-y-6">
-        <div className="space-y-2">
-          <h1 className="text-2xl font-bold text-gray-900">
-            {tSituations('title')}
-          </h1>
-          <p className="text-sm text-gray-600">
-            {tSituations('subtitle').replace('3', MAX_SELECTIONS.toString())}
-          </p>
+    <main className="flex min-h-screen flex-col items-center justify-center px-6 py-12 bg-gray-50">
+      <div className="max-w-md md:max-w-2xl w-full space-y-6">
+        {/* Header */}
+        <div>
+          <Link 
+            href={`/${locale}/onboarding/name`}
+            className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <Label size="action" tone="sub" className="text-blue-600 hover:text-blue-700">
+              {tCommon('back')}
+            </Label>
+          </Link>
         </div>
 
+        {/* Title Section */}
+        <div className="space-y-2">
+          <Heading as="h1" size="page" className="text-gray-900">
+            {tSituations('title')}
+          </Heading>
+          <Caption tone="muted" className="text-base">
+            {tSituations('subtitle').replace('3', MAX_SELECTIONS.toString())}
+          </Caption>
+        </div>
+
+        {/* Options List */}
         <div className="space-y-3">
           {SITUATION_OPTIONS.map((situation) => {
             const isSelected = selectedSituations.has(situation.key)
@@ -108,53 +112,55 @@ export default function SituationsPage() {
                 key={situation.key}
                 onClick={() => toggleSituation(situation.key)}
                 disabled={isDisabled}
-                className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
+                className={`w-full p-5 rounded-xl border-2 transition-all text-left ${
                   isSelected
-                    ? 'border-blue-600 bg-blue-50'
+                    ? 'border-blue-600 bg-blue-50/50'
                     : isDisabled
-                    ? 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed'
-                    : 'border-gray-200 bg-white hover:border-gray-300'
+                    ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
+                    : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
                 }`}
               >
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl flex-shrink-0">{situation.emoji}</span>
+                <div className="flex items-start gap-4">
+                  <span className="text-2xl flex-shrink-0 mt-0.5">{situation.emoji}</span>
                   <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-lg text-gray-900">
+                    <Body size="bodyStrong" className="text-gray-900 mb-1">
                       {tSituations(translation.label)}
-                    </div>
-                    <div className="text-sm text-gray-600 mt-1">
+                    </Body>
+                    <Caption tone="muted" className="text-sm leading-relaxed">
                       {tSituations(translation.desc)}
-                    </div>
+                    </Caption>
                   </div>
                   {isSelected && (
-                    <Check className="w-6 h-6 text-blue-600 flex-shrink-0" />
+                    <Check className="w-5 h-5 text-blue-600 flex-shrink-0 mt-1" />
                   )}
                 </div>
               </button>
             )
           })}
         </div>
-      </div>
 
-      {/* Sticky bottom buttons */}
-      <div className="pt-6 pb-6 space-y-3">
-        <button
-          onClick={handleContinue}
-          disabled={!hasSelection}
-          className={`w-full py-4 px-6 rounded-xl font-semibold text-lg transition-colors ${
-            hasSelection
-              ? 'bg-blue-600 text-white active:bg-blue-700 shadow-lg'
-              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-          }`}
-        >
-          {tCommon('continue')}
-        </button>
-        <button
-          onClick={handleSkip}
-          className="w-full py-3 px-6 text-center font-medium text-lg text-gray-600 hover:text-gray-900 transition-colors"
-        >
-          {tOnboarding('notNow')}
-        </button>
+        {/* Bottom Actions */}
+        <div className="space-y-3 pt-2">
+          <button
+            onClick={handleContinue}
+            disabled={!hasSelection}
+            className={`w-full bg-blue-600 text-white text-center font-semibold h-12 flex items-center justify-center px-6 rounded-xl transition-all text-base ${
+              hasSelection
+                ? 'hover:bg-blue-700 active:bg-blue-700 shadow-md hover:shadow-lg'
+                : 'opacity-50 cursor-not-allowed'
+            }`}
+          >
+            {tCommon('continue')}
+          </button>
+          <button
+            onClick={handleSkip}
+            className="w-full text-center py-2 text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <Label size="action" tone="sub">
+              {tOnboarding('notNow')}
+            </Label>
+          </button>
+        </div>
       </div>
     </main>
   )

@@ -18,6 +18,9 @@ export function generateStaticParams() {
 export const metadata = {
   title: 'Cue - English Listening Practice',
   description: 'Practice your English listening skills',
+  icons: {
+    icon: '/icon.svg',
+  },
 }
 
 export default async function LocaleLayout({
@@ -36,7 +39,7 @@ export default async function LocaleLayout({
   const messages = await getMessages({ locale })
 
   return (
-    <html lang={locale} className="overflow-x-hidden">
+    <html lang={locale} className={`${inter.variable} overflow-x-hidden`}>
       <body className={`${inter.className} bg-gray-50 antialiased overflow-x-hidden`}>
         <NextIntlClientProvider messages={messages} locale={locale}>
           <div className="min-h-dvh w-full">

@@ -126,12 +126,18 @@ export function buildQuickStartSummary(results: QuickStartClipResult[]): QuickSt
     : 0
 
   // Compute startingDifficulty using heuristic:
-  // if missedRate >= 0.4 => 15
+  // Edge case: if user skipped most/all clips (>= 67%), treat as skip-diagnosis default
+  // This ensures they get ['easy', 'medium'] clips instead of only ['easy']
+  // if missedRate >= 0.67 => 25 (skip-diagnosis default)
+  // else if missedRate >= 0.4 => 15
   // else if attemptAccuracy >= 70 => 55
   // else if attemptAccuracy >= 40 => 35
   // else => 25
   let startingDifficulty: 15 | 25 | 35 | 55
-  if (missedRate >= 0.4) {
+  if (missedRate >= 0.67) {
+    // User skipped 2+ out of 3 clips - give them skip-diagnosis default
+    startingDifficulty = 25
+  } else if (missedRate >= 0.4) {
     startingDifficulty = 15
   } else if (attemptAccuracy >= 70) {
     startingDifficulty = 55
@@ -254,5 +260,35 @@ export function getFeedStartDifficulty(summary: QuickStartSummary | null): numbe
   }
   
   return Math.max(0, summary.startingDifficulty - 20)
+}
+
+/**
+ * Map diagnosis startingDifficulty to database difficulty filters
+ * 
+ * startingDifficulty ranges:
+ * - 15: Very beginner → filter: ['easy']
+ * - 25: Beginner → filter: ['easy', 'medium']
+ * - 35: Intermediate → filter: ['easy', 'medium']  
+ * - 55: Advanced → filter: ['medium', 'hard']
+ */
+export function getDifficultyFilterFromDiagnosis(
+  summary: QuickStartSummary | null
+): ('easy' | 'medium' | 'hard')[] {
+  if (!summary) {
+    // Default for users without diagnosis
+    return ['easy', 'medium']
+  }
+  
+  const difficulty = summary.startingDifficulty
+  
+  if (difficulty <= 15) {
+    return ['easy'] // Very beginner - only easy clips
+  } else if (difficulty <= 30) {
+    return ['easy', 'medium'] // Beginner - easy + some medium
+  } else if (difficulty <= 45) {
+    return ['easy', 'medium'] // Intermediate - balanced mix
+  } else {
+    return ['medium', 'hard'] // Advanced - challenging content
+  }
 }
 

@@ -42,8 +42,8 @@ export function convertClipsToStories(clips: Clip[]): Story[] {
   
   // Create stories from grouped clips
   for (const [situation, situationClips] of Array.from(clipsBySituation.entries())) {
-    // Split situation clips into groups of 3 clips per story (changed from 5 for better distribution)
-    const clipsPerStory = 3
+    // Randomly select 4 or 5 clips per story for better variety and learning depth
+    const clipsPerStory = Math.random() < 0.5 ? 4 : 5
     console.log(`📚 [convertClipsToStories] Processing situation "${situation}":`, {
       clipsInSituation: situationClips.length,
       clipsPerStory,
@@ -66,6 +66,7 @@ export function convertClipsToStories(clips: Clip[]): Story[] {
           audioUrl: clip.audioUrl,
           audioStatus: clip.audioUrl ? 'ready' : 'needs_generation',
           focusSkill: clip.focus?.[0] || 'connected_speech',
+          dbClipId: clip.id, // Database clip ID for chunk lookup (word meanings)
         }
       })
       

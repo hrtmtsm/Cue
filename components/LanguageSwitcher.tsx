@@ -1,17 +1,30 @@
 'use client'
 
 import { useLocale } from 'next-intl'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import { replaceLocaleInPath } from '@/lib/localePath'
 
 export function LanguageSwitcher() {
   const locale = useLocale()
   const router = useRouter()
   const pathname = usePathname()
+  const searchParams = useSearchParams()
 
   const switchLanguage = (newLocale: string) => {
-    const segments = pathname.split('/')
-    segments[1] = newLocale
-    router.push(segments.join('/'))
+    // Replace locale in pathname
+    const newPath = replaceLocaleInPath(pathname || '', newLocale)
+    
+    // Preserve query parameters
+    const queryString = searchParams.toString()
+    const fullPath = queryString ? `${newPath}?${queryString}` : newPath
+    
+    // Use replace instead of push to avoid adding to history
+    router.replace(fullPath)
+    
+    // Optional: Persist to localStorage for future sessions
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('NEXT_LOCALE', newLocale)
+    }
   }
 
   return (
@@ -39,4 +52,5 @@ export function LanguageSwitcher() {
     </div>
   )
 }
+
 

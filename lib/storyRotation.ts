@@ -6,6 +6,8 @@
  */
 
 import { Story } from './storyTypes'
+import { ListeningProfile, UserPreferences } from './userPreferences'
+import { selectNextClipDifficulty } from './clipProfileMapper'
 
 const COMPLETED_STORIES_KEY = 'completedStories'
 
@@ -63,19 +65,54 @@ export function clearCompletedStories(): void {
   }
 }
 
+export interface NextStoryResult {
+  story: Story | null
+  cycleCompleted: boolean // True if all stories were completed and cycle was reset
+}
+
 /**
  * Get the next uncompleted story from the list
  * 
+ * Phase 1: Smart Story Selection
+ * - Filters stories by recommended difficulty based on user's listening profile
+ * - Falls back to next available if no matching difficulty found
+ * - Auto-cycles when all stories are completed
+ * 
  * @param allStories - Array of all available stories
- * @returns Next uncompleted story, or null if no stories available
+ * @param profile - Optional listening profile for adaptive difficulty selection
+ * @param preferences - Optional user preferences for fallback logic
+ * @returns Object with story and cycleCompleted flag
  */
-export function getNextUncompletedStory(allStories: Story[]): Story | null {
+export function getNextUncompletedStory(
+  allStories: Story[],
+  profile?: ListeningProfile,
+  preferences?: UserPreferences
+): NextStoryResult {
   if (!allStories || allStories.length === 0) {
     console.warn('⚠️ No stories available')
-    return null
+    return { story: null, cycleCompleted: false }
   }
   
-  const completed = getCompletedStories()
+  const completedRaw = getCompletedStories()
+  
+  // ✅ NEW: Clean up stale completion IDs that don't match current stories
+  const currentStoryIds = allStories.map(s => s.id)
+  const completed = completedRaw.filter(id => currentStoryIds.includes(id))
+  
+  // If we cleaned up stale IDs, update localStorage
+  if (completed.length !== completedRaw.length) {
+    const staleIds = completedRaw.filter(id => !currentStoryIds.includes(id))
+    console.warn('🧹 [StoryRotation] Cleaned up stale completion IDs:', {
+      before: completedRaw.length,
+      after: completed.length,
+      removed: staleIds.length,
+      staleIds: staleIds,
+    })
+    
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(COMPLETED_STORIES_KEY, JSON.stringify(completed))
+    }
+  }
   
   // Filter out completed stories
   const remaining = allStories.filter(story => !completed.includes(story.id))
@@ -87,33 +124,75 @@ export function getNextUncompletedStory(allStories: Story[]): Story | null {
     completedIds: completed.slice(-3), // Last 3 completed
   })
   
-  // If all completed, clear and start over
+  // If all completed, clear completed stories and start a new cycle
   if (remaining.length === 0 && completed.length > 0) {
-    console.log('🎉 All stories completed! Starting fresh cycle...')
+    console.log('🎉 All stories completed! Starting new cycle...')
     clearCompletedStories()
-    return allStories[0]
+    
+    // Return first story with cycleCompleted flag for UI celebration
+    return {
+      story: allStories[0] || null,
+      cycleCompleted: true
+    }
   }
   
-  // Return first uncompleted story
+  // Phase 1: Adaptive difficulty filtering
+  if (profile) {
+    const recommendedDifficulty = selectNextClipDifficulty(profile, preferences)
+    console.log('🎯 [AdaptiveSelection] Recommended difficulty:', recommendedDifficulty)
+    
+    // Filter remaining stories by recommended difficulty
+    const matchingStories = remaining.filter(
+      story => story.difficulty === recommendedDifficulty
+    )
+    
+    console.log('📚 [AdaptiveSelection] Matching stories:', matchingStories.length, {
+      recommended: recommendedDifficulty,
+      total: remaining.length,
+    })
+    
+    // If we found a matching story, return it
+    if (matchingStories.length > 0) {
+      console.log('✅ Selected adaptive story:', {
+        storyId: matchingStories[0].id,
+        title: matchingStories[0].title,
+        difficulty: matchingStories[0].difficulty,
+        position: allStories.indexOf(matchingStories[0]) + 1,
+        totalStories: allStories.length,
+      })
+      return { story: matchingStories[0], cycleCompleted: false }
+    }
+    
+    // No matching difficulty, fall through to next available
+    console.log('⚠️ [AdaptiveSelection] No stories match recommended difficulty, using next available')
+  }
+  
+  // Fallback: Return first uncompleted story
   if (remaining.length > 0) {
     console.log('✅ Selected next story:', {
       storyId: remaining[0].id,
       title: remaining[0].title,
+      difficulty: remaining[0].difficulty,
       position: allStories.indexOf(remaining[0]) + 1,
       totalStories: allStories.length,
     })
-    return remaining[0]
+    return { story: remaining[0], cycleCompleted: false }
   }
   
-  // Fallback: return first story
-  return allStories[0]
+  // Final fallback: return first story
+  return { story: allStories[0], cycleCompleted: false }
 }
 
 /**
  * Get progress statistics
  */
 export function getStoryProgress(allStories: Story[]) {
-  const completed = getCompletedStories()
+  const completedRaw = getCompletedStories()
+  
+  // Clean up stale completion IDs
+  const currentStoryIds = allStories.map(s => s.id)
+  const completed = completedRaw.filter(id => currentStoryIds.includes(id))
+  
   const remaining = allStories.filter(story => !completed.includes(story.id))
   
   return {

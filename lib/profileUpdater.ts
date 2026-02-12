@@ -1,16 +1,22 @@
-import { ListeningProfile, PracticeEvent } from './userPreferences'
+import { ListeningProfile, PracticeEvent, DetailedPracticeEvent, getPracticeEvents } from './userPreferences'
 import { Clip } from './clipTypes'
+import { calculateMetrics, identifyWeaknesses } from './metricsCalculator'
 
 /**
  * Update listening profile based on practice event and clip metadata
+ * Now supports DetailedPracticeEvent for enhanced metrics tracking
  */
 export function updateListeningProfile(
   profile: ListeningProfile,
-  event: PracticeEvent,
+  event: PracticeEvent | DetailedPracticeEvent,
   clipMeta: { focus: string[]; difficulty?: 'easy' | 'medium' | 'hard' }
 ): ListeningProfile {
   const updated = { ...profile }
   updated.lastUpdatedAt = new Date().toISOString()
+  
+  // Initialize new fields if not present (backward compat)
+  if (!updated.patternMastery) updated.patternMastery = {}
+  if (!updated.weaknesses) updated.weaknesses = []
   
   // Target difficulty band: replays 1-3, accuracy 0.55-0.85
   const targetReplaysMin = 1
@@ -89,6 +95,50 @@ export function updateListeningProfile(
   updated.vocabTolerance = Math.max(0, Math.min(100, updated.vocabTolerance))
   updated.memoryLoadTolerance = Math.max(0, Math.min(100, updated.memoryLoadTolerance))
   updated.confidence = Math.max(0, Math.min(100, updated.confidence))
+  
+  // NEW: Update pattern mastery (if DetailedPracticeEvent)
+  if ('patternsEncountered' in event && event.patternsEncountered) {
+    event.patternsEncountered.forEach(patternKey => {
+      const success = event.patternsSucceeded?.includes(patternKey) || false
+      const current = updated.patternMastery![patternKey] || 50
+      
+      // Exponential moving average: new = 0.7 * old + 0.3 * (success ? 100 : 0)
+      updated.patternMastery![patternKey] = current * 0.7 + (success ? 100 : 0) * 0.3
+    })
+  }
+  
+  // NEW: Recalculate linguistic metrics (every 5 events)
+  try {
+    const recentEvents = getPracticeEvents()
+    
+    // Check if we have enough events and it's time to recalculate (every 5 events)
+    if (recentEvents.length >= 5 && recentEvents.length % 5 === 0) {
+      // Filter for DetailedPracticeEvents (have alignmentEvents field)
+      const detailedEvents = recentEvents.filter(
+        (e): e is DetailedPracticeEvent => 'alignmentEvents' in e
+      ).slice(-30) // Last 30 detailed events
+      
+      if (detailedEvents.length >= 5) {
+        console.log('📊 [Metrics] Recalculating linguistic metrics:', {
+          totalEvents: recentEvents.length,
+          detailedEvents: detailedEvents.length,
+        })
+        
+        updated.linguisticMetrics = calculateMetrics(detailedEvents)
+        const weaknessReport = identifyWeaknesses(updated.linguisticMetrics)
+        updated.weaknesses = weaknessReport.top3
+        
+        console.log('📊 [Metrics] Updated profile:', {
+          patternMastery: Object.keys(updated.patternMastery!).length,
+          weaknesses: updated.weaknesses!.map(w => w.type),
+          metricsAnalyzed: updated.linguisticMetrics.eventsAnalyzed,
+        })
+      }
+    }
+  } catch (error) {
+    console.error('❌ [Metrics] Error calculating metrics:', error)
+    // Don't fail profile update if metrics calculation fails
+  }
   
   return updated
 }

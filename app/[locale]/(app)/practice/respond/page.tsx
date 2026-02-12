@@ -3,8 +3,10 @@
 import { useState, useRef, useEffect, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
-import { ChevronLeft, AlertCircle, Mic } from 'lucide-react'
+import { ChevronLeft, AlertCircle } from 'lucide-react'
+import { Play, Pause, Microphone } from '@phosphor-icons/react'
 import Link from 'next/link'
+import { Heading } from '@/components/ui/Typography'
 import AudioWaveLine from '@/components/AudioWaveLine'
 import Snackbar from '@/components/Snackbar'
 import FullScreenLoader from '@/components/FullScreenLoader'
@@ -13,7 +15,7 @@ import ClipTopBar from '@/components/ClipTopBar'
 import VoiceRecorder from '@/components/VoiceRecorder'
 import MicPermissionModal from '@/components/MicPermissionModal'
 import ExitPracticeModal from '@/components/ExitPracticeModal'
-import { getStoryByIdClient } from '@/lib/storyClient'
+import { getStoryByIdClientDbOnly } from '@/lib/storyClient'
 import { getAudioMetadata, generateAudio } from '@/lib/audioApi'
 import { useClipLessonProgress } from '@/lib/clipLessonProgress'
 
@@ -533,13 +535,70 @@ function RespondPageContent() {
     let foundClip = false
 
     if (storyId && storyClipId) {
-      const { story, source } = getStoryByIdClient(storyId)
+      // Use DB-only lookup - mock stories not allowed in practice flows
+      const { story } = getStoryByIdClientDbOnly(storyId)
+      
+      console.log('🔥 [RespondPage] Story lookup result:', {
+        storyId,
+        storyFound: !!story,
+        storySource: getStoryByIdClientDbOnly(storyId).source,
+        storyClipsCount: story?.clips?.length || 0,
+      })
+      
       if (story) {
         const clip = story.clips.find(c => c.id === storyClipId)
-        if (clip) {
+        
+        // DEBUG: Log clip details when checking dbClipId (ALWAYS log, not just in dev)
+        console.log('🔥 [RespondPage] Clip validation check:', {
+          storyId,
+          storyClipId,
+          clipFound: !!clip,
+          clipId: clip?.id,
+          clipDbClipId: clip?.dbClipId,
+          clipKeys: clip ? Object.keys(clip) : [],
+          clipFull: clip ? JSON.stringify(clip, null, 2) : null,
+          allClipIds: story.clips.map(c => ({ id: c.id, dbClipId: c.dbClipId })),
+        })
+        
+        // Check localStorage directly
+        const userStories = typeof window !== 'undefined' 
+          ? JSON.parse(localStorage.getItem('userStories') || '[]')
+          : []
+        const localStorageStory = userStories.find((s: any) => s.id === storyId)
+        if (localStorageStory) {
+          const localStorageClip = localStorageStory.clips?.find((c: any) => c.id === storyClipId)
+          console.log('🔥 [RespondPage] localStorage clip check:', {
+            foundInLocalStorage: !!localStorageClip,
+            localStorageClipId: localStorageClip?.id,
+            localStorageClipDbClipId: localStorageClip?.dbClipId,
+            localStorageClipKeys: localStorageClip ? Object.keys(localStorageClip) : [],
+          })
+        }
+        
+        if (clip && clip.dbClipId) {
+          // Only use clips that have dbClipId (DB-backed)
           transcript = clip.transcript
           foundClip = true
+        } else if (clip && !clip.dbClipId) {
+          // FALLBACK: Use clip.id as dbClipId if missing (for backward compat with cached data)
+          // This handles stale localStorage data from before enrichment was added
+          console.warn('⚠️ [RespondPage] Clip missing dbClipId, using clip.id as fallback:', {
+            storyId,
+            storyClipId: clip.id,
+            fallbackDbClipId: clip.id,
+            transcript: clip.transcript?.substring(0, 30) + '...',
+          })
+          transcript = clip.transcript
+          foundClip = true
+          // Note: This assumes clip.id === database clip ID, which is true for our data
         }
+      } else {
+        // Story not found in DB - show error
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('⚠️ [RespondPage] Story not found in DB:', { storyId })
+        }
+        setErrorMessage('This story is not available. Please select a different practice.')
+        setUiPhase('error')
       }
     }
 
@@ -1585,9 +1644,35 @@ function RespondPageContent() {
     })
 
     // Route to review screen - support story-based, clip-based, and session-based routing
+    // CRITICAL: Validate story/clip before navigation (must be DB-backed)
     let reviewUrl = ''
     
     if (storyId && storyClipId) {
+      // Validate story and clip before navigation
+      const { story } = getStoryByIdClientDbOnly(storyId)
+      if (!story) {
+        console.error('❌ [RespondPage] Cannot navigate: Story not found in DB', { storyId })
+        setErrorMessage('This story is not available. Please select a different practice.')
+        return
+      }
+      
+      const clip = story.clips.find(c => c.id === storyClipId)
+      if (!clip) {
+        console.error('❌ [RespondPage] Cannot navigate: Clip not found in story', { storyId, storyClipId })
+        setErrorMessage('This clip is not available. Please select a different practice.')
+        return
+      }
+      
+      if (!clip.dbClipId) {
+        // FALLBACK: Use clip.id as dbClipId if missing (for backward compat with cached data)
+        console.warn('⚠️ [RespondPage] Navigation: Clip missing dbClipId, using clip.id as fallback:', {
+          storyId,
+          storyClipId: clip.id,
+          fallbackDbClipId: clip.id,
+        })
+        // Continue with navigation - clip.id will be used as fallback
+      }
+      
       // Story-based routing - mark as done and navigate to review
       reviewUrl = `/${locale}/practice/review?storyId=${storyId}&clipId=${storyClipId}&clipIndex=${clipIndex}&userText=${encodeURIComponent(
         userInput
@@ -1677,19 +1762,29 @@ function RespondPageContent() {
       {/* Progress now managed by shared ClipLessonProgress context */}
       <ClipTopBar 
         onBack={handleBack}
-        // Override percent to show cumulative per-clip progress (3-clip session)
+        // Override percent to show cumulative per-clip progress within the current story session
         overridePercent={(() => {
-          const totalClips = 3
+          // Get story to determine total clips in session
+          let totalClips = 3 // Default fallback
+          if (storyId) {
+            const { story } = getStoryByIdClientDbOnly(storyId)
+            if (story?.clips?.length) {
+              totalClips = story.clips.length
+            }
+          }
+          
           const safeIndex = Number.isNaN(clipIndex) ? 0 : Math.max(0, clipIndex)
+          // Calculate progress: (current clip index + 1) / total clips
+          // clipIndex is 0-indexed, so clipIndex=0 means "clip 1 of N"
           const progress = ((safeIndex + 1) / totalClips) * 100
           return Math.max(0, Math.min(100, progress))
         })()}
       />
 
       {/* Content with padding */}
-      <div className="flex-1 px-6 py-6">
-        {/* Max-width container for centered content */}
-        <div className="max-w-2xl mx-auto space-y-6">
+      <div className="flex-1 py-6">
+        {/* Max-width container for centered content - wider on desktop */}
+        <div className="w-full space-y-6">
         {/* Missing clipId error */}
         {!effectiveClipId && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-lg space-y-3">
@@ -1701,11 +1796,44 @@ function RespondPageContent() {
               </div>
             </div>
             <Link
-              href={storyId ? `/practice/story/${storyId}` : '/practice/select'}
+              href={storyId ? `/${locale}/practice/story/${storyId}` : `/${locale}/practice/select`}
               className="block w-full py-2 px-4 bg-blue-600 text-white rounded-lg font-medium text-center active:bg-blue-700 transition-colors"
             >
               {storyId ? 'Back to Story' : 'Back to Practice'}
             </Link>
+          </div>
+        )}
+
+        {/* Story/clip validation error */}
+        {errorMessage && errorMessage.includes('not available') && (
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg space-y-3">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-body-small text-red-800 font-medium">Practice not available</p>
+                <p className="text-xs text-red-700 mt-1">{errorMessage}</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  // Clear cached stories to force refresh
+                  localStorage.removeItem('userStories')
+                  console.log('🗑️ [RespondPage] Cleared userStories cache')
+                  // Redirect to practice select to re-fetch with enrichment
+                  router.push(`/${locale}/practice/select`)
+                }}
+                className="flex-1 py-2 px-4 bg-gray-100 text-gray-700 rounded-lg font-medium text-center active:bg-gray-200 transition-colors border border-gray-300"
+              >
+                Clear Cache & Reload
+              </button>
+              <Link
+                href={storyId ? `/${locale}/practice/story/${storyId}` : `/${locale}/practice/select`}
+                className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg font-medium text-center active:bg-blue-700 transition-colors"
+              >
+                {storyId ? 'Back to Story' : 'Back to Practice'}
+              </Link>
+            </div>
           </div>
         )}
 
@@ -1752,66 +1880,64 @@ function RespondPageContent() {
           />
         )}
 
-        <div className="text-center space-y-2">
-          <h1 className="text-heading-2 text-gray-900" style={{ fontFamily: 'Poppins' }}>
-            {t('practice.enterWhatYouHear')}
-          </h1>
+        <div className="text-center mb-4">
+          <Heading 
+            as="h1" 
+            size="card" 
+            weight="semibold"
+            className="text-[#1D1D20] text-lg md:text-xl lg:text-2xl"
+          >
+            Type what you hear
+          </Heading>
         </div>
 
-        {/* Audio Controls - Always accessible (single Play button, Spotify-like) */}
-        <div className="relative flex flex-col items-center justify-center py-6 min-h-[140px]">
-          {/* Continuous waveform line - full width behind controls (only if using generated audio) */}
-          {voiceMode === 'generated' && (
-          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-12 z-0">
-            <AudioWaveLine audioRef={audioRef} isPlaying={isPlaying} side="full" height={48} />
-          </div>
-          )}
-          
-          {/* Center controls - overlays waveform */}
-          <div className="relative flex items-center justify-center space-x-6 z-10">
-            <button
-              onClick={handlePlayPause}
-              disabled={!isPlayable}
-              className={`w-20 h-20 rounded-full text-white flex items-center justify-center transition-colors shadow-lg ${
-                isPlayable
-                  ? 'bg-blue-600 active:bg-blue-700'
-                  : 'bg-gray-400 cursor-not-allowed'
-              }`}
-              aria-label={isPlaying ? 'Pause' : 'Play'}
-              title={isPlayable ? 'Play audio' : 'Preparing audio...'}
+        {/* Audio Controls - Calm, friendly play button */}
+        <div className="relative flex flex-col items-center justify-center py-4">
+          <div className="flex items-center justify-center gap-4">
+            <div
+              className={`rounded-2xl ${isPlaying ? 'animate-breathing' : ''}`}
+              style={{ width: '72px', height: '72px' }}
             >
-              {/* Play / Pause icon (always present to avoid layout shift - no spinner) */}
-              {isPlaying ? (
-                <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-                </svg>
-              ) : (
-                <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              )}
-            </button>
+              <button
+                onClick={handlePlayPause}
+                disabled={!isPlayable}
+                className={`w-full h-full rounded-2xl flex items-center justify-center transition-all ${
+                  isPlayable
+                    ? 'bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.98] shadow-sm'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
+                aria-label={isPlaying ? 'Pause' : 'Play'}
+                title={isPlayable ? 'Play audio' : 'Preparing audio...'}
+              >
+                {isPlaying ? (
+                  <Pause weight="fill" size={28} />
+                ) : (
+                  <Play weight="fill" size={28} />
+                )}
+              </button>
+            </div>
 
-          {focusInsightId && (
-            <button
-              onClick={handleLoopToggle}
-              className={`p-3 rounded-full transition-colors ${
-                isLooping
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'bg-gray-100 text-gray-700 active:bg-gray-200'
-              }`}
-              aria-label="Loop"
-              title="Loop enabled for focused practice"
-            >
-              <span className="text-2xl">🎯</span>
-            </button>
-          )}
+            {focusInsightId && (
+              <button
+                onClick={handleLoopToggle}
+                className={`rounded-2xl flex items-center justify-center transition-all ${
+                  isLooping
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'bg-gray-100 text-gray-600 active:bg-gray-200'
+                }`}
+                style={{ width: '44px', height: '44px' }}
+                aria-label="Loop"
+                title="Loop enabled for focused practice"
+              >
+                <span className="text-xl">🎯</span>
+              </button>
+            )}
           </div>
         </div>
 
         {/* Unified input area with optional speech input (Duolingo-style) */}
         <div className="space-y-4">
-          <div className="relative space-y-2">
+          <div className="relative space-y-2 max-w-[560px] mx-auto">
             <textarea
               id="answer-input"
               ref={textareaRef}
@@ -1823,12 +1949,15 @@ function RespondPageContent() {
                   setInputError(null)
                 }
               }}
-              placeholder={t('practice.typeWhatYouHeard')}
-              className={`w-full h-[200px] p-4 pr-14 border-2 rounded-xl resize-none focus:outline-none text-lg ${
+              placeholder="Type what you heard…"
+              className={`w-full min-h-[160px] md:min-h-[180px] pt-3 pb-5 px-4 pr-14 border-2 rounded-[18px] resize-none focus:outline-none text-lg md:text-xl leading-relaxed bg-white placeholder:text-gray-400 md:placeholder:text-lg transition-all ${
                 inputError 
-                  ? 'border-red-300 focus:border-red-500' 
-                  : 'border-gray-200 focus:border-blue-600'
+                  ? 'border-red-300 focus:border-red-500 focus:shadow-[0_0_0_3px_rgba(239,68,68,0.1)]' 
+                  : isPlaying
+                    ? 'border-blue-300'
+                    : 'border-gray-200 focus:border-blue-600 focus:shadow-[0_0_0_3px_rgba(37,99,235,0.1)]'
               }`}
+              style={{ lineHeight: '1.6' }}
             />
 
             {/* Microphone button + waveform inside the textarea */}
@@ -1951,11 +2080,12 @@ function RespondPageContent() {
                     {/* Mic/Stop button */}
                     <button
                       type="button"
-                      className={`p-3 rounded-full border transition-all active:scale-95 z-10 pointer-events-auto ${
+                      className={`rounded-full bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center transition-all active:scale-95 z-10 pointer-events-auto ${
                         state === 'recording'
-                          ? 'bg-white border-blue-600'
-                          : 'bg-white border-blue-600'
+                          ? 'shadow-md'
+                          : ''
                       }`}
+                      style={{ width: '40px', height: '40px' }}
                       onClick={handleMicClick}
                       disabled={state === 'transcribing'}
                       aria-label={
@@ -1968,12 +2098,12 @@ function RespondPageContent() {
                     >
                       {state === 'recording' ? (
                         // Stop icon (square)
-                        <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
                           <rect x="6" y="6" width="12" height="12" rx="2" />
                         </svg>
                       ) : state === 'transcribing' ? (
                         <svg
-                          className="animate-spin h-6 w-6 text-blue-600"
+                          className="animate-spin h-5 w-5 text-blue-600"
                           xmlns="http://www.w3.org/2000/svg"
                           fill="none"
                           viewBox="0 0 24 24"
@@ -1993,7 +2123,7 @@ function RespondPageContent() {
                           />
                         </svg>
                       ) : (
-                        <Mic className="w-6 h-6 text-blue-600" />
+                        <Microphone weight="fill" size={20} className="text-blue-600" />
                       )}
                     </button>
             </div>
@@ -2002,20 +2132,20 @@ function RespondPageContent() {
             </VoiceRecorder>
 
             {inputError && (
-              <p className="text-body-small text-red-600">{inputError}</p>
+              <p className="text-sm md:text-base text-red-600">{inputError}</p>
             )}
           </div>
       </div>
 
-        {/* Sticky bottom button */}
-        <div className="pt-6 pb-6 flex justify-center">
+        {/* Primary action button */}
+        <div className="pt-8 pb-6 flex justify-center">
           <button
-              type="button"
+            type="button"
             onClick={handleCheckAnswer}
-              disabled={!userInput.trim() || userInput.trim().length < MIN_INPUT_CHARS}
-              className={`w-full md:w-auto md:min-w-[320px] py-4 px-6 rounded-xl font-semibold text-body-large transition-colors ${
-                userInput.trim() && userInput.trim().length >= MIN_INPUT_CHARS
-                ? 'bg-blue-600 text-white active:bg-blue-700 shadow-lg'
+            disabled={!userInput.trim() || userInput.trim().length < MIN_INPUT_CHARS || !!errorMessage}
+            className={`w-full md:w-auto md:min-w-[480px] h-14 rounded-xl font-semibold text-base md:text-lg transition-all ${
+              userInput.trim() && userInput.trim().length >= MIN_INPUT_CHARS && !errorMessage
+                ? 'bg-blue-600 text-white active:bg-blue-700 shadow-md hover:shadow-lg'
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             }`}
           >

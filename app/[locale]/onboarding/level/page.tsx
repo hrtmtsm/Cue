@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useLocale } from 'next-intl'
 import { ChevronLeft } from 'lucide-react'
 import { getOnboardingData, setOnboardingData } from '@/lib/onboardingStore'
 
@@ -16,6 +17,7 @@ const levels = [
 export default function LevelPage() {
   const [selectedLevel, setSelectedLevel] = useState<string | null>(null)
   const router = useRouter()
+  const locale = useLocale()
 
   useEffect(() => {
     // Load existing selection if any
@@ -31,11 +33,11 @@ export default function LevelPage() {
         level: selectedLevel,
       })
     }
-    router.push('/onboarding/ready')
+    router.push(`/${locale}/onboarding/ready`)
   }
 
   const handleSkip = () => {
-    router.push('/onboarding/ready')
+    router.push(`/${locale}/onboarding/ready`)
   }
 
   return (
@@ -44,7 +46,7 @@ export default function LevelPage() {
       <div className="space-y-4 mb-8">
         <div className="flex items-center justify-between">
           <Link 
-            href="/onboarding/topics"
+            href={`/${locale}/onboarding/topics`}
             className="text-blue-600 font-medium text-lg py-2 px-1 -ml-1 inline-flex items-center gap-1"
           >
             <ChevronLeft className="w-5 h-5" />

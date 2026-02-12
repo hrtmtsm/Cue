@@ -3,7 +3,8 @@
 import { usePathname } from 'next/navigation'
 import BottomNav from '@/components/BottomNav'
 import Sidebar from '@/components/Sidebar'
-import { shouldHideBottomNav } from '@/lib/navigationUtils'
+import LearningLayout from '@/components/LearningLayout'
+import { shouldHideBottomNav, isLearningRoute } from '@/lib/navigationUtils'
 import { ClipLessonProgressProvider } from '@/lib/clipLessonProgress'
 
 export default function AppLayout({
@@ -13,7 +14,20 @@ export default function AppLayout({
 }) {
   const pathname = usePathname()
   const shouldHide = shouldHideBottomNav(pathname)
+  const isLearning = isLearningRoute(pathname)
 
+  // Practice complete page needs full viewport (no padding/margins)
+  const isCompletePage = pathname?.includes('/practice/complete')
+  if (isCompletePage) {
+    return <>{children}</>
+  }
+
+  // Use focused learning layout for practice/review routes
+  if (isLearning) {
+    return <LearningLayout>{children}</LearningLayout>
+  }
+
+  // Normal app layout with sidebar and navigation
   return (
     <ClipLessonProgressProvider>
       {/* Responsive layout: sidebar on desktop, bottom nav on mobile */}

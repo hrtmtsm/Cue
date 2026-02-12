@@ -17,6 +17,7 @@ export interface Clip {
   situation: Situation // Categorical badge (Work, Daily Life, Social, Travel, Media)
   lengthSec: number
   difficulty?: 'easy' | 'medium' | 'hard'
+  cefrLevel?: 'A1' | 'A2' | 'B1' | 'B2' | 'C1' // CEFR level for Listening Level metric
   createdAt: string // ISO timestamp
 }
 

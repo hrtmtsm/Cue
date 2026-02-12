@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSupabaseAdminClient, resolveUserId } from '@/lib/supabase/server'
+import { getSupabaseAdminClient } from '@/lib/supabase/server'
+import { resolveUserId } from '@/lib/supabase/resolveUserId'
 import { generateTextHash } from '@/lib/audioHash'
 
 export async function GET(request: NextRequest) {
@@ -45,62 +46,101 @@ export async function GET(request: NextRequest) {
     // Compute transcript hash if transcript is available
     const transcriptHash = transcript ? generateTextHash(transcript) : null
 
-    // Strategy: First try to find by exact transcript_hash if transcript is available
-    // If not found or transcript unavailable, fall back to latest ready audio for (user_id, clip_id, variant_key)
+    // Check if clip is diagnostic
+    const { data: clipInfo } = await supabaseAdmin
+      .from('curated_clips')
+      .select('clip_type')
+      .eq('id', clipId)
+      .maybeSingle()
+    
+    const isDiagnostic = clipInfo?.clip_type === 'diagnostic'
+
+    // Strategy: For diagnostic clips, check diagnostic_audio table
+    // For regular clips, check user audio from clip_audio table
     let audioRow: any = null
     let error: any = null
 
-    if (transcript && transcriptHash) {
-      // Try exact match with transcript_hash first
-      const exactMatch = await supabaseAdmin
-        .from('clip_audio')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('clip_id', clipId)
-        .eq('variant_key', variantKey)
-        .eq('transcript_hash', transcriptHash)
-        .single()
+    if (isDiagnostic) {
+      // Diagnostic clips: Check diagnostic_audio table
+      console.log('🔍 [Audio Metadata] Diagnostic clip detected, checking diagnostic_audio table...', { clipId })
       
-      if (!exactMatch.error && exactMatch.data) {
-        audioRow = exactMatch.data
-        // Validate hash matches (integrity check)
-        if (audioRow.transcript_hash !== transcriptHash) {
-          console.warn('⚠️ [Audio Metadata] Hash mismatch detected - trying fallback lookup', {
-            clipId,
-            variantKey,
-            transcriptHashClient: transcriptHash,
-            transcriptHashRow: audioRow.transcript_hash,
-          })
-          audioRow = null // Clear and try fallback
+      const { data: diagnosticAudio, error: diagnosticError } = await supabaseAdmin
+        .from('diagnostic_audio')
+        .select('*')
+        .eq('clip_id', clipId)
+        .maybeSingle()
+      
+      if (!diagnosticError && diagnosticAudio) {
+        // Map diagnostic_audio to clip_audio format for compatibility
+        audioRow = {
+          clip_id: diagnosticAudio.clip_id,
+          audio_status: diagnosticAudio.status,
+          blob_path: diagnosticAudio.audio_path,
+          variant_key: variantKey,
+          transcript_hash: transcriptHash || '',
+          updated_at: diagnosticAudio.updated_at,
         }
-      } else {
-        error = exactMatch.error
+        console.log('✅ [Audio Metadata] Found diagnostic audio:', { clipId })
+      } else if (diagnosticError && diagnosticError.code !== 'PGRST116') {
+        // PGRST116 = not found, which is fine
+        error = diagnosticError
       }
     }
 
-    // Fallback: If no exact match or transcript unavailable, find latest ready audio
-    if (!audioRow) {
-      const fallbackQuery = supabaseAdmin
-        .from('clip_audio')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('clip_id', clipId)
-        .eq('variant_key', variantKey)
-        .eq('audio_status', 'ready')
-        .order('updated_at', { ascending: false })
-        .limit(1)
-      
-      const fallbackResult = await fallbackQuery.single()
-      
-      if (!fallbackResult.error && fallbackResult.data) {
-        audioRow = fallbackResult.data
-        console.log('✅ [Audio Metadata] Using fallback lookup (latest ready audio):', {
-          clipId,
-          variantKey,
-          transcriptHash: audioRow.transcript_hash?.substring(0, 12) + '...',
-        })
-      } else {
-        error = fallbackResult.error
+    // Check user audio (for regular clips only, or as fallback for diagnostic clips if not found)
+    if (!audioRow && !isDiagnostic) {
+      if (transcript && transcriptHash) {
+        // Try exact match with transcript_hash first
+        const exactMatch = await supabaseAdmin
+          .from('clip_audio')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('clip_id', clipId)
+          .eq('variant_key', variantKey)
+          .eq('transcript_hash', transcriptHash)
+          .single()
+        
+        if (!exactMatch.error && exactMatch.data) {
+          audioRow = exactMatch.data
+          // Validate hash matches (integrity check)
+          if (audioRow.transcript_hash !== transcriptHash) {
+            console.warn('⚠️ [Audio Metadata] Hash mismatch detected - trying fallback lookup', {
+              clipId,
+              variantKey,
+              transcriptHashClient: transcriptHash,
+              transcriptHashRow: audioRow.transcript_hash,
+            })
+            audioRow = null // Clear and try fallback
+          }
+        } else {
+          error = exactMatch.error
+        }
+      }
+
+      // Fallback: If no exact match or transcript unavailable, find latest ready audio
+      if (!audioRow) {
+        const fallbackQuery = supabaseAdmin
+          .from('clip_audio')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('clip_id', clipId)
+          .eq('variant_key', variantKey)
+          .eq('audio_status', 'ready')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+        
+        const fallbackResult = await fallbackQuery.single()
+        
+        if (!fallbackResult.error && fallbackResult.data) {
+          audioRow = fallbackResult.data
+          console.log('✅ [Audio Metadata] Using fallback lookup (latest ready audio):', {
+            clipId,
+            variantKey,
+            transcriptHash: audioRow.transcript_hash?.substring(0, 12) + '...',
+          })
+        } else {
+          error = fallbackResult.error
+        }
       }
     }
 

@@ -201,14 +201,10 @@ export function pickTopIssue(
   // First, extract from events with phrase hints (these are best)
   for (const event of events) {
     if (event.phraseHint && (event.type === 'missing' || event.type === 'substitution')) {
-      const phrase = extractPhrase(
-        refTokens,
-        event.phraseHint.spanRefStart,
-        event.phraseHint.spanRefEnd,
-        3
-      )
-      if (phrase && phrase.trim().length > 0) {
-        practicePhrases.push(phrase.trim())
+      // Use phraseHint.spanText directly (already a multi-word chunk)
+      const phrase = event.phraseHint.spanText?.trim()
+      if (phrase && phrase.length > 0) {
+        practicePhrases.push(phrase)
       }
     }
   }
@@ -262,8 +258,13 @@ export function pickTopIssue(
         t.type === 'missing' && t.refIndex === e.refStart - 1
       ))
     )
-    if (firstClustered && refTokens.length > 0) {
-      examplePhrase = extractPhrase(refTokens, firstClustered.refStart, firstClustered.refEnd)
+    if (firstClustered) {
+      // Prioritize phraseHint.spanText when available (multi-word chunk)
+      if (firstClustered.phraseHint?.spanText) {
+        examplePhrase = firstClustered.phraseHint.spanText
+      } else if (refTokens.length > 0) {
+        examplePhrase = extractPhrase(refTokens, firstClustered.refStart, firstClustered.refEnd)
+      }
     }
   }
   // 2. Casual shortcuts (reductions like wanna/gonna)
@@ -276,8 +277,13 @@ export function pickTopIssue(
       const expected = (e.expectedSpan || '').toLowerCase()
       return CASUAL_REDUCTIONS.has(actual) || CASUAL_REDUCTIONS.has(expected)
     })
-    if (casualEvent && refTokens.length > 0) {
-      examplePhrase = extractPhrase(refTokens, casualEvent.refStart, casualEvent.refEnd)
+    if (casualEvent) {
+      // Prioritize phraseHint.spanText when available (multi-word chunk)
+      if (casualEvent.phraseHint?.spanText) {
+        examplePhrase = casualEvent.phraseHint.spanText
+      } else if (refTokens.length > 0) {
+        examplePhrase = extractPhrase(refTokens, casualEvent.refStart, casualEvent.refEnd)
+      }
     }
   }
   // 3. Brain filled in extra words
@@ -285,10 +291,15 @@ export function pickTopIssue(
     categoryId = 'brain_filled_in'
     title = 'Your brain often filled in extra words when the audio was unclear.'
     const extraEvent = events.find(e => e.type === 'extra')
-    if (extraEvent && refTokens.length > 0) {
-      // Get surrounding context
-      const contextIdx = Math.min(extraEvent.refStart, refTokens.length - 1)
-      examplePhrase = extractPhrase(refTokens, contextIdx, contextIdx + 1)
+    if (extraEvent) {
+      // Prioritize phraseHint.spanText when available (multi-word chunk)
+      if (extraEvent.phraseHint?.spanText) {
+        examplePhrase = extraEvent.phraseHint.spanText
+      } else if (refTokens.length > 0) {
+        // Get surrounding context
+        const contextIdx = Math.min(extraEvent.refStart, refTokens.length - 1)
+        examplePhrase = extractPhrase(refTokens, contextIdx, contextIdx + 1)
+      }
     }
   }
   // 4. Key words were hard to catch
@@ -301,8 +312,13 @@ export function pickTopIssue(
       }
       return false
     })
-    if (contentEvent && refTokens.length > 0) {
-      examplePhrase = extractPhrase(refTokens, contentEvent.refStart, contentEvent.refEnd)
+    if (contentEvent) {
+      // Prioritize phraseHint.spanText when available (multi-word chunk)
+      if (contentEvent.phraseHint?.spanText) {
+        examplePhrase = contentEvent.phraseHint.spanText
+      } else if (refTokens.length > 0) {
+        examplePhrase = extractPhrase(refTokens, contentEvent.refStart, contentEvent.refEnd)
+      }
     }
   }
   // 5. Speed felt fast (low accuracy + many wrong guesses)
@@ -310,8 +326,13 @@ export function pickTopIssue(
     categoryId = 'speed_fast'
     title = 'The speed felt fast, making it harder to catch every word.'
     const firstEvent = events[0]
-    if (firstEvent && refTokens.length > 0) {
-      examplePhrase = extractPhrase(refTokens, firstEvent.refStart, firstEvent.refEnd)
+    if (firstEvent) {
+      // Prioritize phraseHint.spanText when available (multi-word chunk)
+      if (firstEvent.phraseHint?.spanText) {
+        examplePhrase = firstEvent.phraseHint.spanText
+      } else if (refTokens.length > 0) {
+        examplePhrase = extractPhrase(refTokens, firstEvent.refStart, firstEvent.refEnd)
+      }
     }
   }
   // Default: words blended
@@ -319,8 +340,13 @@ export function pickTopIssue(
     categoryId = 'words_blended'
     title = 'You tended to miss phrases when words were spoken together.'
     const firstMissing = events.find(e => e.type === 'missing')
-    if (firstMissing && refTokens.length > 0) {
-      examplePhrase = extractPhrase(refTokens, firstMissing.refStart, firstMissing.refEnd)
+    if (firstMissing) {
+      // Prioritize phraseHint.spanText when available (multi-word chunk)
+      if (firstMissing.phraseHint?.spanText) {
+        examplePhrase = firstMissing.phraseHint.spanText
+      } else if (refTokens.length > 0) {
+        examplePhrase = extractPhrase(refTokens, firstMissing.refStart, firstMissing.refEnd)
+      }
     }
   }
   
@@ -328,7 +354,12 @@ export function pickTopIssue(
   if (!examplePhrase && refTokens.length > 0) {
     const firstEvent = events[0]
     if (firstEvent) {
-      examplePhrase = extractPhrase(refTokens, firstEvent.refStart, firstEvent.refEnd)
+      // Prioritize phraseHint.spanText when available (multi-word chunk)
+      if (firstEvent.phraseHint?.spanText) {
+        examplePhrase = firstEvent.phraseHint.spanText
+      } else {
+        examplePhrase = extractPhrase(refTokens, firstEvent.refStart, firstEvent.refEnd)
+      }
     } else {
       examplePhrase = refTokens.slice(0, Math.min(3, refTokens.length)).join(' ')
     }

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { put } from '@vercel/blob'
-import { getSupabaseAdminClient, resolveUserId } from '@/lib/supabase/server'
+import { getSupabaseAdminClient } from '@/lib/supabase/server'
+import { resolveUserId } from '@/lib/supabase/resolveUserId'
 import { generateTextHash, getTextPreview } from '@/lib/audioHash'
 
 const openai = new OpenAI({
