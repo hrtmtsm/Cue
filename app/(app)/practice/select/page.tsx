@@ -172,7 +172,7 @@ export default function PracticeSelectPage() {
     if (!isHydrated || stories.length === 0) return
 
     // ✅ NEW: Select first uncompleted story (rotation logic)
-    const daily = getNextUncompletedStory(stories)
+    const { story: daily } = getNextUncompletedStory(stories)
     
     if (!daily) {
       console.warn('⚠️ [SELECT PAGE] No stories available')
