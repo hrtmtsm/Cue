@@ -33,6 +33,7 @@ export default function PracticeChunkPage() {
   const router = useRouter()
   const params = useParams<{ clipId: string }>()
   const searchParams = useSearchParams()
+  const locale = useLocale()
 
   const clipId = params?.clipId
   const returnTo = searchParams.get('returnTo')
