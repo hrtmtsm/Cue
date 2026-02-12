@@ -629,11 +629,18 @@ function ReviewPageContent() {
           diffResult.patternFeedback?.forEach(pattern => {
             // If pattern affects a missing/substitution event, mark as failed
             // Otherwise, mark as succeeded
-            const affectedByError = diffResult.events?.some(event => 
-              (event.type === 'missing' || event.type === 'substitution') &&
-              event.refStart <= (pattern.refStart ?? Infinity) &&
-              event.refEnd >= (pattern.refEnd ?? -Infinity)
-            )
+            const affectedByError = diffResult.events?.some(event => {
+              if (event.type !== 'missing' && event.type !== 'substitution') {
+                return false;
+              }
+              
+              // Type guard: check if pattern has refStart/refEnd
+              if (!('refStart' in pattern) || !('refEnd' in pattern)) {
+                return false;
+              }
+              
+              return event.refStart <= pattern.refStart && event.refEnd >= pattern.refEnd;
+            })
             
             if (affectedByError) {
               patternsFailed.push(pattern.patternKey)
