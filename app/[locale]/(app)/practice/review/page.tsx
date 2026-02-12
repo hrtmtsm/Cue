@@ -631,8 +631,8 @@ function ReviewPageContent() {
             // Otherwise, mark as succeeded
             const affectedByError = diffResult.events?.some(event => 
               (event.type === 'missing' || event.type === 'substitution') &&
-              event.refStart <= pattern.refStart &&
-              event.refEnd >= pattern.refEnd
+              event.refStart <= (pattern.refStart ?? Infinity) &&
+              event.refEnd >= (pattern.refEnd ?? -Infinity)
             )
             
             if (affectedByError) {
