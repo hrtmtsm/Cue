@@ -441,7 +441,7 @@ export default function PhraseCard(props: PhraseCardProps) {
             <Label className="text-gray-500 mb-2">Listening tip</Label>
             <Body className="text-gray-900 leading-7">
               Try listening to this part again—it becomes clearer with practice.
-            </div>
+            </Body>
           </div>
         )
       })()}
@@ -452,7 +452,7 @@ export default function PhraseCard(props: PhraseCardProps) {
           <Label className="text-gray-500 mb-2">How it sounds</Label>
           <Body className="text-gray-900 leading-7">
             {hasChunk && chunkModeSoundRule ? chunkModeSoundRule : soundRule}
-          </div>
+          </Body>
         </div>
       )}
 
@@ -460,7 +460,7 @@ export default function PhraseCard(props: PhraseCardProps) {
       {showFallbackInHowItSounds && (
         <div className="mb-6">
           <Label className="text-gray-500 mb-2">How it sounds</Label>
-          <Body className="text-gray-900 leading-7">This word is often unstressed and easy to miss in fast speech.</div>
+          <Body className="text-gray-900 leading-7">This word is often unstressed and easy to miss in fast speech.</Body>
         </div>
       )}
 
