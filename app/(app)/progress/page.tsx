@@ -106,6 +106,7 @@ export default function ProgressPage() {
               situation: story.situation as any || 'Daily Life',
               lengthSec: (storyClip.endMs - storyClip.startMs) / 1000,
               difficulty: story.difficulty,
+              createdAt: new Date().toISOString(),
             })
           })
         })
