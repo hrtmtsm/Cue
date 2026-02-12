@@ -226,7 +226,7 @@ export default function PracticeChunkPage() {
     try {
       const result = await saveTip(tipData)
       if (result.success && result.tip) {
-        setSavedTips(prev => new Map(prev).set(tipData.phrase, result.tip.id))
+        setSavedTips(prev => new Map(prev).set(tipData.phrase, result.tip!.id))
         return true
       }
       return false
