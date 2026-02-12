@@ -422,7 +422,7 @@ export default function PhraseCard(props: PhraseCardProps) {
               <Label className="text-gray-500 mb-2">{title}</Label>
               <Body className="text-gray-900 leading-7">
                 &quot;{currentChunk}&quot; is how &quot;{parentChunk}&quot; sounds in casual, fast speech.
-              </div>
+              </Body>
             </div>
           )
         }
