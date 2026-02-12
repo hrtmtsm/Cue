@@ -366,7 +366,7 @@ export default function PracticeSelectPage() {
           if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
             console.log('[Feed] seed difficulty', {
               source: 'quickStartSummary',
-              startingDifficulty: quickStartSummary.startingDifficulty,
+              startingDifficulty: quickStartSummary!.startingDifficulty,
               feedStartDifficulty,
               cefr,
             })
@@ -375,8 +375,8 @@ export default function PracticeSelectPage() {
           console.log('🎯 [SELECT PAGE] Fetching feed from quick start summary:', {
             cefr,
             feedStartDifficulty,
-            missedRate: (quickStartSummary.missedRate * 100).toFixed(1) + '%',
-            attemptAccuracy: quickStartSummary.attemptAccuracy.toFixed(1) + '%',
+            missedRate: (quickStartSummary!.missedRate * 100).toFixed(1) + '%',
+            attemptAccuracy: quickStartSummary!.attemptAccuracy.toFixed(1) + '%',
             mappedSituations,
             situationCount: mappedSituations.length,
             userSituations: onboardingData.situations,
