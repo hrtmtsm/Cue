@@ -37,6 +37,7 @@ import ChunkDictionary from '@/components/ChunkDictionary'
 import { useClipLessonProgress } from '@/lib/clipLessonProgress'
 import { extractPracticeSteps, type FeedbackCategory } from '@/lib/practiceSteps'
 import type { DiagnosticCategory, CefrLevel } from '@/lib/diagnosticSummary'
+import type { AlignmentEvent } from '@/lib/alignmentEngine'
 import {
   storeDiagnosticResult,
   isDiagnosticComplete,
