@@ -200,7 +200,7 @@ export async function GET(request: NextRequest) {
           })
           .filter(Boolean) as string[]
         
-        const uniqueCookieRefs = [...new Set(cookieProjectRefs)]
+        const uniqueCookieRefs = Array.from(new Set(cookieProjectRefs))
         
         if (uniqueCookieRefs.length > 0 && !uniqueCookieRefs.includes(urlProjectRef)) {
           console.error('❌ [Callback] Project ref mismatch detected')

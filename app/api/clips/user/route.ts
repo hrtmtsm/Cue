@@ -30,7 +30,7 @@ function mapDifficultyToCEFR(difficulties: string[]): string[] {
   }
   
   // Remove duplicates
-  return [...new Set(cefrLevels)]
+  return Array.from(new Set(cefrLevels))
 }
 
 /**
