@@ -793,8 +793,8 @@ export function prioritizeAndSelectTop3(
     // Sort by score within the group and take the best one
     const sorted = items.sort((a, b) => {
       // Prioritize meaning-critical mistakes within the group
-      if (a.isMeaningCritical && !b.isMeaningCritical) return -1
-      if (!a.isMeaningCritical && b.isMeaningCritical) return 1
+      if ((a as any).isMeaningCritical && !(b as any).isMeaningCritical) return -1
+      if (!(a as any).isMeaningCritical && (b as any).isMeaningCritical) return 1
       return b.score - a.score
     })
     
