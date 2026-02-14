@@ -825,8 +825,8 @@ export function prioritizeAndSelectTop3(
   // Sort groups by their best mistake's score (highest first)
   // BUT: Prioritize groups containing meaning-critical words
   const sortedGroups = bestFromEachGroup.sort((a, b) => {
-    const aIsCritical = a.bestItem.isMeaningCritical || false
-    const bIsCritical = b.bestItem.isMeaningCritical || false
+    const aIsCritical = (a.bestItem as any).isMeaningCritical || false
+    const bIsCritical = (b.bestItem as any).isMeaningCritical || false
     
     // If one is meaning-critical and the other isn't, meaning-critical wins
     if (aIsCritical && !bIsCritical) return -1
