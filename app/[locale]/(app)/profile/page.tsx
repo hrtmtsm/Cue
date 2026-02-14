@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations, useLocale } from 'next-intl'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
@@ -10,7 +10,7 @@ import { useSubscription } from '@/lib/useSubscription'
 
 const isDevelopment = process.env.NODE_ENV === 'development'
 
-export default function ProfilePage() {
+function ProfileContent() {
   const router = useRouter()
   const locale = useLocale()
   const t = useTranslations()
@@ -394,3 +394,14 @@ export default function ProfilePage() {
   )
 }
 
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={
+      <main className="flex min-h-screen flex-col items-center justify-center px-6">
+        <div className="text-gray-500">Loading...</div>
+      </main>
+    }>
+      <ProfileContent />
+    </Suspense>
+  )
+}
