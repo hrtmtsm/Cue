@@ -35,7 +35,7 @@ function evictOldestIfNeeded() {
     let oldestKey: string | null = null
     let oldestTime = Date.now()
     
-    for (const [key, entry] of audioCache.entries()) {
+    for (const [key, entry] of Array.from(audioCache.entries())) {
       if (entry.timestamp < oldestTime) {
         oldestTime = entry.timestamp
         oldestKey = key
