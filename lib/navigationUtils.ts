@@ -43,3 +43,35 @@ export function shouldHideBottomNav(pathname: string | null): boolean {
   return hideNavRoutes.some(route => pathname.startsWith(route))
 }
 
+/**
+ * Check if current route is in learning/practice flow (should use LearningLayout)
+ * 
+ * Learning routes that should hide sidebar and use focused layout:
+ * - All practice routes except /practice/select (story list)
+ * - Review page
+ * - Respond page
+ * - Feedback page
+ * - Session summary
+ * - Any /practice/* routes
+ */
+export function isLearningRoute(pathname: string | null): boolean {
+  if (!pathname) return false
+
+  // Remove locale prefix if present (e.g., /en/practice -> /practice)
+  // Handle patterns like /en/practice/review or /practice/review
+  const pathWithoutLocale = pathname.replace(/^\/[a-z]{2}\//, '/')
+
+  // Story list should use normal layout (has sidebar)
+  // Match /practice or /practice/select (with or without locale)
+  if (pathWithoutLocale === '/practice' || pathWithoutLocale === '/practice/select') {
+    return false
+  }
+
+  // All other practice routes use learning layout
+  if (pathWithoutLocale.startsWith('/practice/')) {
+    return true
+  }
+
+  return false
+}
+

@@ -485,3 +485,6 @@ let extraExample = patternMatch?.pattern.extraExample ?? generateExtraExample(ta
 - `lib/listeningPatterns.ts` (add fields to interface + update patterns)
 - `lib/listeningPatternMatcher.ts` (no changes needed)
 
+
+
+

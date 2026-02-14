@@ -34,14 +34,8 @@ export default function FullScreenLoader({ open }: FullScreenLoaderProps) {
         }
       `}</style>
       <div
-        className="fixed bg-white/90 backdrop-blur-sm z-50 flex items-center justify-center"
+        className="fixed inset-0 bg-white/90 backdrop-blur-sm z-50 flex items-center justify-center"
         style={{
-          top: 0,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: '100%',
-          maxWidth: '420px',
-          height: '100%',
           transition: 'opacity 200ms ease-out',
           opacity: open ? 1 : 0,
           pointerEvents: open ? 'auto' : 'none',

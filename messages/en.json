@@ -1,0 +1,325 @@
+{
+  "common": {
+    "appName": "Cue",
+    "loading": "Loading...",
+    "continue": "Continue",
+    "back": "Back",
+    "skip": "Skip",
+    "close": "Close",
+    "hi": "Hi",
+    "there": "there"
+  },
+  "landing": {
+    "hero": {
+      "headline": "Can't get what native speakers actually say?",
+      "subheadline": "We got you.",
+      "description": "Master English listening with personalized practice and instant pattern-based feedback.",
+      "cta_primary": "Get started",
+      "cta_secondary": "I already have an account"
+    },
+    "nav": {
+      "get_started": "Get started"
+    },
+    "selling_points": {
+      "personalized": {
+        "title": "Made for your level, adapts as you improve",
+        "description": "Cue tailors every clip to match your listening ability.",
+        "bullets": [
+          "Start at your current level",
+          "Content adjusts as you improve",
+          "Focus on patterns you struggle with",
+          "Never too easy, never too hard"
+        ],
+        "outro": "Your personal listening coach that grows with you."
+      },
+      "pattern_based": {
+        "title": "Learn why, not just what you missed",
+        "description": "Understand the patterns native speakers use:",
+        "bullets": [
+          "'wanna' (want to)",
+          "'gonna' (going to)",
+          "Sound linking and reductions",
+          "Phonetic breakdowns"
+        ],
+        "outro": "Master the listening patterns textbooks don't teach."
+      },
+      "real_time": {
+        "title": "Instant explanations, every time",
+        "description": "No waiting. No teacher needed.",
+        "bullets": [
+          "See what you missed immediately",
+          "Understand why it was hard",
+          "Get phonetic breakdowns",
+          "Practice with examples"
+        ],
+        "outro": "Learn from every mistake, right away."
+      }
+    },
+    "how_it_works": {
+      "title": "Start improving in minutes",
+      "steps": {
+        "listen": {
+          "title": "Listen",
+          "description": "Pick a clip at your level"
+        },
+        "type": {
+          "title": "Type",
+          "description": "Write what you hear"
+        },
+        "learn": {
+          "title": "Learn",
+          "description": "Get instant feedback on patterns"
+        }
+      }
+    },
+    "final_cta": {
+      "title": "Ready to understand native English?",
+      "subtitle": "Start for free.",
+      "button": "Get started",
+      "alreadyHaveAccount": "I already have an account"
+    }
+  },
+  "nav": {
+    "home": "Home",
+    "practice": "Practice",
+    "progress": "Progress",
+    "profile": "Profile"
+  },
+  "practice": {
+    "title": "Today's Practice",
+    "subtitle": "Build your ear, one clip at a time.",
+    "clipsReadyTitle": "Your clips are ready",
+    "clipsReadyDesc": "We picked a few short conversations based on what you listened to and what you want to practice.",
+    "start": "Start",
+    "playAudio": "Play Audio",
+    "checkAnswer": "Check Answer",
+    "continue": "Continue",
+    "yourAnswer": "Your answer",
+    "correctAnswer": "Correct answer",
+    "accuracy": "Accuracy",
+    "mistakes": "Mistakes",
+    "reviewing": "Reviewing your answer...",
+    "selectStory": "Select a story to practice",
+    "clips": "clips",
+    "completedToday": "You've completed today's session!",
+    "comeBackTomorrow": "Come back tomorrow for more practice",
+    "dayStreak": "day streak",
+    "loadingStories": "Loading stories...",
+    "greatWorkToday": "Great work today!",
+    "completedDailyPractice": "You completed your daily practice session. Come back tomorrow for more!",
+    "nextSessionAvailable": "Next session available in",
+    "wantPracticeMore": "Want to practice more?",
+    "upgradeToPro": "Upgrade to Pro for unlimited daily sessions.",
+    "learnAboutPro": "Learn About Pro →",
+    "startPractice": "Start Practice →",
+    "quickSession": "Quick session • ~1 minute",
+    "shortClips": "3 short clips",
+    "storiesCompleted": "stories completed",
+    "clipsFrom": "Clips from:",
+    "yourProgress": "Your Progress",
+    "keepShowing": "Keep showing up. A few minutes a day adds up quickly.",
+    "thisWeek": "This week",
+    "days": "days",
+    "savedToday": "Saved today",
+    "vocabulary": "Vocabulary",
+    "listeningTips": "Listening tips",
+    "items": "items",
+    "enterWhatYouHear": "Enter what you hear",
+    "typeWhatYouHeard": "Type what you heard...",
+    "play": "Play",
+    "slow": "Slow",
+    "loop": "Loop",
+    "notQuite": "Not quite - you missed key information",
+    "comparedToWhatYouHeard": "Compared to what you heard",
+    "whyDidIMissThis": "Listening tips",
+    "continueArrow": "Continue →",
+    "checkingAudio": "Checking audio...",
+    "generatingAudio": "Generating audio...",
+    "waitingForTranscript": "Waiting for transcript...",
+    "tapToPlay": "Tap to play",
+    "listenCarefully": "Listen carefully",
+    "replay": "Replay",
+    "submit": "Submit",
+    "couldntCatchIt": "I couldn't catch it",
+    "complete": {
+      "greatWorkToday": "Great work today!",
+      "daysInARow": "{count} days in a row",
+      "dayInARow": "{count} day in a row",
+      "comeBackIn": "Come back in {time}",
+      "done": "Done",
+      "wantMorePractice": "Want more practice?",
+      "upgradeToPro": "Upgrade to Pro →"
+    }
+  },
+  "feedback": {
+    "title": "Listening Tips",
+    "loading": "Generating feedback...",
+    "perfect": "Perfect! You got everything right. Excellent! 🎉",
+    "modalTitle": "Why this was hard",
+    "whatYouMissed": "What you missed",
+    "whatYouMightHaveHeard": "What you might have heard",
+    "whatItActuallyWas": "What it actually was",
+    "whatYouAdded": "What you added",
+    "whatItShouldBe": "What it should be",
+    "whyThisHappens": "Why this happens",
+    "tryThis": "Try this"
+  },
+  "progress": {
+    "title": "Progress",
+    "subtitle": "Track your listening improvement",
+    "yourStats": "Your Stats",
+    "streak": "Day Streak",
+    "sessions": "Sessions",
+    "minutes": "Minutes",
+    "allTime": "All Time",
+    "totalClips": "Total Clips",
+    "storiesCompleted": "Stories Completed",
+    "noProgress": "Complete your first practice session to start tracking your progress!",
+    "keepGoing": "Keep it up!",
+    "startFirstSession": "Start your first session",
+    "saved": "Saved",
+    "savedToday": "Saved today",
+    "vocabulary": "Vocabulary",
+    "listeningTips": "Listening tips",
+    "words": "Words",
+    "phrases": "Phrases",
+    "tips": "Tips",
+    "noSavedWords": "No saved words yet",
+    "noSavedPhrases": "No saved phrases yet",
+    "noSavedTips": "No saved tips yet",
+    "listeningMinutes": "Listening Minutes",
+    "listeningLevel": {
+      "title": "Listening Level",
+      "around": "Around",
+      "stability": "Stability",
+      "confidence": "Confidence",
+      "stabilityTooltip": "Stability measures how consistently you understand clips at this level.",
+      "confidenceLevels": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "exploring": "Exploring"
+      },
+      "progression": {
+        "from": "From"
+      },
+      "cefrLabels": {
+        "A1": "Beginner",
+        "A2": "Elementary",
+        "B1": "Intermediate",
+        "B2": "Upper Intermediate",
+        "C1": "Advanced",
+        "C2": "Mastery"
+      },
+      "descriptors": {
+        "A1": "Understanding basic phrases and common words",
+        "A2": "Catching simple sentences in familiar contexts",
+        "B1": "Following most everyday conversations",
+        "B2": "Understanding complex ideas and nuanced discussions",
+        "C1": "Grasping almost everything, even with accents",
+        "C2": "Effortlessly understanding all forms of spoken language"
+      }
+    }
+  },
+  "complete": {
+    "title": "Session Complete!",
+    "subtitle": "Great work today",
+    "backToHome": "Back to Home",
+    "practiceAgain": "Practice Again",
+    "todaysSession": "Today's Session",
+    "clipsCompleted": "Clips Completed",
+    "avgAccuracy": "Average Accuracy"
+  },
+  "auth": {
+    "createAccount": "Create your Cue account",
+    "signIn": "Sign in",
+    "signUp": "Sign up",
+    "signingIn": "Signing in...",
+    "signingUp": "Signing up...",
+    "welcomeBack": "Welcome back to Cue",
+    "signInToContinue": "Sign in to continue learning",
+    "or": "or",
+    "continueWithGoogle": "Continue with Google",
+    "continueWithApple": "Continue with Apple",
+    "continueWithEmail": "Continue with email",
+    "alreadyHaveAccount": "Already have an account? Sign in",
+    "dontHaveAccount": "Don't have an account? Sign up",
+    "email": "Email",
+    "password": "Password",
+    "emailRequired": "Email is required",
+    "emailInvalid": "Email is invalid",
+    "passwordRequired": "Password is required",
+    "forgotPassword": "Forgot password?",
+    "createYourProfile": "Create your profile",
+    "tellUsAboutYourself": "Tell us a bit about yourself to personalize your experience"
+  },
+  "onboarding": {
+    "welcome": "Welcome to Cue",
+    "getStarted": "Get Started",
+    "notNow": "Not now",
+    "name": {
+      "title": "What's your name?",
+      "subtitle": "We'll use this to personalize your experience",
+      "label": "Your name",
+      "placeholder": "Enter your name",
+      "continue": "Continue",
+      "loading": "Loading your information...",
+      "googleNameHint": "We've filled in your name from Google. You can change it if you'd like."
+    },
+    "situations": {
+      "title": "Where do you want to use English?",
+      "subtitle": "Choose up to 3 situations",
+      "work": "At work",
+      "workDesc": "Business meetings, office conversations, professional settings",
+      "daily": "With friends & family",
+      "dailyDesc": "Casual hangouts, everyday life, social situations",
+      "travel": "While traveling",
+      "travelDesc": "Hotels, restaurants, airports, asking for help",
+      "media": "In movies & shows",
+      "mediaDesc": "TV series, YouTube, podcasts, entertainment",
+      "formal": "In formal settings",
+      "formalDesc": "Interviews, presentations, academic discussions",
+      "general": "Everywhere",
+      "generalDesc": "I want to practice all situations"
+    }
+  },
+  "profile": {
+    "title": "Profile",
+    "account": "Account",
+    "name": "Name",
+    "email": "Email",
+    "preferences": "Preferences",
+    "language": "Language",
+    "playbackSpeed": "Playback speed",
+    "defaultSpeed": "Default: 1.0x",
+    "change": "Change",
+    "captions": "Captions",
+    "showSubtitles": "Show subtitles",
+    "toggle": "Toggle",
+    "signOut": "Sign out",
+    "buildListeningSkills": "Build your listening skills",
+    "subscription": {
+      "title": "Subscription",
+      "proPlan": "Pro Plan",
+      "freePlan": "Free Plan",
+      "manage": "Manage",
+      "loading": "Loading...",
+      "proUntil": "Pro until {date}, then Free plan",
+      "upgrade": "Upgrade"
+    }
+  },
+  "streak": {
+    "dayInRow": "{count} day in a row",
+    "daysInRow": "{count} days in a row",
+    "consistencyMessage": "Consistency matters most. A little every day adds up.",
+    "days": {
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri",
+      "sat": "Sat",
+      "sun": "Sun"
+    }
+  }
+}

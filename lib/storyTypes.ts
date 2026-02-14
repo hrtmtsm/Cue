@@ -11,6 +11,7 @@ export interface StoryClip {
   audioGeneratedFrom?: string // First 30 chars of transcript used to generate audio (for debugging)
   focusSkill?: string
   done?: boolean // Client-side state for completion tracking
+  dbClipId?: string // Database clip ID for chunk lookup (e.g., "clip-practice-292")
 }
 
 export interface Story {

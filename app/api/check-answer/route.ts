@@ -181,7 +181,7 @@ export async function POST(request: NextRequest) {
           // Continue without pattern feedback (non-fatal)
         } else if (patternSpans && patternSpans.length > 0) {
           // 2. Filter patterns to only those affecting what the learner actually missed
-          const relevantSpans = (patternSpans || []).filter((span: any) => {
+          let relevantSpans = (patternSpans || []).filter((span: any) => {
             const spanText = transcript.substring(span.ref_start, span.ref_end).toLowerCase()
             
             // If they missed specific keywords, show patterns affecting those keywords
@@ -225,9 +225,46 @@ export async function POST(request: NextRequest) {
                 }
               }
             }
-            
             return false
           }) || []
+
+          // If strict filtering removed everything, fall back to a more lenient strategy
+          if (relevantSpans.length === 0 && patternSpans && patternSpans.length > 0) {
+            console.log('⚠️ [check-answer] Strict filter removed all spans, using fallback')
+
+            try {
+              // Strategy: Show patterns for words they actually missed (from alignment events)
+              const missedWords: string[] = (aligned.events || [])
+                .filter((e: any) => e.type === 'missing' && typeof e.expectedSpan === 'string')
+                .map((e: any) => (e.expectedSpan as string).toLowerCase())
+
+              if (missedWords.length > 0) {
+                relevantSpans = patternSpans.filter((span: any) => {
+                  const spanText = transcript.substring(span.ref_start, span.ref_end).toLowerCase().trim()
+                  if (!spanText) return false
+
+                  // Check if this span overlaps with any missed word
+                  return missedWords.some((word) =>
+                    word &&
+                    (spanText.includes(word) || word.includes(spanText))
+                  )
+                })
+              }
+
+              // If still nothing, just take the first pattern span as last resort
+              if (relevantSpans.length === 0) {
+                relevantSpans = [patternSpans[0]]
+                console.log('⚠️ [check-answer] Using first span as last resort', {
+                  fallbackPatternKey: patternSpans[0]?.pattern_key,
+                })
+              }
+            } catch (fallbackError: any) {
+              console.warn('⚠️ [check-answer] Fallback filtering failed, skipping pattern feedback fallback:', {
+                message: fallbackError?.message,
+                stack: fallbackError?.stack,
+              })
+            }
+          }
 
           console.log('🔍 After filtering:', {
             relevantCount: relevantSpans?.length || 0,

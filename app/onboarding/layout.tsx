@@ -15,9 +15,17 @@ export default function OnboardingLayout({
     // Simple auth check - in production, use Supabase
     // For now, check if user has completed profile
     if (typeof window !== 'undefined') {
+      // Skip check for name page - it's the entry point for Google auth
+      // This prevents redirect loops when coming from OAuth callback
+      if (pathname?.includes('/onboarding/name')) {
+        console.log('🔓 [Onboarding Layout] Skipping auth check for name page')
+        return
+      }
+      
       const firstName = localStorage.getItem('userFirstName')
       if (!firstName) {
         // Redirect to auth if no profile
+        console.log('🚫 [Onboarding Layout] No firstName found, redirecting to auth/profile')
         router.push('/auth/profile')
         return
       }
@@ -37,7 +45,13 @@ export default function OnboardingLayout({
     }
   }, [router, pathname])
 
-  return <>{children}</>
+  return (
+    <div className="min-h-screen">
+      <div className="max-w-2xl mx-auto">
+        {children}
+      </div>
+    </div>
+  )
 }
 
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSupabaseAdminClient, resolveUserId } from '@/lib/supabase/server'
+import { getSupabaseAdminClient } from '@/lib/supabase/server'
+import { resolveUserId } from '@/lib/supabase/resolveUserId'
 
 export async function GET(request: NextRequest) {
   try {
@@ -40,16 +41,65 @@ export async function GET(request: NextRequest) {
     // Get Supabase admin client
     const supabaseAdmin = getSupabaseAdminClient()
     
-    // Fetch clip_audio
-    const { data: audioRow, error } = await supabaseAdmin
-      .from('clip_audio')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('clip_id', clipId)
-      .eq('variant_key', variantKey)
-      .single()
+    // Check if clip is diagnostic
+    const { data: clipInfo } = await supabaseAdmin
+      .from('curated_clips')
+      .select('clip_type')
+      .eq('id', clipId)
+      .maybeSingle()
+    
+    const isDiagnostic = clipInfo?.clip_type === 'diagnostic'
+    
+    // For diagnostic clips: Check diagnostic_audio table
+    // For regular clips: Check user audio from clip_audio table
+    let audioPath: string | null = null
+    let audioStatus: string = 'needs_generation'
+    let error: any = null
+    
+    if (isDiagnostic) {
+      // Diagnostic clips: Check diagnostic_audio table
+      console.log('🔍 [Audio URL] Diagnostic clip detected, checking diagnostic_audio table...', { clipId })
+      
+      const { data: diagnosticAudio, error: diagnosticError } = await supabaseAdmin
+        .from('diagnostic_audio')
+        .select('audio_path, status')
+        .eq('clip_id', clipId)
+        .maybeSingle()
+      
+      if (!diagnosticError && diagnosticAudio) {
+        audioPath = diagnosticAudio.audio_path
+        audioStatus = diagnosticAudio.status
+        console.log('✅ [Audio URL] Found diagnostic audio:', { clipId })
+      } else if (diagnosticError && diagnosticError.code !== 'PGRST116') {
+        // PGRST116 = not found, which is fine
+        error = diagnosticError
+      }
+    } else {
+      // Regular clips: Check user audio from clip_audio table
+      const { data: userAudio, error: userError } = await supabaseAdmin
+        .from('clip_audio')
+        .select('blob_path, audio_status')
+        .eq('user_id', userId)
+        .eq('clip_id', clipId)
+        .eq('variant_key', variantKey)
+        .maybeSingle()
+      
+      if (!userError && userAudio) {
+        audioPath = userAudio.blob_path
+        audioStatus = userAudio.audio_status
+      } else {
+        error = userError
+      }
+    }
 
-    if (error || !audioRow) {
+    if (error && error.code !== 'PGRST116') {
+      return NextResponse.json(
+        { error: 'Error fetching audio', status: 'error' },
+        { status: 500 }
+      )
+    }
+
+    if (!audioPath) {
       return NextResponse.json(
         { error: 'Audio not found', status: 'needs_generation' },
         { status: 404 }
@@ -57,33 +107,26 @@ export async function GET(request: NextRequest) {
     }
 
     // If status !== ready → return status
-    if (audioRow.audio_status !== 'ready') {
+    if (audioStatus !== 'ready') {
       return NextResponse.json({
-        status: audioRow.audio_status,
+        status: audioStatus,
         clipId,
       })
     }
 
-    if (!audioRow.blob_path) {
-      return NextResponse.json(
-        { error: 'Audio blob path missing', status: 'error' },
-        { status: 500 }
-      )
-    }
-
     // Construct public URL from blob path
-    // blob_path is now stored as full URL from blob.url, but handle legacy pathname format
+    // audio_path is stored as full URL from blob.url, but handle legacy pathname format
     let blobUrl: string
-    if (audioRow.blob_path.startsWith('http')) {
+    if (audioPath.startsWith('http')) {
       // Already a full URL (new format)
-      blobUrl = audioRow.blob_path
+      blobUrl = audioPath
     } else {
       // Legacy: construct URL from pathname
       // Format: https://{account}.public.blob.vercel-storage.com/{path}
       // Extract account from BLOB_READ_WRITE_TOKEN (format: vercel_blob_rw_{account}_{token})
       const tokenParts = process.env.BLOB_READ_WRITE_TOKEN?.split('_') || []
       const account = tokenParts.length >= 4 ? tokenParts[3] : 'public'
-      const pathname = audioRow.blob_path.startsWith('/') ? audioRow.blob_path : `/${audioRow.blob_path}`
+      const pathname = audioPath.startsWith('/') ? audioPath : `/${audioPath}`
       blobUrl = `https://${account}.public.blob.vercel-storage.com${pathname}`
     }
     
@@ -91,7 +134,6 @@ export async function GET(request: NextRequest) {
       url: blobUrl,
       status: 'ready',
       clipId,
-      transcriptHash: audioRow.transcript_hash,
     })
   } catch (error: any) {
     console.error('Error in /api/audio/url:', error)

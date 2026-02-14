@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Play, Pause, RotateCcw, AlertCircle } from 'lucide-react'
 import AudioWaveLine from './AudioWaveLine'
 import { getAudioGenerationQueue } from '@/lib/audioGenerationQueue'
+import { Caption, Label, Body } from '@/components/ui/Typography'
 
 interface ClipPlayerProps {
   clip: {
@@ -349,7 +350,7 @@ export default function ClipPlayer({ clip, onDone, onReplay, onAudioReady }: Cli
   if (!clip.audioUrl && !clip.transcript && clip.audioStatus !== 'needs_generation') {
     return (
       <div className="p-4 border-2 border-gray-200 rounded-xl bg-gray-50">
-        <p className="text-gray-500 text-center">Audio not available</p>
+        <Body className="text-gray-500 text-center">Audio not available</Body>
       </div>
     )
   }
@@ -359,33 +360,33 @@ export default function ClipPlayer({ clip, onDone, onReplay, onAudioReady }: Cli
       {/* Generating Status - Lightweight inline */}
       {audioStatus === 'generating' && (
         <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg mb-2">
-          <p className="text-xs text-blue-800 text-center">Preparing audio...</p>
+          <Caption className="text-blue-800 text-center">Preparing audio...</Caption>
         </div>
       )}
 
       {/* Needs Generation - Lightweight inline */}
       {audioStatus === 'needs_generation' && (
         <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg mb-2">
-          <p className="text-xs text-blue-800 text-center">Audio will be ready soon...</p>
+          <Caption className="text-blue-800 text-center">Audio will be ready soon...</Caption>
         </div>
       )}
 
       {/* Error State - Only show after retries failed */}
       {audioStatus === 'error' && (
         <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg mb-2 space-y-2">
-          <p className="text-xs text-gray-800 text-center">Audio unavailable</p>
+          <Caption className="text-gray-800 text-center">Audio unavailable</Caption>
           <div className="flex gap-2">
             <button
               onClick={handleRetry}
-              className="flex-1 py-1.5 px-3 text-xs bg-gray-100 text-gray-700 rounded font-medium active:bg-gray-200 transition-colors"
+              className="flex-1 py-1.5 px-3 bg-gray-100 rounded active:bg-gray-200 transition-colors"
             >
-              Retry
+              <Label className="text-gray-700 text-xs">Retry</Label>
             </button>
             <button
               onClick={handleUseDeviceVoice}
-              className="flex-1 py-1.5 px-3 text-xs bg-blue-600 text-white rounded font-medium active:bg-blue-700 transition-colors"
+              className="flex-1 py-1.5 px-3 bg-blue-600 rounded active:bg-blue-700 transition-colors"
             >
-              Use device voice
+              <Label className="text-white text-xs">Use device voice</Label>
             </button>
           </div>
         </div>
@@ -394,7 +395,7 @@ export default function ClipPlayer({ clip, onDone, onReplay, onAudioReady }: Cli
       {/* Play Blocked Hint */}
       {playBlockedHint && (
         <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-800">Tap again to play</p>
+          <Body className="text-blue-800 text-sm">Tap again to play</Body>
         </div>
       )}
 
@@ -403,7 +404,7 @@ export default function ClipPlayer({ clip, onDone, onReplay, onAudioReady }: Cli
         <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2">
           <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <p className="text-sm text-blue-800">Voice mode: Quick (device voice)</p>
+            <Body className="text-blue-800 text-sm">Voice mode: Quick (device voice)</Body>
           </div>
         </div>
       )}
@@ -448,11 +449,11 @@ export default function ClipPlayer({ clip, onDone, onReplay, onAudioReady }: Cli
 
           <button
             onClick={handleSpeedToggle}
-            className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 active:bg-gray-200 transition-colors font-medium text-sm"
+            className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 active:bg-gray-200 transition-colors"
             aria-label={`Speed: ${formatSpeed(playbackRate)}`}
             title={`Speed: ${formatSpeed(playbackRate)}`}
           >
-            {formatSpeed(playbackRate)}
+            <Label className="text-gray-700">{formatSpeed(playbackRate)}</Label>
           </button>
         </div>
       </div>
@@ -460,15 +461,15 @@ export default function ClipPlayer({ clip, onDone, onReplay, onAudioReady }: Cli
       {/* Transcript Toggle */}
       <button
         onClick={() => setShowTranscript(!showTranscript)}
-        className="w-full py-2 px-4 rounded-lg bg-gray-100 text-gray-700 active:bg-gray-200 transition-colors text-sm font-medium"
+        className="w-full py-2 px-4 rounded-lg bg-gray-100 text-gray-700 active:bg-gray-200 transition-colors"
       >
-        {showTranscript ? 'Hide' : 'Show'} Transcript
+        <Label className="text-gray-700">{showTranscript ? 'Hide' : 'Show'} Transcript</Label>
       </button>
 
       {/* Transcript Display */}
       {showTranscript && (
         <div className="p-4 bg-gray-50 rounded-lg">
-          <p className="text-gray-900 text-lg leading-relaxed">{clip.transcript}</p>
+          <Body className="text-gray-900 leading-relaxed">{clip.transcript}</Body>
         </div>
       )}
 
@@ -476,13 +477,15 @@ export default function ClipPlayer({ clip, onDone, onReplay, onAudioReady }: Cli
       <button
         onClick={handleMarkDone}
         disabled={clip.done}
-        className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
+        className={`w-full py-3 px-4 rounded-lg transition-colors ${
           clip.done
-            ? 'bg-green-100 text-green-700 cursor-not-allowed'
-            : 'bg-blue-600 text-white active:bg-blue-700'
+            ? 'bg-green-100 cursor-not-allowed'
+            : 'bg-blue-600 active:bg-blue-700'
         }`}
       >
-        {clip.done ? '✓ Done' : 'Mark as Done'}
+        <Label className={clip.done ? 'text-green-700' : 'text-white'}>
+          {clip.done ? '✓ Done' : 'Mark as Done'}
+        </Label>
       </button>
     </div>
   )

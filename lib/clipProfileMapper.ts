@@ -1,5 +1,7 @@
 import { OnboardingData } from './onboardingStore'
 import { ClipProfile } from './clipTypes'
+import { ListeningProfile, UserPreferences } from './userPreferences'
+import { getNextGenerationParams } from './clipGenerationParams'
 
 /**
  * Maps onboarding data to clip focus types
@@ -144,6 +146,98 @@ export function createClipProfiles(
   })
   
   return profiles
+}
+
+/**
+ * Select next clip difficulty based on linguistic metrics and profile
+ * 
+ * Uses linguistic metrics to adaptively adjust difficulty:
+ * - If user has severe weaknesses (severity >= 7): select easier clips
+ * - If user has moderate weaknesses (severity >= 4): maintain current difficulty
+ * - If user is performing well: increase difficulty
+ * 
+ * Falls back to tolerance-based logic if metrics not available.
+ * 
+ * @param profile - User's listening profile with metrics
+ * @param preferences - User preferences (for fallback logic)
+ * @returns Recommended difficulty level
+ */
+export function selectNextClipDifficulty(
+  profile: ListeningProfile,
+  preferences?: UserPreferences
+): 'easy' | 'medium' | 'hard' {
+  // If linguistic metrics available, use weakness-based adaptation
+  if (profile.linguisticMetrics && profile.weaknesses && profile.weaknesses.length > 0) {
+    const topWeakness = profile.weaknesses[0]
+    const eventsAnalyzed = profile.linguisticMetrics.eventsAnalyzed
+    
+    console.log('📊 [AdaptiveDifficulty] Using linguistic metrics:', {
+      topWeakness: topWeakness.type,
+      severity: topWeakness.severity,
+      eventsAnalyzed,
+      description: topWeakness.description,
+    })
+    
+    // Need sufficient data before adjusting difficulty (at least 5 events)
+    if (eventsAnalyzed < 5) {
+      console.log('📊 [AdaptiveDifficulty] Insufficient data, using fallback')
+      return fallbackDifficultySelection(profile, preferences)
+    }
+    
+    // Adaptive logic based on top weakness severity
+    if (topWeakness.severity >= 7) {
+      // Struggling significantly - recommend easier content
+      console.log('📊 [AdaptiveDifficulty] High severity weakness detected → EASY')
+      return 'easy'
+    } else if (topWeakness.severity >= 4) {
+      // Moderate challenges - maintain medium difficulty
+      console.log('📊 [AdaptiveDifficulty] Moderate weakness detected → MEDIUM')
+      return 'medium'
+    } else {
+      // Performing well - increase challenge
+      console.log('📊 [AdaptiveDifficulty] Low weakness, performing well → HARD')
+      return 'hard'
+    }
+  }
+  
+  // Fallback to tolerance-based logic if no metrics available
+  console.log('📊 [AdaptiveDifficulty] No linguistic metrics, using tolerance-based fallback')
+  return fallbackDifficultySelection(profile, preferences)
+}
+
+/**
+ * Fallback difficulty selection based on tolerance values
+ * (existing logic from clipGenerationParams.ts)
+ */
+function fallbackDifficultySelection(
+  profile: ListeningProfile,
+  preferences?: UserPreferences
+): 'easy' | 'medium' | 'hard' {
+  // If we have clipGenerationParams available, use it
+  if (preferences) {
+    try {
+      const params = getNextGenerationParams(preferences, profile)
+      return params.difficulty
+    } catch (error) {
+      console.warn('📊 [AdaptiveDifficulty] Error using getNextGenerationParams:', error)
+    }
+  }
+  
+  // Final fallback: use average tolerance
+  const avgTolerance = (
+    profile.speedTolerance +
+    profile.reductionTolerance +
+    profile.vocabTolerance +
+    profile.memoryLoadTolerance
+  ) / 4
+  
+  if (avgTolerance < 40) {
+    return 'easy'
+  } else if (avgTolerance < 70) {
+    return 'medium'
+  } else {
+    return 'hard'
+  }
 }
 
 

@@ -1,0 +1,26 @@
+{
+  "timestamp": "2026-02-08T02:50:25.545Z",
+  "total_failures": 5,
+  "failures": [
+    {
+      "clipId": "clip-practice-045",
+      "reason": "Invalid rate 67% after retry"
+    },
+    {
+      "clipId": "clip-practice-189",
+      "reason": "Invalid rate 75% after retry"
+    },
+    {
+      "clipId": "clip-practice-201",
+      "reason": "Invalid rate 75% after retry"
+    },
+    {
+      "clipId": "clip-practice-v2-129",
+      "reason": "Invalid rate 60% after retry"
+    },
+    {
+      "clipId": "clip-practice-v2-287",
+      "reason": "Invalid rate 75% after retry"
+    }
+  ]
+}

@@ -1,0 +1,116 @@
+id,transcript,cefr,situation,focus_areas,length_sec,patterns
+# NEW PATTERN: "lemme" (let me)
+clip-practice-new-001,"Lemme think about it",A1,general,"connected_speech,reductions",3,"lemme"
+clip-practice-new-002,"Lemme check my schedule",A1,work_meetings,"connected_speech,reductions",4,"lemme"
+clip-practice-new-003,"Lemme grab my coat",A1,daily,"connected_speech,reductions",3,"lemme"
+clip-practice-new-004,"Lemme see that",A1,general,"connected_speech,reductions",3,"lemme"
+clip-practice-new-005,"Lemme know when you're free",A2,general,"connected_speech,reductions",4,"lemme"
+clip-practice-new-006,"Lemme help you with that",A1,daily,"connected_speech,reductions",4,"lemme"
+clip-practice-new-007,"Lemme get back to you",A2,work_meetings,"connected_speech,reductions",4,"lemme"
+clip-practice-new-008,"Lemme finish this first",A1,general,"connected_speech,reductions",3,"lemme"
+clip-practice-new-009,"Lemme ask my boss",A2,work_meetings,"connected_speech,reductions",3,"lemme"
+clip-practice-new-010,"Lemme give you a hand",A1,daily,"connected_speech,reductions",4,"lemme"
+
+# NEW PATTERN: "gimme" (give me)
+clip-practice-new-011,"Gimme a minute",A1,general,"connected_speech,reductions",3,"gimme"
+clip-practice-new-012,"Gimme a call later",A1,daily,"connected_speech,reductions",4,"gimme"
+clip-practice-new-013,"Gimme a hand with this",A1,general,"connected_speech,reductions",4,"gimme"
+clip-practice-new-014,"Gimme a break",A1,general,"connected_speech,reductions",3,"gimme"
+clip-practice-new-015,"Gimme some time",A1,general,"connected_speech,reductions",3,"gimme"
+clip-practice-new-016,"Gimme the details",A2,work_meetings,"connected_speech,reductions",3,"gimme"
+clip-practice-new-017,"Gimme your number",A1,daily,"connected_speech,reductions",3,"gimme"
+clip-practice-new-018,"Gimme a sec",A1,general,"connected_speech,reductions",2,"gimme"
+clip-practice-new-019,"Gimme a chance to explain",A2,general,"connected_speech,reductions",4,"gimme"
+clip-practice-new-020,"Gimme some space",A1,general,"connected_speech,reductions",3,"gimme"
+
+# NEW PATTERN: "dunno" (don't know)
+clip-practice-new-021,"I dunno what to do",A1,general,"connected_speech,reductions",4,"dunno"
+clip-practice-new-022,"I dunno where it is",A1,general,"connected_speech,reductions",4,"dunno"
+clip-practice-new-023,"I dunno if I can make it",A2,daily,"connected_speech,reductions",5,"dunno"
+clip-practice-new-024,"I dunno why he left",A2,general,"connected_speech,reductions",4,"dunno"
+clip-practice-new-025,"I dunno how to fix it",A2,general,"connected_speech,reductions",4,"dunno"
+clip-practice-new-026,"I dunno when she's coming",A2,general,"connected_speech,reductions",4,"dunno"
+clip-practice-new-027,"I dunno who told you that",A2,general,"connected_speech,reductions",4,"dunno"
+clip-practice-new-028,"I dunno the answer",A1,general,"connected_speech,reductions",3,"dunno"
+clip-practice-new-029,"I dunno what you mean",A1,general,"connected_speech,reductions",4,"dunno"
+clip-practice-new-030,"I dunno about that",A1,general,"connected_speech,reductions",3,"dunno"
+
+# NEW PATTERN: "hafta" (have to)
+clip-practice-new-031,"I hafta go now",A1,general,"connected_speech,reductions",3,"hafta"
+clip-practice-new-032,"You hafta see this",A1,general,"connected_speech,reductions",3,"hafta"
+clip-practice-new-033,"We hafta finish today",A2,work_meetings,"connected_speech,reductions",4,"hafta"
+clip-practice-new-034,"She hafta leave early",A1,general,"connected_speech,reductions",4,"hafta"
+clip-practice-new-035,"I hafta be there by noon",A2,general,"connected_speech,reductions",5,"hafta"
+clip-practice-new-036,"You hafta try this",A1,daily,"connected_speech,reductions",3,"hafta"
+clip-practice-new-037,"We hafta talk",A1,general,"connected_speech,reductions",3,"hafta"
+clip-practice-new-038,"I hafta work late tonight",A2,work_meetings,"connected_speech,reductions",5,"hafta"
+clip-practice-new-039,"You hafta believe me",A1,general,"connected_speech,reductions",3,"hafta"
+clip-practice-new-040,"I hafta get going",A1,general,"connected_speech,reductions",3,"hafta"
+
+# NEW PATTERN: "whaddya" (what do you)
+clip-practice-new-041,"Whaddya think?",A1,general,"connected_speech,reductions",3,"whaddya"
+clip-practice-new-042,"Whaddya mean?",A1,general,"connected_speech,reductions",3,"whaddya"
+clip-practice-new-043,"Whaddya want?",A1,general,"connected_speech,reductions",3,"whaddya"
+clip-practice-new-044,"Whaddya think about this?",A2,general,"connected_speech,reductions",4,"whaddya"
+clip-practice-new-045,"Whaddya call it?",A1,general,"connected_speech,reductions",3,"whaddya"
+clip-practice-new-046,"Whaddya say?",A1,general,"connected_speech,reductions",2,"whaddya"
+clip-practice-new-047,"Whaddya know about that?",A2,general,"connected_speech,reductions",4,"whaddya"
+clip-practice-new-048,"Whaddya need?",A1,general,"connected_speech,reductions",3,"whaddya"
+
+# NEW PATTERN: "whatcha" (what are you)
+clip-practice-new-049,"Whatcha doing?",A1,daily,"connected_speech,reductions",3,"whatcha"
+clip-practice-new-050,"Whatcha watching?",A1,videos_shows,"connected_speech,reductions",3,"whatcha"
+clip-practice-new-051,"Whatcha reading?",A1,daily,"connected_speech,reductions",3,"whatcha"
+clip-practice-new-052,"Whatcha working on?",A2,work_meetings,"connected_speech,reductions",3,"whatcha"
+clip-practice-new-053,"Whatcha thinking about?",A2,general,"connected_speech,reductions",4,"whatcha"
+clip-practice-new-054,"Whatcha listening to?",A1,daily,"connected_speech,reductions",3,"whatcha"
+clip-practice-new-055,"Whatcha gonna do?",A2,general,"connected_speech,reductions,linking",4,"whatcha,gonna"
+clip-practice-new-056,"Whatcha looking for?",A1,general,"connected_speech,reductions",3,"whatcha"
+
+# NEW PATTERN: "outta" (out of)
+clip-practice-new-057,"We're outta time",A1,general,"connected_speech,reductions",3,"outta"
+clip-practice-new-058,"I'm outta coffee",A1,daily,"connected_speech,reductions",3,"outta"
+clip-practice-new-059,"We're outta milk",A1,daily,"connected_speech,reductions",3,"outta"
+clip-practice-new-060,"I'm outta ideas",A2,general,"connected_speech,reductions",3,"outta"
+clip-practice-new-061,"Get outta here",A1,general,"connected_speech,reductions",3,"outta"
+clip-practice-new-062,"I'm outta breath",A1,general,"connected_speech,reductions",3,"outta"
+
+# NEW PATTERN: "betcha" (bet you)
+clip-practice-new-063,"Betcha can't guess",A2,general,"connected_speech,reductions",3,"betcha"
+clip-practice-new-064,"Betcha didn't know that",A2,general,"connected_speech,reductions",4,"betcha"
+clip-practice-new-065,"Betcha he's late again",A2,daily,"connected_speech,reductions",4,"betcha"
+clip-practice-new-066,"Betcha five bucks",A2,general,"connected_speech,reductions",3,"betcha"
+clip-practice-new-067,"Betcha she forgot",A2,general,"connected_speech,reductions",3,"betcha"
+
+# NEW PATTERN: "kinda" (kind of) - more casual than "kind of"
+clip-practice-new-068,"It's kinda weird",A1,general,"connected_speech,reductions",3,"kinda"
+clip-practice-new-069,"I'm kinda tired",A1,daily,"connected_speech,reductions",3,"kinda"
+clip-practice-new-070,"It's kinda late",A1,general,"connected_speech,reductions",3,"kinda"
+clip-practice-new-071,"That's kinda cool",A1,general,"connected_speech,reductions",3,"kinda"
+clip-practice-new-072,"I kinda like it",A1,general,"connected_speech,reductions",3,"kinda"
+clip-practice-new-073,"It's kinda funny",A1,general,"connected_speech,reductions",3,"kinda"
+clip-practice-new-074,"I'm kinda busy right now",A2,general,"connected_speech,reductions",4,"kinda"
+clip-practice-new-075,"That's kinda what I thought",A2,general,"connected_speech,reductions",4,"kinda"
+
+# NEW PATTERN: "sorta" (sort of)
+clip-practice-new-076,"It's sorta like that",A2,general,"connected_speech,reductions",4,"sorta"
+clip-practice-new-077,"I sorta understand",A2,general,"connected_speech,reductions",3,"sorta"
+clip-practice-new-078,"That's sorta what happened",A2,general,"connected_speech,reductions",4,"sorta"
+clip-practice-new-079,"I sorta forgot",A1,general,"connected_speech,reductions",3,"sorta"
+clip-practice-new-080,"It's sorta complicated",A2,general,"connected_speech,reductions",3,"sorta"
+
+# TOTAL NEW CLIPS: 80
+# Pattern distribution:
+# - lemme: 10 clips
+# - gimme: 10 clips
+# - dunno: 10 clips
+# - hafta: 10 clips
+# - whaddya: 8 clips
+# - whatcha: 8 clips
+# - outta: 6 clips
+# - betcha: 5 clips
+# - kinda: 8 clips
+# - sorta: 5 clips
+
+
+

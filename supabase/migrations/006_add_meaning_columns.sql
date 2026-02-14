@@ -23,3 +23,6 @@ COMMENT ON COLUMN listening_patterns.meaning_status IS
 'Controls which meaning to show: "none" (no meaning), "general" (use meaning_general), "approved" (use meaning_approved), "revoked" (hide meaning).';
 
 
+
+
+

@@ -656,3 +656,6 @@ Separate:
 4. Update local sorting to use difficulty matching
 5. Keep categories for explanation only (no changes needed)
 
+
+
+

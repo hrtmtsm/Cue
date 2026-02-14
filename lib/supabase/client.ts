@@ -1,11 +1,22 @@
 /**
  * Supabase Client
  * For use in client components
- * Lazy initialization - only initializes when getSupabase() is called
+ * Uses createBrowserClient from @supabase/ssr
+ * which properly handles PKCE flow for OAuth
  */
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
+import { SupabaseClient } from '@supabase/supabase-js'
 
 let supabaseInstance: SupabaseClient | null = null
+
+/**
+ * Extract project reference from Supabase URL
+ * Example: https://imlrsvugipgkqwjcffdq.supabase.co -> imlrsvugipgkqwjcffdq
+ */
+function extractProjectRef(url: string): string | null {
+  const match = url.match(/https?:\/\/([^.]+)\.supabase\.co/)
+  return match ? match[1] : null
+}
 
 function getSupabaseClient(): SupabaseClient {
   if (supabaseInstance) {
@@ -15,19 +26,30 @@ function getSupabaseClient(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  if (!url || !anonKey) {
-    // Return a mock client that will fail gracefully
-    // This allows the app to load even if Supabase isn't configured yet
-    console.warn('⚠️ Supabase not configured: NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY missing')
-    // Create a client with dummy values - it will fail on actual API calls but won't crash the app
-    supabaseInstance = createClient(
-      'https://placeholder.supabase.co',
-      'placeholder-key'
-    )
-    return supabaseInstance
+  // Fast-fail assertion in development
+  if (process.env.NODE_ENV === 'development') {
+    if (!url || !url.trim()) {
+      throw new Error('NEXT_PUBLIC_SUPABASE_URL is missing or empty. Check your .env.local file and restart the dev server.')
+    }
+    if (!anonKey || !anonKey.trim()) {
+      throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY is missing or empty. Check your .env.local file and restart the dev server.')
+    }
+    
+    // Validate URL format
+    const projectRef = extractProjectRef(url)
+    if (!projectRef) {
+      throw new Error(`Invalid NEXT_PUBLIC_SUPABASE_URL format: "${url}". Expected: https://<project-ref>.supabase.co`)
+    }
   }
 
-  supabaseInstance = createClient(url, anonKey)
+  // Production: fail if env vars are missing
+  if (!url || !anonKey) {
+    throw new Error('NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY is missing')
+  }
+
+  // Use createBrowserClient from @supabase/ssr which handles PKCE flow automatically
+  // This ensures OAuth uses code flow (?code=) instead of implicit flow (#access_token=)
+  supabaseInstance = createBrowserClient(url, anonKey)
   return supabaseInstance
 }
 

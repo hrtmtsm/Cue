@@ -1,59 +1,29 @@
-'use client'
+import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 
-import Link from 'next/link'
-import { useEffect, useState } from 'react'
+const SUPPORTED_LOCALES = ['en', 'ja'] as const;
+const DEFAULT_LOCALE = 'ja'; // Match i18n.ts default
 
-export default function IntroPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-
-  useEffect(() => {
-    // Check authentication status
-    // TODO: Replace with Supabase auth check
-    // const { data: { user } } = await supabase.auth.getUser()
-    // setIsAuthenticated(!!user)
-    
-    // Placeholder: for now, default to false (not authenticated)
-    setIsAuthenticated(false)
-  }, [])
-
-  const ctaText = isAuthenticated ? 'Continue' : 'Get started'
-  const ctaHref = isAuthenticated ? '/practice' : '/auth'
-
-  return (
-    <main className="flex min-h-screen flex-col px-6 py-12">
-      <div className="flex flex-col justify-center flex-1 space-y-8">
-        <div className="space-y-4 text-center">
-          <div className="mb-8">
-            <h2 className="text-5xl font-bold text-blue-600 tracking-tight">
-              Cue
-            </h2>
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900 leading-tight">
-            Can't catch what native speakers actually say?
-          </h1>
-          <p className="text-lg text-gray-600">
-            Train your ear to hear fast, natural speech — one short clip at a time.
-          </p>
-        </div>
-      </div>
-
-      <div className="pt-8 pb-6 space-y-3">
-        <Link
-          href={ctaHref}
-          className="block w-full bg-blue-600 text-white text-center font-semibold py-4 px-6 rounded-xl shadow-lg active:bg-blue-700 transition-colors"
-        >
-          {ctaText}
-        </Link>
-        {!isAuthenticated && (
-          <Link
-            href="/auth/login"
-            className="block w-full text-center font-medium py-3 px-6 text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            I already have an account
-          </Link>
-        )}
-      </div>
-    </main>
-  )
+export default async function RootPage() {
+  console.log('🚨🚨🚨 ROOT PAGE HIT - SHOULD NOT HAPPEN AFTER OAUTH 🚨🚨🚨');
+  console.log('   → This page should only be hit when user visits "/"');
+  console.log('   → If seen after OAuth, there is a routing issue');
+  
+  const headersList = await headers();
+  const acceptLanguage = headersList.get('accept-language');
+  
+  // Detect best matching locale from browser
+  let locale = DEFAULT_LOCALE;
+  if (acceptLanguage) {
+    // Check for English
+    if (acceptLanguage.includes('en')) {
+      locale = 'en';
+    }
+    // Check for Japanese (ja)
+    if (acceptLanguage.includes('ja')) {
+      locale = 'ja';
+    }
+  }
+  
+  redirect(`/${locale}`);
 }
-

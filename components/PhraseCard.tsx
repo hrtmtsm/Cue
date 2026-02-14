@@ -1,5 +1,8 @@
 import type { FeedbackItem, FeedbackCategory } from '@/lib/practiceSteps'
 import { Bookmark } from 'lucide-react'
+import { Heading, Body, Label, Caption } from '@/components/ui/Typography'
+import { useState } from 'react'
+import type { SaveTipData } from '@/lib/savedTips'
 
 type PhraseCardProps = 
   | {
@@ -8,6 +11,9 @@ type PhraseCardProps =
       phrase?: never
       meaning?: never
       howItSounds?: never
+      onSave?: (tipData: SaveTipData) => Promise<boolean>
+      onUnsave?: (phrase: string) => Promise<boolean>
+      isSaved?: boolean
     }
   | {
       // Legacy structure (backward compatibility)
@@ -15,6 +21,9 @@ type PhraseCardProps =
       phrase: string
       meaning: string
       howItSounds: string
+      onSave?: (tipData: SaveTipData) => Promise<boolean>
+      onUnsave?: (phrase: string) => Promise<boolean>
+      isSaved?: boolean
     }
 
 /**
@@ -165,6 +174,13 @@ export default function PhraseCard(props: PhraseCardProps) {
   const actualSpan = isLegacy ? undefined : props.feedbackItem.actualSpan
   const type = isLegacy ? undefined : props.feedbackItem.type
   const explainAllowed = isLegacy ? true : props.feedbackItem.explainAllowed // Legacy items always show explanations
+  const onSave = props.onSave
+  const onUnsave = props.onUnsave
+  const isSaved = props.isSaved || false
+
+  // State for save button
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
 
   // Chunk mode: active when chunkDisplay exists
   const hasChunk = Boolean(inSentence?.chunkDisplay)
@@ -256,16 +272,63 @@ export default function PhraseCard(props: PhraseCardProps) {
     console.log('Bookmark:', phrase)
   }
 
+  const handleSaveToggle = async (e: React.MouseEvent) => {
+    // Stop event propagation
+    e.stopPropagation()
+    e.preventDefault()
+
+    if (isSaving) return
+
+    setIsSaving(true)
+    setSaveSuccess(false)
+
+    // If already saved, unsave it
+    if (isSaved && onUnsave) {
+      const success = await onUnsave(phrase)
+      setIsSaving(false)
+      return
+    }
+
+    // Otherwise, save it
+    if (!onSave) {
+      setIsSaving(false)
+      return
+    }
+
+    const tipData: SaveTipData = {
+      phrase,
+      meaning_in_context: meaningInContext,
+      sound_rule: soundRule,
+      in_sentence_original: inSentence?.original,
+      in_sentence_highlighted: inSentence?.highlighted,
+      in_sentence_heard_as: inSentence?.heardAs,
+      chunk_display: inSentence?.chunkDisplay,
+      extra_example_sentence: extraExample?.sentence,
+      extra_example_heard_as: extraExample?.heardAs,
+      category,
+      tip,
+    }
+
+    const success = await onSave(tipData)
+    
+    setIsSaving(false)
+    if (success) {
+      setSaveSuccess(true)
+      // Reset success message after 2 seconds
+      setTimeout(() => setSaveSuccess(false), 2000)
+    }
+  }
+
   return (
     <div className="p-8 bg-white border border-gray-200 rounded-2xl shadow-sm">
       {/* Header: Title, Category Badge, Bookmark Icon */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
-          <h1 className="text-3xl font-bold text-gray-900 leading-tight">{phrase}</h1>
+          <Heading as="h1" className="text-gray-900 leading-tight text-3xl">{phrase}</Heading>
           {category && explainAllowed && (
-            <span className="text-xs font-medium px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full">
+            <Label className="text-xs px-2.5 py-1 bg-gray-100 text-gray-700 rounded-full">
               {getCategoryLabel(category)}
-            </span>
+            </Label>
           )}
         </div>
         
@@ -356,10 +419,10 @@ export default function PhraseCard(props: PhraseCardProps) {
           
           return (
             <div className="mb-6">
-              <div className="text-sm font-medium text-gray-500 mb-2">{title}</div>
-              <div className="text-base text-gray-900 leading-7">
+              <Label className="text-gray-500 mb-2">{title}</Label>
+              <Body className="text-gray-900 leading-7">
                 &quot;{currentChunk}&quot; is how &quot;{parentChunk}&quot; sounds in casual, fast speech.
-              </div>
+              </Body>
             </div>
           )
         }
@@ -375,10 +438,10 @@ export default function PhraseCard(props: PhraseCardProps) {
         
         return (
           <div className="mb-6">
-            <div className="text-sm font-medium text-gray-500 mb-2">Listening tip</div>
-            <div className="text-base text-gray-900 leading-7">
+            <Label className="text-gray-500 mb-2">Listening tip</Label>
+            <Body className="text-gray-900 leading-7">
               Try listening to this part again—it becomes clearer with practice.
-            </div>
+            </Body>
           </div>
         )
       })()}
@@ -386,18 +449,18 @@ export default function PhraseCard(props: PhraseCardProps) {
       {/* How it sounds in fast speech */}
       {showHowItSounds && (
         <div className="mb-6">
-          <div className="text-sm font-medium text-gray-500 mb-2">How it sounds</div>
-          <div className="text-base text-gray-900 leading-7">
+          <Label className="text-gray-500 mb-2">How it sounds</Label>
+          <Body className="text-gray-900 leading-7">
             {hasChunk && chunkModeSoundRule ? chunkModeSoundRule : soundRule}
-          </div>
+          </Body>
         </div>
       )}
 
       {/* Fallback message when tautology is detected (shown in "How it sounds" section) */}
       {showFallbackInHowItSounds && (
         <div className="mb-6">
-          <div className="text-sm font-medium text-gray-500 mb-2">How it sounds</div>
-          <div className="text-base text-gray-900 leading-7">This word is often unstressed and easy to miss in fast speech.</div>
+          <Label className="text-gray-500 mb-2">How it sounds</Label>
+          <Body className="text-gray-900 leading-7">This word is often unstressed and easy to miss in fast speech.</Body>
         </div>
       )}
 
@@ -405,7 +468,7 @@ export default function PhraseCard(props: PhraseCardProps) {
       {inSentence && (
         <div className="mb-6 pt-6 border-t border-gray-100">
           <div className="flex items-center justify-between mb-3">
-            <div className="text-sm font-medium text-gray-500">In this sentence</div>
+            <Label className="text-gray-500">In this sentence</Label>
             <button
               onClick={handlePlayInSentence}
               className="flex-shrink-0 w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
@@ -417,34 +480,34 @@ export default function PhraseCard(props: PhraseCardProps) {
             </button>
           </div>
           <div className="p-4 bg-gray-50 rounded-lg border border-gray-100 mb-3">
-            <div className="text-base text-gray-900 leading-7 italic">"{inSentence.original}"</div>
+            <Body className="text-gray-900 leading-7 italic">"{inSentence.original}"</Body>
           </div>
           {/* Chunk mode: show chunk line */}
           {showChunkLine && (
-            <div className="text-sm text-gray-600 leading-6">
+            <Body className="text-gray-600 leading-6 text-sm">
               {inSentence.chunkDisplay && inSentence.reducedForm ? (
                 <>
-                  <span className="font-medium">"{inSentence.chunkDisplay}"</span> →{' '}
-                  <span className="font-medium">"{inSentence.reducedForm}"</span>
+                  <Label>"{inSentence.chunkDisplay}"</Label> →{' '}
+                  <Label>"{inSentence.reducedForm}"</Label>
                 </>
               ) : (
                 <>
-                  <span className="font-medium">"{inSentence.highlighted}"</span> links into{' '}
-                  <span className="font-medium">"{inSentence.chunkDisplay}"</span>
+                  <Label>"{inSentence.highlighted}"</Label> links into{' '}
+                  <Label>"{inSentence.chunkDisplay}"</Label>
                 </>
               )}
-            </div>
+            </Body>
           )}
           {/* Non-chunk mode: show heardAs line or fallback */}
           {!hasChunk && showHeardAsLine && (
-            <div className="text-sm text-gray-600 leading-6">
-              <span className="font-medium">"{inSentence.highlighted}"</span> often sounds like <span className="font-medium">"{inSentence.heardAs}"</span>
-            </div>
+            <Body className="text-gray-600 leading-6 text-sm">
+              <Label>"{inSentence.highlighted}"</Label> often sounds like <Label>"{inSentence.heardAs}"</Label>
+            </Body>
           )}
           {showFallbackInSentence && (
-            <div className="text-sm text-gray-600 leading-6">
+            <Body className="text-gray-600 leading-6 text-sm">
               This word is often unstressed and easy to miss in fast speech.
-            </div>
+            </Body>
           )}
         </div>
       )}
@@ -453,7 +516,7 @@ export default function PhraseCard(props: PhraseCardProps) {
       {showExtraExample && (
         <div className="mb-6 pt-6 border-t border-gray-100">
           <div className="flex items-center justify-between mb-3">
-            <div className="text-sm font-medium text-gray-500">Another example</div>
+            <Label className="text-gray-500">Another example</Label>
             <button
               onClick={handlePlayExtraExample}
               className="flex-shrink-0 w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
@@ -465,12 +528,12 @@ export default function PhraseCard(props: PhraseCardProps) {
             </button>
           </div>
           <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-            <div className="text-base text-gray-900 leading-7 italic">"{extraExample.sentence}"</div>
+            <Body className="text-gray-900 leading-7 italic">"{extraExample.sentence}"</Body>
             {/* Show heardAs suffix only if not tautological and not hidden by chunk mode */}
             {showExtraExampleHeardAs && (
-              <div className="mt-2 text-sm text-gray-600 leading-6">
+              <Body className="mt-2 text-gray-600 leading-6 text-sm">
                 (sounds like "{extraExample.heardAs}")
-              </div>
+              </Body>
             )}
           </div>
         </div>
@@ -481,6 +544,40 @@ export default function PhraseCard(props: PhraseCardProps) {
         <div className="pt-6 border-t border-gray-100">
           <div className="text-sm font-medium text-blue-600 mb-2">💡 Listening tip</div>
           <div className="text-sm text-gray-700 leading-6">{tip}</div>
+        </div>
+      )}
+
+      {/* Save tip button */}
+      {onSave && (
+        <div className="pt-6 border-t border-gray-100">
+          <button
+            onClick={handleSaveToggle}
+            onMouseDown={(e) => {
+              e.stopPropagation()
+              e.preventDefault()
+            }}
+            disabled={isSaving}
+            className={`w-full py-3 px-4 rounded-lg font-medium text-sm transition-colors ${
+              isSaving
+                ? 'bg-gray-100 text-gray-500 border-2 border-gray-200 cursor-wait'
+                : isSaved || saveSuccess
+                ? 'bg-gray-100 text-gray-600 border-2 border-gray-200 hover:bg-gray-200 active:bg-gray-300'
+                : 'bg-blue-50 text-blue-700 border-2 border-blue-200 hover:bg-blue-100 active:bg-blue-200'
+            }`}
+          >
+            {isSaving ? (
+              'Saving...'
+            ) : isSaved || saveSuccess ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                Saved
+              </span>
+            ) : (
+              'Save tip'
+            )}
+          </button>
         </div>
       )}
     </div>

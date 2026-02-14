@@ -7,41 +7,59 @@ import type { SituationKey } from './onboardingStore'
 
 export interface SituationOption {
   key: SituationKey
+  emoji: string
   label: string
-  description?: string
+  description: string
 }
 
 /**
  * Available situations for user selection during onboarding
- * Ordered list of situation options with labels and optional descriptions
+ * Ordered list of situation options with emojis, labels, and descriptions
+ * Focus: WHERE do you want to use English?
  */
 export const SITUATION_OPTIONS: SituationOption[] = [
   {
     key: 'work_meetings',
-    label: 'Work & meetings',
+    emoji: '💼',
+    label: 'At work',
+    description: 'Business meetings, office conversations, professional settings',
   },
   {
     key: 'daily',
-    label: 'Daily conversations',
+    emoji: '💬',
+    label: 'With friends & family',
+    description: 'Casual hangouts, everyday life, social situations',
   },
   {
     key: 'travel',
-    label: 'Travel',
+    emoji: '✈️',
+    label: 'While traveling',
+    description: 'Hotels, restaurants, airports, asking for help',
   },
   {
     key: 'videos_shows',
-    label: 'Videos & shows',
+    emoji: '🎬',
+    label: 'In movies & shows',
+    description: 'TV series, YouTube, podcasts, entertainment',
+  },
+  {
+    key: 'interviews_presentations',
+    emoji: '🎤',
+    label: 'In formal settings',
+    description: 'Interviews, presentations, academic discussions',
   },
   {
     key: 'general',
-    label: 'Just getting better',
+    emoji: '🌍',
+    label: 'Everywhere',
+    description: 'I want to practice all situations',
   },
 ]
 
 /**
  * Maximum number of situations a user can select
  */
-export const MAX_SITUATION_SELECTIONS = 2
+export const MAX_SITUATION_SELECTIONS = 3
 
 /**
  * Default situation to use when none is selected

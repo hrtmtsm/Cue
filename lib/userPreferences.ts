@@ -1,3 +1,6 @@
+import type { AlignmentEvent } from './alignmentEngine'
+import type { LinguisticMetrics } from './metricsCalculator'
+
 export type UserLevel = 'Beginner' | 'Intermediate' | 'Advanced' | 'Not sure'
 
 export interface UserPreferences {
@@ -8,12 +11,28 @@ export interface UserPreferences {
 }
 
 export interface ListeningProfile {
+  // Existing (keep for backward compat)
   speedTolerance: number // 0..100
   reductionTolerance: number // 0..100
   vocabTolerance: number // 0..100
   memoryLoadTolerance: number // 0..100
   confidence: number // 0..100
   lastUpdatedAt: string // ISO timestamp
+  
+  // NEW: Detailed pattern tracking
+  patternMastery?: {
+    [patternKey: string]: number  // 0-100, per pattern accuracy
+  }
+  
+  // NEW: Specific weaknesses identified
+  weaknesses?: Array<{
+    type: 'phonological' | 'lexical' | 'syntactic' | 'semantic' | 'processing'
+    description: string
+    severity: number  // 0-10
+  }>
+  
+  // NEW: Aggregated linguistic metrics (defined in metricsCalculator.ts)
+  linguisticMetrics?: LinguisticMetrics
 }
 
 export interface PracticeEvent {
@@ -25,6 +44,36 @@ export interface PracticeEvent {
   gaveUp: boolean
   revealedTranscript: boolean
   device?: string
+}
+
+/**
+ * Extended practice event with detailed linguistic data for metrics tracking
+ */
+export interface DetailedPracticeEvent extends PracticeEvent {
+  // Raw alignment data
+  alignmentEvents: AlignmentEvent[]
+  alignmentStats: {
+    correct: number
+    substitutions: number
+    missing: number
+    extra: number
+  }
+  
+  // Semantic data
+  semanticScore: number | null
+  understood: boolean
+  missingKeywords: string[]
+  capturedKeywords: string[]
+  missingUnits: string[]
+  
+  // Pattern data
+  patternsEncountered: string[]  // pattern_keys from patternFeedback
+  patternsSucceeded: string[]    // patterns where user got it right
+  patternsFailed: string[]       // patterns where user missed
+  
+  // Sentence metadata
+  transcriptWordCount: number
+  transcriptText: string
 }
 
 const PREFERENCES_KEY = 'userPreferences'

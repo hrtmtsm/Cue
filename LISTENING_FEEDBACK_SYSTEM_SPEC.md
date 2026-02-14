@@ -650,3 +650,6 @@ All categories:
 - `components/PhraseCard.tsx` → `PhraseCard()` component, `getCategoryLabel()`, `isTautology()`, `containsTautologyPattern()`, `isChunkOrientedSoundRule()`, `isRedundantExample()` - All rendering logic and visibility guards
 
 
+
+
+

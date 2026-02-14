@@ -11,6 +11,8 @@ interface ClipTopBarProps {
   // Optional: override for cases where we don't have lesson progress yet
   fallbackStep?: number
   fallbackTotalSteps?: number
+  // Optional: override percent (0-100) for simple flows like per-clip progress
+  overridePercent?: number
 }
 
 // Debug flag for progress logging (can be disabled via NEXT_PUBLIC_DEBUG_PROGRESS=false)
@@ -21,6 +23,7 @@ export default function ClipTopBar({
   rightSlot,
   fallbackStep,
   fallbackTotalSteps = 5, // Default to 5 (will be 6 if detail steps exist)
+  overridePercent,
 }: ClipTopBarProps) {
   const pathname = usePathname()
   
@@ -146,9 +149,11 @@ export default function ClipTopBar({
     totalScreensDisplay = fallbackTotalSteps
   }
   
-  const percent = progress?.percent ?? (fallbackStep 
-    ? Math.round((fallbackStep / fallbackTotalSteps) * 100)
-    : 0)
+  const percent = overridePercent !== undefined
+    ? overridePercent
+    : progress?.percent ?? (fallbackStep 
+        ? Math.round((fallbackStep / fallbackTotalSteps) * 100)
+        : 0)
   
   // Calculate step display (current screen / total screens for clip)
   // Screen counter: base screens (5) + 1 for all practice steps combined = 5 or 6
@@ -156,21 +161,23 @@ export default function ClipTopBar({
   const stepText = `${currentScreenDisplay}/${totalScreensDisplay}`
   
   return (
-    <div className="flex items-center justify-between w-full py-3 px-6 mb-4">
-      {/* Left: Back button */}
+    <div className="flex items-center justify-between w-full py-3 mb-4">
+      {/* Left: Back button - minimal left padding */}
       <button
         onClick={onBack}
-        className="flex-shrink-0 w-10 h-10 flex items-center justify-center text-gray-600 hover:text-gray-900 transition-colors"
+        className="flex-shrink-0 w-10 h-10 flex items-center justify-center text-gray-600 hover:text-gray-900 transition-colors pl-4"
         aria-label="Back"
       >
         <ChevronLeft className="w-6 h-6" />
       </button>
       
-      {/* Center: Progress bar */}
-      <ClipProgressBar percent={percent} />
+      {/* Center: Progress bar - extends almost edge-to-edge on mobile, wider on desktop */}
+      <div className="flex-1 px-2 md:px-3 lg:px-4 lg:max-w-[800px] xl:max-w-[880px]">
+        <ClipProgressBar percent={percent} />
+      </div>
       
-      {/* Right: Custom slot */}
-      <div className="flex-shrink-0 min-w-[32px] flex items-center justify-center">
+      {/* Right: Custom slot - minimal right padding */}
+      <div className="flex-shrink-0 min-w-[32px] flex items-center justify-center pr-4">
         {rightSlot}
       </div>
     </div>

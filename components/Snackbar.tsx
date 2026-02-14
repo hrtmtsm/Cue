@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { X, Loader2, AlertCircle, Info } from 'lucide-react'
+import { Label, Caption } from '@/components/ui/Typography'
 
 interface SnackbarProps {
   open: boolean
@@ -83,9 +84,9 @@ export default function Snackbar({
           <div className="flex items-start gap-3">
             <div className="flex-shrink-0 mt-0.5">{style.icon}</div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900">{title}</p>
+              <Label className="text-gray-900">{title}</Label>
               {message && (
-                <p className="text-xs text-gray-600 mt-1">{message}</p>
+                <Caption className="text-gray-600 mt-1">{message}</Caption>
               )}
             </div>
             {onClose && (

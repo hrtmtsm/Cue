@@ -168,9 +168,7 @@
 - File: `app/api/check-answer/route.ts`
 - Function: `POST` handler (line 3)
 - Returns: `{ correct, message, similarity }`
-- Uses: Levenshtein distance for similarity (line 49)
-
-**Feedback Generator**:
+- Uses: Levenshtein distance for similarity (line 49)**Feedback Generator**:
 - File: `lib/mockFeedbackGenerator.ts`
 - Function: `generateFeedback()` (line 4)
 - Logic: Heuristic-based, no true accuracy score

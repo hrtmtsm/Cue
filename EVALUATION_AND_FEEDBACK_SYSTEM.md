@@ -518,3 +518,6 @@ UI: Display feedback in PhraseCard components
 4. **Adaptive feedback**: Adjust feedback detail based on user level
 5. **Pattern learning**: Track which patterns users struggle with most
 
+
+
+

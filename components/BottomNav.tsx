@@ -2,42 +2,54 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useLocale, useTranslations } from 'next-intl'
 import { Play, TrendingUp, User } from 'lucide-react'
 import { shouldHideBottomNav } from '@/lib/navigationUtils'
+import { Caption } from '@/components/ui/Typography'
 
 export default function BottomNav() {
   const pathname = usePathname()
+  const locale = useLocale()
+  const t = useTranslations()
   const shouldHide = shouldHideBottomNav(pathname)
+
+  // Debug log (can be removed later)
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    console.log('🧭 [BottomNav] pathname:', pathname, 'locale:', locale)
+  }
 
   // Hide bottom nav in story/clip flow
   if (shouldHide) {
     return null
   }
 
-  const isActive = (path: string) => {
-    if (path === '/practice') {
-      return pathname === '/practice' || pathname?.startsWith('/practice/select')
-    }
-    return pathname === path || pathname?.startsWith(`${path}/`)
-  }
-
   const tabs = [
     {
-      name: 'Practice',
-      path: '/practice',
+      name: t('nav.practice'),
+      path: `/${locale}/practice`,
       icon: Play,
+      matchPaths: [`/${locale}/practice`, `/${locale}/practice/select`],
     },
     {
-      name: 'Progress',
-      path: '/progress',
+      name: t('nav.progress'),
+      path: `/${locale}/progress`,
       icon: TrendingUp,
+      matchPaths: [`/${locale}/progress`],
     },
     {
-      name: 'Profile',
-      path: '/profile',
+      name: t('nav.profile'),
+      path: `/${locale}/profile`,
       icon: User,
+      matchPaths: [`/${locale}/profile`],
     },
   ]
+
+  const isActive = (tab: typeof tabs[0]) => {
+    // Check if current pathname matches any of the tab's match paths
+    return tab.matchPaths.some(matchPath => {
+      return pathname === matchPath || pathname?.startsWith(`${matchPath}/`)
+    })
+  }
 
   return (
     <nav 
@@ -47,20 +59,26 @@ export default function BottomNav() {
         <div className="flex items-center justify-around h-16">
           {tabs.map((tab) => {
             const Icon = tab.icon
-            const active = isActive(tab.path)
+            const active = isActive(tab)
+            
+            // Debug logging
+            if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+              console.log(`🧭 [BottomNav] ${tab.name} - active:`, active, 'pathname:', pathname, 'matchPaths:', tab.matchPaths)
+            }
+            
             return (
               <Link
                 key={tab.path}
                 href={tab.path}
-                className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-                  active ? 'text-blue-600' : 'text-gray-500'
-                }`}
+                className="flex flex-col items-center justify-center flex-1 h-full transition-colors"
                 aria-label={tab.name}
               >
-                <Icon className={`w-6 h-6 mb-1 ${active ? 'text-blue-600' : 'text-gray-500'}`} />
-                <span className={`text-xs font-medium ${active ? 'text-blue-600' : 'text-gray-500'}`}>
+                <Icon className={`w-6 h-6 mb-1 transition-colors ${active ? 'text-blue-600' : 'text-gray-500'}`} />
+                <Caption 
+                  className={`transition-colors ${active ? 'text-blue-600' : 'text-gray-500'}`}
+                >
                   {tab.name}
-                </span>
+                </Caption>
               </Link>
             )
           })}
