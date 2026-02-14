@@ -742,9 +742,9 @@ export function prioritizeAndSelectTop3(
     })
   
   // Separate mistakes by type
-  const criticalMistakes = scored.filter(item => item.isMeaningCritical)
+  const criticalMistakes = scored.filter(item => (item as any).isMeaningCritical)
   const reductionCriticalMistakes = scored.filter(item => item.isReductionCritical && item.shouldSurface)
-  const otherMistakes = scored.filter(item => !item.isMeaningCritical && !item.isReductionCritical)
+  const otherMistakes = scored.filter(item => !(item as any).isMeaningCritical && !item.isReductionCritical)
   
   // Filter out mistakes with negative scores (trivial mistakes)
   // BUT: Always keep meaning-critical mistakes even if they have negative scores
@@ -779,7 +779,7 @@ export function prioritizeAndSelectTop3(
       token: item.event.expectedSpan,
       category: item.category,
       score: item.score.toFixed(1),
-      isMeaningCritical: item.isMeaningCritical,
+      isMeaningCritical: (item as any).isMeaningCritical,
       isReductionCritical: item.isReductionCritical,
       shouldSurface: item.shouldSurface
     })))
@@ -848,7 +848,7 @@ export function prioritizeAndSelectTop3(
     return isMeaningCritical(normalized)
   })
   
-  const allMeaningCritical = mistakesToUse.filter(item => item.isMeaningCritical)
+  const allMeaningCritical = mistakesToUse.filter(item => (item as any).isMeaningCritical)
   if (allMeaningCritical.length > 0 && !hasMeaningCriticalInTop3) {
     // Replace lowest-scoring non-meaning-critical with highest-scoring meaning-critical
     const top3WithScores = top3.map(e => ({
@@ -858,7 +858,7 @@ export function prioritizeAndSelectTop3(
     }))
     
     // Find lowest-scoring non-meaning-critical
-    const nonCritical = top3WithScores.filter(item => !item.isMeaningCritical)
+    const nonCritical = top3WithScores.filter(item => !(item as any).isMeaningCritical)
     if (nonCritical.length > 0) {
       nonCritical.sort((a, b) => a.score - b.score) // Lowest first
       const lowestIndex = top3.findIndex(e => e === nonCritical[0].event)
@@ -894,8 +894,8 @@ export function prioritizeAndSelectTop3(
     
     // Sort by: meaning-critical first, then score
     top3WithMetadata.sort((a, b) => {
-      if (a.isMeaningCritical && !b.isMeaningCritical) return -1
-      if (!a.isMeaningCritical && b.isMeaningCritical) return 1
+      if ((a as any).isMeaningCritical && !(b as any).isMeaningCritical) return -1
+      if (!(a as any).isMeaningCritical && (b as any).isMeaningCritical) return 1
       if (a.isReductionCritical && !b.isReductionCritical) return 1  // Prefer non-reduction-critical when equal
       if (!a.isReductionCritical && b.isReductionCritical) return -1
       return b.score - a.score
@@ -999,8 +999,8 @@ export function prioritizeAndSelectTop3(
         items: items.map(i => ({
           expectedSpan: i.event.expectedSpan,
           score: i.score.toFixed(1),
-          isMeaningCritical: i.isMeaningCritical || false,
-          isGrammarCritical: i.isGrammarCritical || false,
+          isMeaningCritical: (i as any).isMeaningCritical || false,
+          isGrammarCritical: (i as any).isGrammarCritical || false,
           category: i.category || 'content',
           shouldSurface: i.shouldSurface || false
         }))
