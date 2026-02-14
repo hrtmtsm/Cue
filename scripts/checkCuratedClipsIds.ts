@@ -114,7 +114,7 @@ async function checkClipIds() {
   }
   
   // Show sample of valid IDs
-  const validClips = allClips.filter(clip => clip.id && clip.id.trim() !== '')
+  const validClips = (allClips as any[]).filter(clip => clip?.id && clip.id.trim() !== '')
   if (validClips.length > 0) {
     console.log('📋 Sample of valid clip IDs (first 10):')
     validClips.slice(0, 10).forEach((clip, index) => {
