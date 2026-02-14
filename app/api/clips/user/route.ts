@@ -244,84 +244,86 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform to Clip format
-    const clips: Clip[] = clipsData.map((dbClip: any) => {
-      // Validate id field
-      if (!dbClip.id || dbClip.id.trim() === '') {
-        console.error('❌ [User Clips API] Clip with invalid id:', {
-          transcript: dbClip.transcript?.substring(0, 30),
-          allKeys: Object.keys(dbClip),
-        })
-        // Skip this clip or use a fallback ID
-        return null
-      }
-      // Map situation to Situation type
-      const situationMap: Record<string, Situation> = {
-        'work': 'Work',
-        'Work': 'Work',
-        'daily': 'Daily Life',
-        'Daily Life': 'Daily Life',
-        'social': 'Social',
-        'Social': 'Social',
-        'travel': 'Travel',
-        'Travel': 'Travel',
-        'media': 'Media',
-        'Media': 'Media',
-      }
+    const clips: Clip[] = clipsData
+      .map((dbClip: any) => {
+        // Validate id field
+        if (!dbClip.id || dbClip.id.trim() === '') {
+          console.error('❌ [User Clips API] Clip with invalid id:', {
+            transcript: dbClip.transcript?.substring(0, 30),
+            allKeys: Object.keys(dbClip),
+          })
+          // Skip this clip or use a fallback ID
+          return null
+        }
+        // Map situation to Situation type
+        const situationMap: Record<string, Situation> = {
+          'work': 'Work',
+          'Work': 'Work',
+          'daily': 'Daily Life',
+          'Daily Life': 'Daily Life',
+          'social': 'Social',
+          'Social': 'Social',
+          'travel': 'Travel',
+          'Travel': 'Travel',
+          'media': 'Media',
+          'Media': 'Media',
+        }
 
-      const situation = situationMap[dbClip.situation || ''] || 'Daily Life'
+        const situation = situationMap[dbClip.situation || ''] || 'Daily Life'
 
-      // Parse focus array (handle both string[] and JSON string)
-      let focus: string[] = []
-      if (Array.isArray(dbClip.focus_areas)) {
-        focus = dbClip.focus_areas
-      } else if (Array.isArray(dbClip.focus)) {
-        focus = dbClip.focus
-      } else if (typeof dbClip.focus_areas === 'string') {
-        try {
-          focus = JSON.parse(dbClip.focus_areas)
-        } catch {
+        // Parse focus array (handle both string[] and JSON string)
+        let focus: string[] = []
+        if (Array.isArray(dbClip.focus_areas)) {
+          focus = dbClip.focus_areas
+        } else if (Array.isArray(dbClip.focus)) {
+          focus = dbClip.focus
+        } else if (typeof dbClip.focus_areas === 'string') {
+          try {
+            focus = JSON.parse(dbClip.focus_areas)
+          } catch {
+            focus = ['connected_speech']
+          }
+        } else if (typeof dbClip.focus === 'string') {
+          try {
+            focus = JSON.parse(dbClip.focus)
+          } catch {
+            focus = ['connected_speech']
+          }
+        } else {
           focus = ['connected_speech']
         }
-      } else if (typeof dbClip.focus === 'string') {
-        try {
-          focus = JSON.parse(dbClip.focus)
-        } catch {
-          focus = ['connected_speech']
-        }
-      } else {
-        focus = ['connected_speech']
-      }
 
-      // Map CEFR to difficulty for frontend compatibility
-      const cefrToDifficulty = (cefr: string): 'easy' | 'medium' | 'hard' => {
-        switch (cefr) {
-          case 'A1':
-          case 'A2':
-            return 'easy'
-          case 'B1':
-            return 'medium'
-          case 'B2':
-          case 'C1':
-          case 'C2':
-            return 'hard'
-          default:
-            return 'medium'
+        // Map CEFR to difficulty for frontend compatibility
+        const cefrToDifficulty = (cefr: string): 'easy' | 'medium' | 'hard' => {
+          switch (cefr) {
+            case 'A1':
+            case 'A2':
+              return 'easy'
+            case 'B1':
+              return 'medium'
+            case 'B2':
+            case 'C1':
+            case 'C2':
+              return 'hard'
+            default:
+              return 'medium'
+          }
         }
-      }
 
-      return {
-        id: dbClip.id,
-        text: dbClip.transcript,
-        title: dbClip.title || 'Practice Clip',
-        audioUrl: dbClip.audio_url || '',
-        focus,
-        targetStyle: dbClip.target_style || 'Everyday conversations',
-        situation,
-        lengthSec: dbClip.length_sec || 15,
-        difficulty: dbClip.cefr ? cefrToDifficulty(dbClip.cefr) : 'medium',
-        createdAt: dbClip.created_at || new Date().toISOString(),
-      }
-    }).filter((clip): clip is Clip => clip !== null) // Remove null entries
+        return {
+          id: dbClip.id,
+          text: dbClip.transcript,
+          title: dbClip.title || 'Practice Clip',
+          audioUrl: dbClip.audio_url || '',
+          focus,
+          targetStyle: dbClip.target_style || 'Everyday conversations',
+          situation,
+          lengthSec: dbClip.length_sec || 15,
+          difficulty: dbClip.cefr ? cefrToDifficulty(dbClip.cefr) : 'medium',
+          createdAt: dbClip.created_at || new Date().toISOString(),
+        }
+      })
+      .filter((clip): clip is Clip => clip !== null)
 
     // DEBUG: Log clip IDs being returned
     console.log('✅ [User Clips API] Returning clips with IDs:', {
