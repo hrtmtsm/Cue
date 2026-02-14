@@ -85,9 +85,9 @@ export async function POST(req: NextRequest) {
     // Validate with Zod
     const validationResult = meaningRequestSchema.safeParse(body)
     if (!validationResult.success) {
-      const errorMessage = validationResult.error.errors.map(e => e.message).join(', ')
+      const errorMessage = validationResult.error.issues.map(e => e.message).join(', ')
       if (process.env.NODE_ENV === 'development') {
-        console.error('❌ [chunk/meaning] Validation error:', validationResult.error.errors)
+        console.error('❌ [chunk/meaning] Validation error:', validationResult.error.issues)
       }
       return NextResponse.json(
         { error: errorMessage },
