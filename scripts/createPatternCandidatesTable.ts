@@ -45,7 +45,11 @@ async function createTable() {
     
     // Use PostgREST doesn't support DDL, so we need to use a different approach
     // For now, let's try using the REST API with raw SQL
-    const { error } = await supabase.rpc('exec', { sql: statement }).catch(async () => {
+    let error;
+    try {
+      const result = await supabase.rpc('exec', { sql: statement });
+      error = result.error;
+    } catch {
       // If RPC doesn't exist, try direct query via REST
       const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/rpc/exec_sql`, {
         method: 'POST',
@@ -56,8 +60,8 @@ async function createTable() {
         },
         body: JSON.stringify({ sql: statement }),
       })
-      return { error: response.ok ? null : new Error(`HTTP ${response.status}`) }
-    })
+      error = response.ok ? null : new Error(`HTTP ${response.status}`)
+    }
     
     if (error) {
       console.warn(`   ⚠️  Statement ${i + 1} may have failed (this is OK if table/index already exists):`, error.message)
