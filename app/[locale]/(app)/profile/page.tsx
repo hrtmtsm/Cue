@@ -54,7 +54,7 @@ export default function ProfilePage() {
   }
 
   useEffect(() => {
-    async function loadUserData() {
+    const loadUserData = async () => {
       if (typeof window === 'undefined') return
 
       const supabase = getSupabaseClient()

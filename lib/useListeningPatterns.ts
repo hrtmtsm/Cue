@@ -22,7 +22,7 @@ export function useListeningPatterns(): UseListeningPatternsResult {
   useEffect(() => {
     let mounted = true
 
-    async function fetchPatterns() {
+    const fetchPatterns = async () => {
       try {
         const response = await fetch('/api/listening-patterns', {
           // Use default fetch cache settings - API route handles cache headers

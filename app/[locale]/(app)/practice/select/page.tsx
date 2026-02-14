@@ -605,7 +605,7 @@ export default function PracticeSelectPage() {
     }
 
     // Check if user has completed signup/login using Supabase auth
-    async function checkAuthStatus() {
+    const checkAuthStatus = async () => {
       try {
         const supabase = getSupabaseClient()
         await new Promise(resolve => setTimeout(resolve, 100)) // Small delay for auth init

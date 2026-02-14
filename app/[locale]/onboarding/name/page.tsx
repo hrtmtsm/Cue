@@ -24,7 +24,7 @@ export default function NamePage() {
   // Pre-fill name from Google if OAuth
   useEffect(() => {
     if (isGoogleAuth) {
-      async function loadGoogleName() {
+      const loadGoogleName = async () => {
         try {
           const supabase = getSupabaseClient()
           const { data: { user }, error: userError } = await supabase.auth.getUser()

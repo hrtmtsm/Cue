@@ -85,7 +85,7 @@ export default function PracticeSelectPage() {
 
   // Verify name exists in Supabase (one-time check on mount)
   useEffect(() => {
-    async function verifyNameInSupabase() {
+    const verifyNameInSupabase = async () => {
       try {
         const supabase = getSupabaseClient()
         // Use getSession() to avoid AuthSessionMissingError
@@ -253,7 +253,7 @@ export default function PracticeSelectPage() {
 
     // Check if user has completed signup/login
     // Use getUser() for more reliable auth state detection
-    async function checkAuthStatus() {
+    const checkAuthStatus = async () => {
       try {
         const supabase = getSupabaseClient()
         
