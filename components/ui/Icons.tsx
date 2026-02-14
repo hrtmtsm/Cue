@@ -1,7 +1,6 @@
 'use client'
 
 import { 
-  Sound,
   Speaker,
   SpeakerHigh,
   SpeakerNone,
@@ -29,7 +28,7 @@ export function SoundIcon({
   ...props 
 }: SoundIconProps) {
   return (
-    <Sound
+    <SpeakerHigh
       size={size}
       className={cn('text-current', className)}
       aria-label={ariaLabel}
