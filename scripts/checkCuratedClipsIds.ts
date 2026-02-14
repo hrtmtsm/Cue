@@ -78,7 +78,9 @@ async function checkClipIds() {
   console.log(`✅ Fetched ${allClips.length} clips from curated_clips\n`)
   
   // Check for NULL or empty IDs
-  const invalidClips = allClips.filter(clip => !clip.id || clip.id.trim() === '')
+  const invalidClips = (allClips as any[]).filter(clip => 
+    clip && typeof clip === 'object' && (!clip.id || clip.id.trim() === '')
+  )
   
   if (invalidClips.length > 0) {
     console.error(`❌ Found ${invalidClips.length} clips with NULL or empty id:\n`)
