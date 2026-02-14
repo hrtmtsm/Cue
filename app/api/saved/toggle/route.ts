@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
 
     const validationResult = toggleSchema.safeParse(body)
     if (!validationResult.success) {
-      const errorMessage = validationResult.error.errors.map(e => e.message).join(', ')
+      const errorMessage = validationResult.error.issues.map(e => e.message).join(', ')
       return NextResponse.json(
         { error: 'Validation error', message: errorMessage },
         { status: 400 }

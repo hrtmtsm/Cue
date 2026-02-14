@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     
     if (!validationResult.success) {
       return NextResponse.json(
-        { clipId: null, error: validationResult.error.errors.map(e => e.message).join(', ') },
+        { clipId: null, error: validationResult.error.issues.map(e => e.message).join(', ') },
         { status: 400 }
       )
     }
