@@ -200,7 +200,7 @@ export default function ProgressPage() {
         allClips.forEach(clip => clipsMap.set(clip.id, clip))
 
         // Debug: Show event clip IDs
-        const uniqueEventClipIds = [...new Set(events.map(e => e.clipId))]
+        const uniqueEventClipIds = Array.from(new Set(events.map(e => e.clipId)))
         console.log('📊 [PROGRESS PAGE] unique event clipIds:', uniqueEventClipIds.slice(0, 5), '...')
         
         // Debug: Check how many events match clips
