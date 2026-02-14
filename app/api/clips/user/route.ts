@@ -244,7 +244,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform to Clip format
-    const clips: Clip[] = clipsData
+    const clips = clipsData
       .map((dbClip: any) => {
         // Validate id field
         if (!dbClip.id || dbClip.id.trim() === '') {
