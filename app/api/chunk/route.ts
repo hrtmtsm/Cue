@@ -140,9 +140,9 @@ export async function POST(req: Request) {
     // Validate with Zod
     const validationResult = chunkRequestSchema.safeParse(body)
     if (!validationResult.success) {
-      const errorMessage = validationResult.error.errors.map(e => e.message).join(', ')
+      const errorMessage = validationResult.error.issues.map(e => e.message).join(', ')
       if (process.env.NODE_ENV === 'development') {
-        console.error('❌ [chunk] Validation error:', validationResult.error.errors)
+        console.error('❌ [chunk] Validation error:', validationResult.error.issues)
       }
       return NextResponse.json(
         { hit: null, error: errorMessage },
