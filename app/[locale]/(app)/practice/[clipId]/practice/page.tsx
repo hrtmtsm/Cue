@@ -19,7 +19,7 @@
  * 10. Verify: Meaning and "how it sounds" are context-specific (no jargon)
  */
 
-import { useEffect, useMemo, useState, useRef } from 'react'
+import { useEffect, useMemo, useState, useRef, Suspense } from 'react'
 import { useParams, useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useLocale } from 'next-intl'
 import ClipTopBar from '@/components/ClipTopBar'
