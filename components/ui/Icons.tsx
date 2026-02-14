@@ -1,10 +1,10 @@
 'use client'
 
 import { 
-  Speaker,
-  SpeakerHigh,
-  SpeakerNone,
-  SpeakerSlash,
+  SpeakerSimpleHigh,
+  SpeakerSimpleLow,
+  SpeakerSimpleNone,
+  SpeakerSimpleSlash,
   Waveform as AudioWave,
 } from '@phosphor-icons/react'
 import { IconProps } from '@phosphor-icons/react'
@@ -28,7 +28,7 @@ export function SoundIcon({
   ...props 
 }: SoundIconProps) {
   return (
-    <SpeakerHigh
+    <SpeakerSimpleHigh
       size={size}
       className={cn('text-current', className)}
       aria-label={ariaLabel}
@@ -47,7 +47,7 @@ export function SpeakerIcon({
   ...props 
 }: SoundIconProps) {
   return (
-    <Speaker
+    <SpeakerSimpleHigh
       size={size}
       className={cn('text-current', className)}
       aria-label={ariaLabel}
@@ -66,7 +66,7 @@ export function SpeakerHighIcon({
   ...props 
 }: SoundIconProps) {
   return (
-    <SpeakerHigh
+    <SpeakerSimpleHigh
       size={size}
       className={cn('text-current', className)}
       aria-label={ariaLabel}
@@ -85,7 +85,7 @@ export function SpeakerNoneIcon({
   ...props 
 }: SoundIconProps) {
   return (
-    <SpeakerNone
+    <SpeakerSimpleNone
       size={size}
       className={cn('text-current', className)}
       aria-label={ariaLabel}
@@ -104,7 +104,7 @@ export function SpeakerSlashIcon({
   ...props 
 }: SoundIconProps) {
   return (
-    <SpeakerSlash
+    <SpeakerSimpleSlash
       size={size}
       className={cn('text-current', className)}
       aria-label={ariaLabel}
