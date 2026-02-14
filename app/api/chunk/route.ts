@@ -1,4 +1,4 @@
-import { Request, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getSupabaseAdminClient } from '@/lib/supabase/server'
 import OpenAI from 'openai'
