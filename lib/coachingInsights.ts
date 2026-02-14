@@ -315,11 +315,11 @@ export async function generateCoachingInsight(input: {
     `- cause_type: "${cause_type || 'unknown'}"`,
     `- contextBefore: "${event.context?.before ?? ''}"`,
     `- contextAfter: "${event.context?.after ?? ''}"`,
-    ...(event.nearbyBefore && event.nearbyBefore.length > 0 ? [
-      `- nearbyBefore: ${event.nearbyBefore.join(', ')}`
+    ...((event as any).nearbyBefore?.length > 0 ? [
+      `- nearbyBefore: ${(event as any).nearbyBefore.join(', ')}`
     ] : []),
-    ...(event.nearbyAfter && event.nearbyAfter.length > 0 ? [
-      `- nearbyAfter: ${event.nearbyAfter.join(', ')}`
+    ...((event as any).nearbyAfter?.length > 0 ? [
+      `- nearbyAfter: ${(event as any).nearbyAfter.join(', ')}`
     ] : []),
     '',
     'IMPORTANT: If nearbyBefore or nearbyAfter exist, check if expectedSpan forms a phrasal verb or idiom with nearby words.',
