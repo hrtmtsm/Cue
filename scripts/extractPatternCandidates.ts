@@ -133,7 +133,7 @@ async function extractCandidates() {
     
     // Extract n-grams
     const ngrams = extractNGrams(tokens, 2, MAX_NGRAM)
-    for (const [ngram, count] of ngrams.entries()) {
+    for (const [ngram, count] of Array.from(ngrams.entries())) {
       if (!ngramMap.has(ngram)) {
         ngramMap.set(ngram, { frequency: 0, clipIds: new Set() })
       }
