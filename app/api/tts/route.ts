@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
     
     if (cached) {
       // Cache hit - return immediately
-      return new NextResponse(cached.audio, {
+      return new NextResponse(new Uint8Array(cached.audio), {
         headers: {
           'Content-Type': 'audio/mpeg',
           'Cache-Control': 'public, max-age=31536000, immutable',
