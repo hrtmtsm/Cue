@@ -30,10 +30,10 @@ type NumericSize = 'kpi' | 'stat'
 type LabelSize = 'nav' | 'kpiLabel' | 'action' | 'label'
 type Tone = 'default' | 'sub' | 'muted'
 
-interface BaseTypographyProps extends HTMLAttributes<HTMLElement> {
+interface BaseTypographyProps extends Omit<HTMLAttributes<HTMLElement>, 'as'> {
   children: ReactNode
   className?: string
-  as?: keyof JSX.IntrinsicElements
+  as?: React.ElementType
   tone?: Tone
 }
 
@@ -153,7 +153,7 @@ export function Heading({
         fontFamily: '"SF Pro Rounded", "SF Pro Rounded Semibold", ui-rounded, system-ui, sans-serif',
         ...props.style,
       }}
-      {...props}
+      {...(props as any)}
     >
       {children}
     </Component>
