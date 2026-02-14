@@ -21,14 +21,21 @@ async function checkClipIds() {
   
   // First, check table structure
   console.log('📋 Checking table structure...')
-  const { data: columns, error: columnsError } = await supabase.rpc('exec_sql', {
-    query: `
-      SELECT column_name, data_type 
-      FROM information_schema.columns 
-      WHERE table_name = 'curated_clips'
-      ORDER BY ordinal_position;
-    `
-  }).catch(async () => {
+  let columns: any[] | null = null
+  let columnsError: any = null
+  
+  try {
+    const result = await supabase.rpc('exec_sql', {
+      query: `
+        SELECT column_name, data_type 
+        FROM information_schema.columns 
+        WHERE table_name = 'curated_clips'
+        ORDER BY ordinal_position;
+      `
+    })
+    columns = result.data
+    columnsError = result.error
+  } catch {
     // Fallback: try direct query
     const { data, error } = await supabase
       .from('curated_clips')
@@ -37,10 +44,13 @@ async function checkClipIds() {
     
     if (data && data.length > 0) {
       console.log('📋 Table columns (from sample row):', Object.keys(data[0]))
-      return { data: Object.keys(data[0]).map(k => ({ column_name: k })), error: null }
+      columns = Object.keys(data[0]).map(k => ({ column_name: k }))
+      columnsError = null
+    } else {
+      columns = null
+      columnsError = error
     }
-    return { data: null, error }
-  })
+  }
   
   const hasUserId = columns?.some((c: any) => c.column_name === 'user_id') || false
   console.log(`  Has user_id column: ${hasUserId}\n`)
