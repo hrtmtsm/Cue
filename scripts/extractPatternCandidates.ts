@@ -144,7 +144,7 @@ async function extractCandidates() {
 
     // Extract phrasal verbs
     const phrasalVerbs = extractPhrasalVerbs(tokens)
-    for (const [phrase, count] of phrasalVerbs.entries()) {
+    for (const [phrase, count] of Array.from(phrasalVerbs.entries())) {
       if (!phrasalVerbMap.has(phrase)) {
         phrasalVerbMap.set(phrase, { frequency: 0, clipIds: new Set() })
       }
