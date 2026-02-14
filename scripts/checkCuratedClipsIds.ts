@@ -97,7 +97,7 @@ async function checkClipIds() {
   
   // Check for duplicate IDs
   const idCounts = new Map<string, number>()
-  allClips.forEach(clip => {
+  ;(allClips as any[]).forEach(clip => {
     if (clip.id) {
       idCounts.set(clip.id, (idCounts.get(clip.id) || 0) + 1)
     }
