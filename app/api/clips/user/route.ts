@@ -323,7 +323,7 @@ export async function GET(request: NextRequest) {
           createdAt: dbClip.created_at || new Date().toISOString(),
         }
       })
-      .filter((clip): clip is Clip => clip !== null)
+      .filter((clip) => clip !== null) as Clip[]
 
     // DEBUG: Log clip IDs being returned
     console.log('✅ [User Clips API] Returning clips with IDs:', {
