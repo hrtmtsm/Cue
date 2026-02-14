@@ -75,7 +75,6 @@ export default function BottomNav() {
               >
                 <Icon className={`w-6 h-6 mb-1 transition-colors ${active ? 'text-blue-600' : 'text-gray-500'}`} />
                 <Caption 
-                  weight="medium"
                   className={`transition-colors ${active ? 'text-blue-600' : 'text-gray-500'}`}
                 >
                   {tab.name}
