@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import { getSupabaseClient } from '@/lib/supabase/auth-helpers'
 import { Heading, Label, Caption } from '@/components/ui/Typography'
 
-export default function NamePage() {
+function NamePageContent() {
   const router = useRouter()
   const locale = useLocale()
   const searchParams = useSearchParams()
@@ -243,4 +243,14 @@ export default function NamePage() {
   )
 }
 
-
+export default function NamePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-gray-500">Loading...</div>
+      </div>
+    }>
+      <NamePageContent />
+    </Suspense>
+  )
+}

@@ -29,7 +29,7 @@ import { useClipLessonProgress } from '@/lib/clipLessonProgress'
 import { useListeningPatterns } from '@/lib/useListeningPatterns'
 import { saveTip, unsaveTip, type SaveTipData } from '@/lib/savedTips'
 
-export default function PracticeChunkPage() {
+function PracticeChunkPageContent() {
   const router = useRouter()
   const params = useParams<{ clipId: string }>()
   const searchParams = useSearchParams()
@@ -336,4 +336,14 @@ export default function PracticeChunkPage() {
   )
 }
 
-
+export default function PracticeChunkPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-500">Loading...</div>
+      </div>
+    }>
+      <PracticeChunkPageContent />
+    </Suspense>
+  )
+}

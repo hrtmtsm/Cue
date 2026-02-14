@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, Suspense } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useLocale } from 'next-intl'
 import { getStoryByIdClient } from '@/lib/storyClient'
 
-export default function StoryRedirectPage() {
+function StoryRedirectPageContent() {
   const params = useParams()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -54,6 +54,18 @@ export default function StoryRedirectPage() {
     <main className="flex min-h-screen flex-col items-center justify-center px-6">
       <div className="text-gray-500 text-sm">Loading your practice...</div>
     </main>
+  )
+}
+
+export default function StoryRedirectPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-500">Loading...</div>
+      </div>
+    }>
+      <StoryRedirectPageContent />
+    </Suspense>
   )
 }
 
