@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
@@ -73,7 +73,7 @@ const getStoryClipProgress = (story: Story | null): { completed: number; total: 
   return { completed, total, percent }
 }
 
-export default function PracticeSelectPage() {
+function PracticeSelectContent() {
   console.log('📍 [Practice Select] Page loaded');
   
   const router = useRouter()
@@ -1677,5 +1677,17 @@ export default function PracticeSelectPage() {
         </div>
       )}
     </main>
+  )
+}
+
+export default function PracticeSelectPage() {
+  return (
+    <Suspense fallback={
+      <main className="flex min-h-screen flex-col items-center justify-center px-6">
+        <div className="text-gray-500">Loading...</div>
+      </main>
+    }>
+      <PracticeSelectContent />
+    </Suspense>
   )
 }
