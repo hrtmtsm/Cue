@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import { Suspense, useEffect, useState } from 'react'
-import { markStoryCompleted, getNextUncompletedStory } from '@/lib/storyRotation'
+import { markStoryCompleted, getNextUncompletedStory, getCompletedStories } from '@/lib/storyRotation'
 import { useSubscription } from '@/lib/useSubscription'
 import { loadUserStories } from '@/lib/storyClient'
 import { getListeningProfile, getUserPreferences } from '@/lib/userPreferences'
@@ -42,6 +42,11 @@ function PracticeCompletePageContent() {
     
     try {
       setIsStartingSession(true)
+      
+      // Safety: ensure current story is marked as completed before selecting next
+      if (storyId) {
+        markStoryCompleted(storyId)
+      }
       
       // Load all stories
       const stories = await loadUserStories()
@@ -93,20 +98,67 @@ function PracticeCompletePageContent() {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
+    // ✅ IMMEDIATELY mark story as completed in localStorage (BEFORE any async work)
+    // This is critical: if user clicks "Done" quickly, async API calls might not finish,
+    // but story rotation needs to know this story is done RIGHT NOW.
+    if (storyId) {
+      console.log('📚 [COMPLETE PAGE] Immediately marking story as completed:', storyId)
+      markStoryCompleted(storyId)
+      
+      // Verify it was saved
+      const completed = getCompletedStories()
+      const isMarked = completed.includes(storyId)
+      console.log('✅ [COMPLETE PAGE] Story completion status (immediate):', {
+        storyId,
+        marked: isMarked,
+        allCompleted: completed,
+      })
+      
+      if (!isMarked) {
+        console.error('❌ [COMPLETE PAGE] Story was NOT marked as completed!', {
+          storyId,
+          completedStories: completed,
+        })
+      }
+    } else {
+      console.warn('⚠️ [COMPLETE PAGE] No storyId in URL params - story not marked as completed', {
+        searchParams: window.location.search,
+      })
+    }
+
+    // Now do async progress updates (can complete in background)
     const updateProgressData = async () => {
       try {
+        console.log('📊 [COMPLETE PAGE] Starting progress update...', {
+          storyId,
+          urlParams: window.location.search,
+        })
+
         const todayKey = new Date().toISOString().split('T')[0]
 
         // Get current progress from DB
+        console.log('📊 [COMPLETE PAGE] Fetching current progress from DB...')
         const result = await getProgress()
         if (!result.success || !result.progress) {
-          console.error('❌ [COMPLETE PAGE] Failed to get progress:', result.error)
+          console.error('❌ [COMPLETE PAGE] Failed to get progress:', {
+            success: result.success,
+            error: result.error,
+            progress: result.progress,
+          })
           return
         }
 
         const progress = result.progress
         const lastPracticeDate = progress.last_practice_date
         const currentStreak = progress.streak
+
+        console.log('📊 [COMPLETE PAGE] Current progress:', {
+          streak: currentStreak,
+          lastPracticeDate,
+          totalSessions: progress.total_sessions,
+          totalMinutes: progress.total_listening_minutes,
+          completedStories: progress.completed_stories?.length || 0,
+        })
 
         // Compute whether this is a new day and if it's consecutive
         const today = new Date()
@@ -134,6 +186,14 @@ function PracticeCompletePageContent() {
           }
         }
 
+        console.log('📊 [COMPLETE PAGE] Updating progress with:', {
+          sessions: 1,
+          minutes: 1,
+          story: storyId,
+          streak: nextStreak,
+          lastPracticeDate: todayKey,
+        })
+
         // Update progress in DB: increment session, update streak, add story to completed list
         const updateResult = await incrementProgress({
           sessions: 1,
@@ -147,20 +207,25 @@ function PracticeCompletePageContent() {
 
         if (updateResult.success && updateResult.progress) {
           setStreak(updateResult.progress.streak)
-          console.log('✅ [COMPLETE PAGE] Progress updated:', updateResult.progress)
+          console.log('✅ [COMPLETE PAGE] Progress updated successfully:', {
+            streak: updateResult.progress.streak,
+            totalSessions: updateResult.progress.total_sessions,
+            totalMinutes: updateResult.progress.total_listening_minutes,
+            completedStories: updateResult.progress.completed_stories?.length || 0,
+          })
         } else {
-          console.error('❌ [COMPLETE PAGE] Failed to update progress:', updateResult.error)
-        }
-
-        // ✅ Mark story as completed for rotation
-        if (storyId) {
-          markStoryCompleted(storyId)
-          console.log('✅ [COMPLETE PAGE] Story completed and marked:', storyId)
-        } else {
-          console.warn('⚠️ [COMPLETE PAGE] No storyId in URL params - story not marked as completed')
+          console.error('❌ [COMPLETE PAGE] Failed to update progress:', {
+            success: updateResult.success,
+            error: updateResult.error,
+            progress: updateResult.progress,
+          })
         }
       } catch (error) {
-        console.error('❌ [COMPLETE PAGE] Error updating progress:', error)
+        console.error('❌ [COMPLETE PAGE] Error updating progress:', error, {
+          errorMessage: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : undefined,
+          storyId,
+        })
       }
     }
 
