@@ -42,8 +42,9 @@ export function convertClipsToStories(clips: Clip[]): Story[] {
   
   // Create stories from grouped clips
   for (const [situation, situationClips] of Array.from(clipsBySituation.entries())) {
-    // Randomly select 4 or 5 clips per story for better variety and learning depth
-    const clipsPerStory = Math.random() < 0.5 ? 4 : 5
+    // Use 4 clips per story (deterministic to ensure consistent story IDs across regeneration)
+    // This prevents story rotation from breaking when stories are re-created
+    const clipsPerStory = 4
     console.log(`📚 [convertClipsToStories] Processing situation "${situation}":`, {
       clipsInSituation: situationClips.length,
       clipsPerStory,

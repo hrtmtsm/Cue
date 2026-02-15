@@ -43,6 +43,11 @@ function PracticeCompletePageContent() {
     try {
       setIsStartingSession(true)
       
+      // Safety: ensure current story is marked as completed before selecting next
+      if (storyId) {
+        markStoryCompleted(storyId)
+      }
+      
       // Load all stories
       const stories = await loadUserStories()
       
@@ -93,21 +98,41 @@ function PracticeCompletePageContent() {
   useEffect(() => {
     if (typeof window === 'undefined') return
 
+    // ✅ IMMEDIATELY mark story as completed in localStorage (BEFORE any async work)
+    // This is critical: if user clicks "Done" quickly, async API calls might not finish,
+    // but story rotation needs to know this story is done RIGHT NOW.
+    if (storyId) {
+      console.log('📚 [COMPLETE PAGE] Immediately marking story as completed:', storyId)
+      markStoryCompleted(storyId)
+      
+      // Verify it was saved
+      const completed = getCompletedStories()
+      const isMarked = completed.includes(storyId)
+      console.log('✅ [COMPLETE PAGE] Story completion status (immediate):', {
+        storyId,
+        marked: isMarked,
+        allCompleted: completed,
+      })
+      
+      if (!isMarked) {
+        console.error('❌ [COMPLETE PAGE] Story was NOT marked as completed!', {
+          storyId,
+          completedStories: completed,
+        })
+      }
+    } else {
+      console.warn('⚠️ [COMPLETE PAGE] No storyId in URL params - story not marked as completed', {
+        searchParams: window.location.search,
+      })
+    }
+
+    // Now do async progress updates (can complete in background)
     const updateProgressData = async () => {
       try {
         console.log('📊 [COMPLETE PAGE] Starting progress update...', {
           storyId,
           urlParams: window.location.search,
         })
-
-        // Validate storyId
-        if (!storyId) {
-          console.error('❌ [COMPLETE PAGE] Missing storyId in URL params!', {
-            searchParams: window.location.search,
-            fullUrl: window.location.href,
-          })
-          // Don't return early - still try to update progress without story
-        }
 
         const todayKey = new Date().toISOString().split('T')[0]
 
@@ -120,11 +145,6 @@ function PracticeCompletePageContent() {
             error: result.error,
             progress: result.progress,
           })
-          // Still try to mark story as completed even if progress fetch fails
-          if (storyId) {
-            markStoryCompleted(storyId)
-            console.log('✅ [COMPLETE PAGE] Story marked as completed (progress fetch failed)')
-          }
           return
         }
 
@@ -198,33 +218,6 @@ function PracticeCompletePageContent() {
             success: updateResult.success,
             error: updateResult.error,
             progress: updateResult.progress,
-          })
-        }
-
-        // ✅ Mark story as completed for rotation (do this even if progress update fails)
-        if (storyId) {
-          console.log('📚 [COMPLETE PAGE] Marking story as completed:', storyId)
-          markStoryCompleted(storyId)
-          
-          // Verify it was marked
-          const completed = getCompletedStories()
-          const isMarked = completed.includes(storyId)
-          
-          console.log('✅ [COMPLETE PAGE] Story completion status:', {
-            storyId,
-            marked: isMarked,
-            allCompleted: completed,
-          })
-          
-          if (!isMarked) {
-            console.error('❌ [COMPLETE PAGE] Story was NOT marked as completed!', {
-              storyId,
-              completedStories: completed,
-            })
-          }
-        } else {
-          console.warn('⚠️ [COMPLETE PAGE] No storyId in URL params - story not marked as completed', {
-            searchParams: window.location.search,
           })
         }
       } catch (error) {

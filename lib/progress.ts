@@ -315,11 +315,13 @@ export async function migrateLocalStorageToDb(): Promise<boolean> {
 
       if (result.success) {
         console.log('✅ [migrate] Migration successful')
-        // Clean up old keys
+        // Clean up old keys (but NOT completedStories - still used by storyRotation.ts)
         localStorage.removeItem('streak')
         localStorage.removeItem('lastPracticeDate')
         localStorage.removeItem('lastSessionCompleted')
-        localStorage.removeItem('completedStories')
+        // NOTE: Do NOT remove 'completedStories' - storyRotation.ts reads from localStorage
+        // to track which stories the user has completed for the rotation system.
+        // Removing it would cause the same story to be shown again.
         localStorage.setItem('progress_migrated', 'true')
         return true
       } else {
