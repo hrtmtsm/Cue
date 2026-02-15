@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
+import { trackEvent } from '@/lib/posthog/usePostHog'
 
 export default function Hero({ locale }: { locale: string }) {
   const [mounted, setMounted] = useState(false)
@@ -39,12 +40,14 @@ export default function Hero({ locale }: { locale: string }) {
             <div className="flex flex-col sm:flex-row gap-4 pt-4 justify-center">
               <Link
                 href={`/${locale}/auth`}
+                onClick={() => trackEvent('cta_clicked', { location: 'hero', type: 'signup' })}
                 className="px-8 py-4 bg-blue-600 text-white rounded-xl text-lg font-semibold hover:bg-blue-700 transition-colors text-center shadow-lg hover:shadow-xl font-inter"
               >
                 {t('cta_primary')}
               </Link>
               <Link
                 href={`/${locale}/auth/login`}
+                onClick={() => trackEvent('cta_clicked', { location: 'hero', type: 'login' })}
                 className="px-8 py-4 border-2 border-gray-300 text-gray-700 rounded-xl text-lg font-semibold hover:border-gray-400 hover:bg-gray-50 transition text-center font-inter"
               >
                 {t('cta_secondary')}

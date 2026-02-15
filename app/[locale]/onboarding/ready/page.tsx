@@ -9,6 +9,7 @@ import { getOnboardingData } from '@/lib/onboardingStore'
 import { Clip } from '@/lib/clipTypes'
 import { convertClipsToStories } from '@/lib/clipToStoryConverter'
 import { saveUserStories } from '@/lib/storyClient'
+import { trackEvent } from '@/lib/posthog/usePostHog'
 
 export default function ReadyPage() {
   const router = useRouter()
@@ -84,6 +85,9 @@ export default function ReadyPage() {
         
         // Small delay to ensure localStorage is committed before navigation
         await new Promise(resolve => setTimeout(resolve, 50))
+        
+        // Track onboarding completion
+        trackEvent('onboarding_completed')
         
         // Route to diagnostic session
         console.log('✅ [DIAGNOSTIC] Navigating to /onboarding/diagnosis')

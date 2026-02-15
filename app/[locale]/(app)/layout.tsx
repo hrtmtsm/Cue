@@ -1,11 +1,13 @@
 'use client'
 
+import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import BottomNav from '@/components/BottomNav'
 import Sidebar from '@/components/Sidebar'
 import LearningLayout from '@/components/LearningLayout'
 import { shouldHideBottomNav, isLearningRoute } from '@/lib/navigationUtils'
 import { ClipLessonProgressProvider } from '@/lib/clipLessonProgress'
+import { trackEvent } from '@/lib/posthog/usePostHog'
 
 export default function AppLayout({
   children,
@@ -15,6 +17,12 @@ export default function AppLayout({
   const pathname = usePathname()
   const shouldHide = shouldHideBottomNav(pathname)
   const isLearning = isLearningRoute(pathname)
+
+  // Track app session for retention analysis
+  useEffect(() => {
+    // Fires when user enters any authenticated page
+    trackEvent('app_session')
+  }, [])
 
   // Practice complete page needs full viewport (no padding/margins)
   const isCompletePage = pathname?.includes('/practice/complete')
