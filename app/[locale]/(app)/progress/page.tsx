@@ -56,28 +56,36 @@ export default function ProgressPage() {
         console.log('📊 [PROGRESS PAGE] Checking for migration')
         await migrateLocalStorageToDb()
 
-        // Then load progress from DB
-        console.log('📊 [PROGRESS PAGE] Loading progress from DB')
-        const result = await getProgress()
+        // Clear cache to force fresh fetch from DB
+        console.log('📊 [PROGRESS PAGE] Loading progress from DB (force refresh)')
+        const result = await getProgress(true) // Force refresh
         
         if (result.success && result.progress) {
           const progress = result.progress
-          setStreak(progress.streak)
-          setTotalSessions(progress.total_sessions)
-          setListeningMinutes(progress.total_listening_minutes)
-          setCompletedStoriesCount(progress.completed_stories.length)
+          setStreak(progress.streak || 0)
+          setTotalSessions(progress.total_sessions || 0)
+          setListeningMinutes(progress.total_listening_minutes || 0)
+          setCompletedStoriesCount(progress.completed_stories?.length || 0)
 
           console.log('✅ [PROGRESS PAGE] Progress loaded:', {
             streak: progress.streak,
             sessions: progress.total_sessions,
             minutes: progress.total_listening_minutes,
-            completedStories: progress.completed_stories.length,
+            completedStories: progress.completed_stories?.length || 0,
+            lastPracticeDate: progress.last_practice_date,
           })
         } else {
-          console.error('❌ [PROGRESS PAGE] Failed to load progress:', result.error)
+          console.error('❌ [PROGRESS PAGE] Failed to load progress:', {
+            success: result.success,
+            error: result.error,
+            progress: result.progress,
+          })
         }
       } catch (error) {
-        console.error('❌ [PROGRESS PAGE] Error loading progress:', error)
+        console.error('❌ [PROGRESS PAGE] Error loading progress:', {
+          error: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : undefined,
+        })
       } finally {
         setIsLoading(false)
       }
@@ -146,6 +154,36 @@ export default function ProgressPage() {
     loadSavedItems()
     loadVocab()
     loadTips()
+  }, [])
+
+  // Refresh progress when page becomes visible (user returns from complete page)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('📊 [PROGRESS PAGE] Page visible - refreshing progress')
+        const loadProgress = async () => {
+          try {
+            const result = await getProgress(true) // Force refresh
+            if (result.success && result.progress) {
+              const progress = result.progress
+              setStreak(progress.streak || 0)
+              setTotalSessions(progress.total_sessions || 0)
+              setListeningMinutes(progress.total_listening_minutes || 0)
+              setCompletedStoriesCount(progress.completed_stories?.length || 0)
+              console.log('✅ [PROGRESS PAGE] Progress refreshed on visibility change')
+            }
+          } catch (error) {
+            console.error('❌ [PROGRESS PAGE] Error refreshing progress:', error)
+          }
+        }
+        loadProgress()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [])
 
   // Load practice events and calculate metrics

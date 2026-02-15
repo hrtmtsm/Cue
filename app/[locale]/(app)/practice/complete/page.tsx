@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import { Suspense, useEffect, useState } from 'react'
-import { markStoryCompleted, getNextUncompletedStory } from '@/lib/storyRotation'
+import { markStoryCompleted, getNextUncompletedStory, getCompletedStories } from '@/lib/storyRotation'
 import { useSubscription } from '@/lib/useSubscription'
 import { loadUserStories } from '@/lib/storyClient'
 import { getListeningProfile, getUserPreferences } from '@/lib/userPreferences'
@@ -95,18 +95,50 @@ function PracticeCompletePageContent() {
 
     const updateProgressData = async () => {
       try {
+        console.log('📊 [COMPLETE PAGE] Starting progress update...', {
+          storyId,
+          urlParams: window.location.search,
+        })
+
+        // Validate storyId
+        if (!storyId) {
+          console.error('❌ [COMPLETE PAGE] Missing storyId in URL params!', {
+            searchParams: window.location.search,
+            fullUrl: window.location.href,
+          })
+          // Don't return early - still try to update progress without story
+        }
+
         const todayKey = new Date().toISOString().split('T')[0]
 
         // Get current progress from DB
+        console.log('📊 [COMPLETE PAGE] Fetching current progress from DB...')
         const result = await getProgress()
         if (!result.success || !result.progress) {
-          console.error('❌ [COMPLETE PAGE] Failed to get progress:', result.error)
+          console.error('❌ [COMPLETE PAGE] Failed to get progress:', {
+            success: result.success,
+            error: result.error,
+            progress: result.progress,
+          })
+          // Still try to mark story as completed even if progress fetch fails
+          if (storyId) {
+            markStoryCompleted(storyId)
+            console.log('✅ [COMPLETE PAGE] Story marked as completed (progress fetch failed)')
+          }
           return
         }
 
         const progress = result.progress
         const lastPracticeDate = progress.last_practice_date
         const currentStreak = progress.streak
+
+        console.log('📊 [COMPLETE PAGE] Current progress:', {
+          streak: currentStreak,
+          lastPracticeDate,
+          totalSessions: progress.total_sessions,
+          totalMinutes: progress.total_listening_minutes,
+          completedStories: progress.completed_stories?.length || 0,
+        })
 
         // Compute whether this is a new day and if it's consecutive
         const today = new Date()
@@ -134,6 +166,14 @@ function PracticeCompletePageContent() {
           }
         }
 
+        console.log('📊 [COMPLETE PAGE] Updating progress with:', {
+          sessions: 1,
+          minutes: 1,
+          story: storyId,
+          streak: nextStreak,
+          lastPracticeDate: todayKey,
+        })
+
         // Update progress in DB: increment session, update streak, add story to completed list
         const updateResult = await incrementProgress({
           sessions: 1,
@@ -147,20 +187,52 @@ function PracticeCompletePageContent() {
 
         if (updateResult.success && updateResult.progress) {
           setStreak(updateResult.progress.streak)
-          console.log('✅ [COMPLETE PAGE] Progress updated:', updateResult.progress)
+          console.log('✅ [COMPLETE PAGE] Progress updated successfully:', {
+            streak: updateResult.progress.streak,
+            totalSessions: updateResult.progress.total_sessions,
+            totalMinutes: updateResult.progress.total_listening_minutes,
+            completedStories: updateResult.progress.completed_stories?.length || 0,
+          })
         } else {
-          console.error('❌ [COMPLETE PAGE] Failed to update progress:', updateResult.error)
+          console.error('❌ [COMPLETE PAGE] Failed to update progress:', {
+            success: updateResult.success,
+            error: updateResult.error,
+            progress: updateResult.progress,
+          })
         }
 
-        // ✅ Mark story as completed for rotation
+        // ✅ Mark story as completed for rotation (do this even if progress update fails)
         if (storyId) {
+          console.log('📚 [COMPLETE PAGE] Marking story as completed:', storyId)
           markStoryCompleted(storyId)
-          console.log('✅ [COMPLETE PAGE] Story completed and marked:', storyId)
+          
+          // Verify it was marked
+          const completed = getCompletedStories()
+          const isMarked = completed.includes(storyId)
+          
+          console.log('✅ [COMPLETE PAGE] Story completion status:', {
+            storyId,
+            marked: isMarked,
+            allCompleted: completed,
+          })
+          
+          if (!isMarked) {
+            console.error('❌ [COMPLETE PAGE] Story was NOT marked as completed!', {
+              storyId,
+              completedStories: completed,
+            })
+          }
         } else {
-          console.warn('⚠️ [COMPLETE PAGE] No storyId in URL params - story not marked as completed')
+          console.warn('⚠️ [COMPLETE PAGE] No storyId in URL params - story not marked as completed', {
+            searchParams: window.location.search,
+          })
         }
       } catch (error) {
-        console.error('❌ [COMPLETE PAGE] Error updating progress:', error)
+        console.error('❌ [COMPLETE PAGE] Error updating progress:', error, {
+          errorMessage: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : undefined,
+          storyId,
+        })
       }
     }
 

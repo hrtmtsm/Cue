@@ -107,10 +107,27 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const { userId } = await resolveUserId(request)
+    
+    if (!userId) {
+      console.error('❌ [PATCH /api/progress] No userId resolved')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
     const supabase = getSupabaseAdminClient()
     const body = await request.json()
 
-    console.log('📊 [PATCH /api/progress] Incrementing progress for user:', userId, body)
+    console.log('📊 [PATCH /api/progress] Incrementing progress for user:', {
+      userId: userId.substring(0, 8) + '...',
+      body: {
+        increment_sessions: body.increment_sessions,
+        increment_minutes: body.increment_minutes,
+        add_story: body.add_story,
+        update_streak: body.update_streak ? {
+          streak: body.update_streak.streak,
+          last_practice_date: body.update_streak.last_practice_date,
+        } : undefined,
+      },
+    })
 
     const {
       increment_sessions,
@@ -120,6 +137,7 @@ export async function PATCH(request: NextRequest) {
     } = body
 
     // First, get current progress
+    console.log('📊 [PATCH /api/progress] Fetching current progress from DB...')
     const { data: currentProgress, error: fetchError } = await supabase
       .from('user_progress')
       .select('*')
@@ -127,8 +145,23 @@ export async function PATCH(request: NextRequest) {
       .single()
 
     if (fetchError && fetchError.code !== 'PGRST116') {
-      console.error('❌ [PATCH /api/progress] Error fetching current progress:', fetchError)
+      console.error('❌ [PATCH /api/progress] Error fetching current progress:', {
+        error: fetchError.message,
+        code: fetchError.code,
+        details: fetchError,
+      })
       return NextResponse.json({ error: fetchError.message }, { status: 500 })
+    }
+
+    if (currentProgress) {
+      console.log('📊 [PATCH /api/progress] Current progress:', {
+        streak: currentProgress.streak,
+        totalSessions: currentProgress.total_sessions,
+        totalMinutes: currentProgress.total_listening_minutes,
+        completedStories: currentProgress.completed_stories?.length || 0,
+      })
+    } else {
+      console.log('📊 [PATCH /api/progress] No existing progress - creating new record')
     }
 
     // Build update object
@@ -172,6 +205,15 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Upsert the progress
+    console.log('📊 [PATCH /api/progress] Upserting progress with updates:', {
+      user_id: updates.user_id?.substring(0, 8) + '...',
+      total_sessions: updates.total_sessions,
+      total_listening_minutes: updates.total_listening_minutes,
+      streak: updates.streak,
+      last_practice_date: updates.last_practice_date,
+      completed_stories_count: updates.completed_stories?.length || 0,
+    })
+    
     const { data, error } = await supabase
       .from('user_progress')
       .upsert(updates, { onConflict: 'user_id' })
@@ -179,11 +221,27 @@ export async function PATCH(request: NextRequest) {
       .single()
 
     if (error) {
-      console.error('❌ [PATCH /api/progress] Error updating progress:', error)
+      console.error('❌ [PATCH /api/progress] Error updating progress:', {
+        error: error.message,
+        code: error.code,
+        details: error,
+        updates,
+      })
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    console.log('✅ [PATCH /api/progress] Progress incremented:', data)
+    if (!data) {
+      console.error('❌ [PATCH /api/progress] No data returned from upsert')
+      return NextResponse.json({ error: 'No data returned from database' }, { status: 500 })
+    }
+
+    console.log('✅ [PATCH /api/progress] Progress incremented successfully:', {
+      streak: data.streak,
+      totalSessions: data.total_sessions,
+      totalMinutes: data.total_listening_minutes,
+      completedStories: data.completed_stories?.length || 0,
+    })
+    
     return NextResponse.json({ success: true, progress: data })
   } catch (error: any) {
     console.error('❌ [PATCH /api/progress] Error:', error)

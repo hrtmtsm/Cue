@@ -68,33 +68,67 @@ function clearCache(): void {
 /**
  * Get user's progress (from cache or DB)
  */
-export async function getProgress(): Promise<{
+export async function getProgress(forceRefresh = false): Promise<{
   success: boolean
   progress?: UserProgress
   error?: string
 }> {
-  // Try cache first
-  const cached = getCachedProgress()
-  if (cached) {
-    return { success: true, progress: cached }
+  // Try cache first (unless force refresh)
+  if (!forceRefresh) {
+    const cached = getCachedProgress()
+    if (cached) {
+      console.log('📊 [getProgress] Using cached progress')
+      return { success: true, progress: cached }
+    }
+  } else {
+    clearCache()
   }
 
   // Fetch from DB
   try {
-    console.log('📊 [getProgress] Fetching from DB')
-    const response = await fetch('/api/progress')
+    console.log('📊 [getProgress] Fetching from DB...', { forceRefresh })
+    const response = await fetch('/api/progress', {
+      cache: forceRefresh ? 'no-store' : 'default',
+    })
+    
+    console.log('📊 [getProgress] API response:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+    })
+
     const data = await response.json()
 
     if (!response.ok) {
-      console.error('❌ [getProgress] API error:', data.error)
+      console.error('❌ [getProgress] API error:', {
+        status: response.status,
+        error: data.error,
+        response: data,
+      })
       return { success: false, error: data.error || 'Failed to fetch progress' }
     }
 
+    // Validate response structure
+    if (!data.progress) {
+      console.error('❌ [getProgress] Invalid response structure:', data)
+      return { success: false, error: 'Invalid response from server' }
+    }
+
     const progress = data.progress
+    console.log('✅ [getProgress] Progress fetched:', {
+      streak: progress.streak,
+      totalSessions: progress.total_sessions,
+      totalMinutes: progress.total_listening_minutes,
+      completedStories: progress.completed_stories?.length || 0,
+    })
+    
     setCachedProgress(progress)
     return { success: true, progress }
   } catch (error: any) {
-    console.error('❌ [getProgress] Network error:', error)
+    console.error('❌ [getProgress] Network error:', {
+      error: error.message,
+      errorStack: error.stack,
+    })
     return { success: false, error: error.message || 'Network error' }
   }
 }
@@ -138,33 +172,105 @@ export async function incrementProgress(options: {
   story?: string
   streak?: { streak: number; last_practice_date: string }
 }): Promise<{ success: boolean; progress?: UserProgress; error?: string }> {
-  try {
-    console.log('📊 [incrementProgress] Incrementing:', options)
-    const response = await fetch('/api/progress', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        increment_sessions: options.sessions,
-        increment_minutes: options.minutes,
-        add_story: options.story,
-        update_streak: options.streak,
-      }),
-    })
+  const maxRetries = 2
+  let lastError: string | undefined
 
-    const data = await response.json()
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      if (attempt > 0) {
+        console.log(`🔄 [incrementProgress] Retry attempt ${attempt}/${maxRetries}...`)
+        // Wait before retry (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
+      }
 
-    if (!response.ok) {
-      console.error('❌ [incrementProgress] API error:', data.error)
-      return { success: false, error: data.error || 'Failed to increment progress' }
+      console.log('📊 [incrementProgress] Incrementing:', {
+        ...options,
+        attempt: attempt + 1,
+        maxRetries: maxRetries + 1,
+      })
+
+      const response = await fetch('/api/progress', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          increment_sessions: options.sessions,
+          increment_minutes: options.minutes,
+          add_story: options.story,
+          update_streak: options.streak,
+        }),
+      })
+
+      console.log('📊 [incrementProgress] API response:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        const errorMsg = data.error || `HTTP ${response.status}: ${response.statusText}`
+        console.error('❌ [incrementProgress] API error:', {
+          status: response.status,
+          error: errorMsg,
+          response: data,
+          attempt: attempt + 1,
+        })
+        
+        lastError = errorMsg
+        
+        // Don't retry on 401 (auth error) or 400 (bad request)
+        if (response.status === 401 || response.status === 400) {
+          return { success: false, error: errorMsg }
+        }
+        
+        // Retry on 500 or network errors
+        if (attempt < maxRetries) {
+          continue
+        }
+        
+        return { success: false, error: errorMsg }
+      }
+
+      // Success - verify response structure
+      if (!data.progress) {
+        console.error('❌ [incrementProgress] Invalid response structure:', data)
+        return { success: false, error: 'Invalid response from server' }
+      }
+
+      const updatedProgress = data.progress
+      
+      console.log('✅ [incrementProgress] Progress updated successfully:', {
+        streak: updatedProgress.streak,
+        totalSessions: updatedProgress.total_sessions,
+        totalMinutes: updatedProgress.total_listening_minutes,
+        completedStories: updatedProgress.completed_stories?.length || 0,
+      })
+
+      // Clear cache and set new progress
+      clearCache()
+      setCachedProgress(updatedProgress)
+      
+      return { success: true, progress: updatedProgress }
+    } catch (error: any) {
+      const errorMsg = error.message || 'Network error'
+      console.error('❌ [incrementProgress] Network error:', {
+        error: errorMsg,
+        attempt: attempt + 1,
+        errorStack: error.stack,
+      })
+      
+      lastError = errorMsg
+      
+      // Retry on network errors
+      if (attempt < maxRetries) {
+        continue
+      }
     }
-
-    const updatedProgress = data.progress
-    setCachedProgress(updatedProgress)
-    return { success: true, progress: updatedProgress }
-  } catch (error: any) {
-    console.error('❌ [incrementProgress] Network error:', error)
-    return { success: false, error: error.message || 'Network error' }
   }
+
+  // All retries failed
+  return { success: false, error: lastError || 'Failed to increment progress after retries' }
 }
 
 // ============================================================================

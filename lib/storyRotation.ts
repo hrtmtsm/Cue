@@ -30,24 +30,51 @@ export function getCompletedStories(): string[] {
  * Mark a story as completed
  */
 export function markStoryCompleted(storyId: string): void {
-  if (typeof window === 'undefined') return
+  if (typeof window === 'undefined') {
+    console.warn('⚠️ [StoryRotation] markStoryCompleted called on server - skipping')
+    return
+  }
+  
+  if (!storyId || typeof storyId !== 'string' || storyId.trim() === '') {
+    console.error('❌ [StoryRotation] Invalid storyId provided to markStoryCompleted:', storyId)
+    return
+  }
   
   try {
     const completed = getCompletedStories()
     
-    if (!completed.includes(storyId)) {
-      completed.push(storyId)
+    // Validate storyId format
+    const trimmedStoryId = storyId.trim()
+    
+    if (!completed.includes(trimmedStoryId)) {
+      completed.push(trimmedStoryId)
       localStorage.setItem(COMPLETED_STORIES_KEY, JSON.stringify(completed))
       
-      console.log('✅ Story marked completed:', {
-        storyId,
-        totalCompleted: completed.length
+      // Verify it was saved correctly
+      const verify = getCompletedStories()
+      const wasSaved = verify.includes(trimmedStoryId)
+      
+      console.log('✅ [StoryRotation] Story marked completed:', {
+        storyId: trimmedStoryId,
+        totalCompleted: completed.length,
+        saved: wasSaved,
+        allCompleted: verify,
       })
+      
+      if (!wasSaved) {
+        console.error('❌ [StoryRotation] Story ID was not saved correctly!', {
+          attempted: trimmedStoryId,
+          saved: verify,
+        })
+      }
     } else {
-      console.log('ℹ️ Story already marked as completed:', storyId)
+      console.log('ℹ️ [StoryRotation] Story already marked as completed:', trimmedStoryId)
     }
   } catch (error) {
-    console.error('❌ Error marking story completed:', error)
+    console.error('❌ [StoryRotation] Error marking story completed:', error, {
+      storyId,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    })
   }
 }
 
@@ -117,12 +144,28 @@ export function getNextUncompletedStory(
   // Filter out completed stories
   const remaining = allStories.filter(story => !completed.includes(story.id))
   
-  console.log('📊 Story rotation status:', {
+  // Enhanced logging with story ID validation
+  console.log('📊 [StoryRotation] Story rotation status:', {
     totalStories: allStories.length,
     completedCount: completed.length,
     remainingCount: remaining.length,
-    completedIds: completed.slice(-3), // Last 3 completed
+    completedIds: completed.slice(-5), // Last 5 completed
+    allStoryIds: allStories.map(s => s.id).slice(0, 5), // First 5 story IDs
+    remainingStoryIds: remaining.map(s => s.id).slice(0, 5), // First 5 remaining
   })
+  
+  // Validate story ID consistency
+  const storyIdMismatches = allStories.filter(story => {
+    const isCompleted = completed.includes(story.id)
+    const isRemaining = remaining.includes(story)
+    return isCompleted && isRemaining // Should never happen
+  })
+  
+  if (storyIdMismatches.length > 0) {
+    console.error('❌ [StoryRotation] Story ID consistency issue detected:', {
+      mismatches: storyIdMismatches.map(s => s.id),
+    })
+  }
   
   // If all completed, clear completed stories and start a new cycle
   if (remaining.length === 0 && completed.length > 0) {

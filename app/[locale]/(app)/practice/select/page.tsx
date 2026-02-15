@@ -479,9 +479,25 @@ function PracticeSelectContent() {
       const profile = getListeningProfile()
       const preferences = getUserPreferences()
       
+      // Log all available stories and their IDs for debugging
+      console.log('📚 [SELECT PAGE] Available stories:', {
+        count: stories.length,
+        storyIds: stories.map(s => s.id),
+        storyTitles: stories.map(s => s.title),
+      })
+
       // Phase 1: Try to find matching story by difficulty
+      console.log('📊 [SELECT PAGE] Selecting next uncompleted story...')
       let result = getNextUncompletedStory(stories, profile || undefined, preferences || undefined)
       let daily = result.story
+      
+      console.log('📊 [SELECT PAGE] Story selection result:', {
+        found: !!daily,
+        storyId: daily?.id,
+        storyTitle: daily?.title,
+        cycleCompleted: result.cycleCompleted,
+        reason: daily ? 'Found uncompleted story' : 'No uncompleted story found',
+      })
       
       // Phase 2: If no story found (shouldn't happen with auto-cycle), fetch new adaptive clips from database
       if (!daily) {
@@ -493,26 +509,44 @@ function PracticeSelectContent() {
             // Update component state with new stories
             setStories(newStories)
             
+            console.log('📚 [SELECT PAGE] Fetched new stories:', {
+              count: newStories.length,
+              storyIds: newStories.map(s => s.id),
+            })
+            
             // Re-run Phase 1 selection with new stories
             result = getNextUncompletedStory(newStories, profile || undefined, preferences || undefined)
             daily = result.story
-            console.log('✅ [SELECT] Fetched adaptive stories, selected first:', {
+            console.log('✅ [SELECT] Fetched adaptive stories, selected:', {
               storyId: daily?.id,
+              storyTitle: daily?.title,
               totalNewStories: newStories.length,
             })
           } else {
             console.warn('⚠️ [SELECT] No adaptive clips available from database')
             // Fallback: use first existing story if available
             daily = stories[0] || null
+            if (daily) {
+              console.log('📊 [SELECT] Using fallback story:', {
+                storyId: daily.id,
+                storyTitle: daily.title,
+              })
+            }
           }
         } catch (error) {
           console.error('❌ [SELECT] Adaptive fetch failed:', error)
           daily = stories[0] || null
+          if (daily) {
+            console.log('📊 [SELECT] Using fallback story after error:', {
+              storyId: daily.id,
+              storyTitle: daily.title,
+            })
+          }
         }
       }
       
       if (!daily) {
-        console.warn('⚠️ [SELECT PAGE] No stories available')
+        console.warn('⚠️ [SELECT PAGE] No stories available after all attempts')
         return
       }
       
@@ -524,21 +558,33 @@ function PracticeSelectContent() {
       setDailyStory(daily)
       setCompletedToday(completed)
 
-      // Log rotation info
+      // Log rotation info with enhanced details
       const completedStories = getCompletedStories()
       const progress = getStoryProgress(stories)
       
       console.log('📅 [SELECT PAGE] Daily session selected (adaptive):', {
-        storyId: daily.id,
-        title: daily.title,
+        selectedStoryId: daily.id,
+        selectedStoryTitle: daily.title,
+        selectedStoryDifficulty: daily.difficulty,
         completedToday: completed,
         lastPracticeDate,
         today,
         totalStories: stories.length,
+        completedStories: completedStories,
         completedCount: completedStories.length,
         remainingCount: progress.remaining,
         progressPercent: progress.percentComplete + '%',
+        isStoryCompleted: completedStories.includes(daily.id),
+        allStoryIds: stories.map(s => s.id),
       })
+      
+      // Validate that selected story is not in completed list
+      if (completedStories.includes(daily.id)) {
+        console.error('❌ [SELECT PAGE] CRITICAL: Selected story is already marked as completed!', {
+          storyId: daily.id,
+          completedStories,
+        })
+      }
     }
     
     selectAdaptiveStory()
