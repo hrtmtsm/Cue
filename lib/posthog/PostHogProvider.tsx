@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import posthog from 'posthog-js'
-import { createClient } from '@/lib/supabase/client'
+import { getSupabase } from '@/lib/supabase/client'
 
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -33,7 +33,7 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
     // Auto-identify authenticated users
     const identifyUser = async () => {
       try {
-        const supabase = createClient()
+        const supabase = getSupabase()
         const { data: { session } } = await supabase.auth.getSession()
         
         if (session?.user) {
