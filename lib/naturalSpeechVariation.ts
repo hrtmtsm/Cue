@@ -8,34 +8,31 @@
 type Difficulty = 'easy' | 'medium' | 'hard'
 
 /**
- * Speech style variations for intimate, soft, mumbled speech
- * Each clip gets a random style to sound like thinking out loud, not clear conversation
+ * Subtle speech instructions to avoid over-emphasis
+ * Simple, natural instructions that don't make OpenAI overcompensate
  */
-const SPEECH_STYLES = [
-  "Speak very softly and casually, almost mumbling to yourself. Like you're thinking out loud, not talking to anyone.",
-  "Speak in a quiet, intimate voice. Sound like you're whispering your thoughts, not performing for an audience.",
-  "Talk softly and quickly, like you're muttering under your breath. Let words blur together naturally.",
-  "Speak in a hushed, casual tone. Sound like someone overhearing your private thoughts.",
-  "Use a soft, mumbled delivery. Sound like you're talking to yourself while doing something else.",
-  "Speak quietly and naturally, like internal monologue spoken aloud. Not trying to be clear or understood.",
-  "Speak in a relaxed, soft voice. Like you're half-talking to yourself, half-thinking. Words can run together.",
-  "Use a gentle, mumbly tone. Sound like casual self-talk, not prepared speech.",
+const SUBTLE_INSTRUCTIONS = [
+  "Speak naturally.",
+  "Use a relaxed, conversational tone.",
+  "Speak at a comfortable pace.",
+  "Talk casually and smoothly.",
 ]
 
 /**
- * Get random speech style instruction for natural variation
- */
-export function getRandomSpeechStyle(): string {
-  return SPEECH_STYLES[Math.floor(Math.random() * SPEECH_STYLES.length)]
-}
-
-/**
- * Get natural, imperfect speech instructions
- * Emphasizes intimate, soft, mumbled speech like thinking out loud
+ * Get natural speech instructions with subtle approach
+ * 50% chance: No instructions (let model be natural)
+ * 50% chance: Simple, subtle instruction
+ * This prevents over-emphasis and makes it sound genuinely natural
  */
 export function getNaturalSpeechInstructions(): string {
-  const style = getRandomSpeechStyle()
-  return `${style} Don't try to be clearly understood - sound like private thoughts, not public speech. Let words blur and mumble together naturally.`
+  // 50% chance: No instructions at all (let the model be natural)
+  if (Math.random() < 0.5) {
+    return ""
+  }
+  
+  // 50% chance: Simple, subtle instruction
+  const instruction = SUBTLE_INSTRUCTIONS[Math.floor(Math.random() * SUBTLE_INSTRUCTIONS.length)]
+  return instruction
 }
 
 /**
