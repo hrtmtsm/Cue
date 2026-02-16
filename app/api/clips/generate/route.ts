@@ -183,11 +183,13 @@ async function generateAudio(text: string, clipId: string, openai: OpenAI): Prom
     console.log('🔊 [TTS] Generating audio for text:', text.substring(0, 50) + '...')
     console.log('🔊 [TTS] Clip ID:', clipId)
     
-    // Call OpenAI TTS API
+    // Call OpenAI TTS API with natural conversation speed
+    // Use 1.25x speed for natural pace (not robotic TOEIC-level 1.0)
     const mp3 = await openai.audio.speech.create({
       model: 'tts-1',
       voice: 'alloy', // Options: alloy, echo, fable, onyx, nova, shimmer
       input: text,
+      speed: 1.25, // Natural conversation pace
     })
     
     // Convert response to buffer

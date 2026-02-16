@@ -4,6 +4,7 @@ import { put } from '@vercel/blob'
 import { getSupabaseAdminClient } from '@/lib/supabase/server'
 import { resolveUserId } from '@/lib/supabase/resolveUserId'
 import { generateTextHash } from '@/lib/audioHash'
+import { getNaturalConversationSpeed } from '@/lib/audioProcessing'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -103,7 +104,14 @@ export async function GET(request: NextRequest) {
     // If blob_path is blob: URL or invalid, ignore it and proceed with streaming
 
     // Generate audio using OpenAI TTS (streaming)
-    console.log('🎤 [Audio Stream] Calling OpenAI TTS (streaming)...')
+    // Use natural conversation speed (1.25x) for more natural, less robotic speech
+    const speed = getNaturalConversationSpeed(variantKey)
+    console.log('🎤 [Audio Stream] Calling OpenAI TTS (streaming)...', {
+      model: 'tts-1',
+      voice: 'alloy',
+      speed,
+      variantKey,
+    })
     
     if (!process.env.OPENAI_API_KEY) {
       throw new Error('OPENAI_API_KEY environment variable is not set')
@@ -113,6 +121,7 @@ export async function GET(request: NextRequest) {
       model: 'tts-1',
       voice: 'alloy',
       input: transcript,
+      speed: speed, // Natural conversation pace (1.25x)
     })
 
     // OpenAI SDK returns a Response-like object

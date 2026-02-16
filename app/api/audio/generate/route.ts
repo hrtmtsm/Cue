@@ -4,6 +4,7 @@ import { put } from '@vercel/blob'
 import { getSupabaseAdminClient } from '@/lib/supabase/server'
 import { resolveUserId } from '@/lib/supabase/resolveUserId'
 import { generateTextHash, getTextPreview } from '@/lib/audioHash'
+import { getNaturalConversationSpeed } from '@/lib/audioProcessing'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -11,13 +12,6 @@ const openai = new OpenAI({
 
 // Voice rotation for variety (6 different voices)
 const VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'] as const
-
-// Speed control based on variant_key
-const SPEED_MAP: Record<string, number> = {
-  'clean_slow': 0.85,
-  'clean_fast': 1.15,
-  'clean_normal': 1.0, // fallback
-}
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
@@ -105,8 +99,8 @@ export async function POST(request: NextRequest) {
     const clipNum = clipMatch ? parseInt(clipMatch[1]) : 0
     const voice = VOICES[clipNum % VOICES.length]
     
-    // Get speed based on variant_key
-    const speed = variantKey ? (SPEED_MAP[variantKey] || 1.0) : 1.0
+    // Get natural conversation speed (1.25-1.5x for natural pace, not robotic TOEIC-level)
+    const speed = getNaturalConversationSpeed(variantKey)
 
     // Get Supabase admin client
     const supabaseAdmin = getSupabaseAdminClient()
