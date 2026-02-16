@@ -28,6 +28,7 @@ import { config } from 'dotenv'
 import { resolve } from 'path'
 import { createClient } from '@supabase/supabase-js'
 import { generateGeminiTTS, GEMINI_VOICES, SPEECH_PROMPTS } from '../lib/gemini-tts'
+import { validateAudio } from '../lib/audio-validation'
 import { put } from '@vercel/blob'
 
 // Load .env.local
@@ -172,30 +173,69 @@ async function migrateClips() {
       try {
         const variantUrls: string[] = []
         const variantMeta: { voice: string; prompt: string }[] = []
+        const MAX_RETRIES_PER_VARIANT = 3
 
-        // Generate variants
+        // Generate variants with validation + retry + rate-limit handling
         for (let i = 0; i < variantsCount; i++) {
-          const result = await generateGeminiTTS({
-            text: clip.transcript,
-            voiceIndex: i % GEMINI_VOICES.length,
-            promptIndex: i % SPEECH_PROMPTS.length,
-          })
+          let generated = false
 
-          // Upload to Vercel Blob
-          const blobPath = `audio/clips/${clip.id}/variant_${i}.mp3`
-          const blob = await put(blobPath, result.audio, {
-            access: 'public',
-            contentType: 'audio/mpeg',
-          })
+          for (let attempt = 1; attempt <= MAX_RETRIES_PER_VARIANT; attempt++) {
+            let result
+            try {
+              result = await generateGeminiTTS({
+                text: clip.transcript,
+                voiceIndex: i % GEMINI_VOICES.length,
+                promptIndex: i % SPEECH_PROMPTS.length,
+              })
+            } catch (genErr: any) {
+              // Handle rate limit / quota errors with backoff
+              if (genErr?.code === 8 || genErr?.message?.includes('RESOURCE_EXHAUSTED')) {
+                const waitSec = 30 * attempt // 30s, 60s, 90s
+                console.log(`    ⏳ Rate limited, waiting ${waitSec}s before retry ${attempt}/${MAX_RETRIES_PER_VARIANT}...`)
+                await new Promise(resolve => setTimeout(resolve, waitSec * 1000))
+                continue
+              }
+              throw genErr // Re-throw non-rate-limit errors
+            }
 
-          variantUrls.push(blob.url)
-          variantMeta.push({ voice: result.voice, prompt: result.prompt })
+            // Validate the generated audio
+            const validation = validateAudio(result.audio, clip.transcript)
 
-          console.log(`    ✅ Variant ${i + 1}/${variantsCount}: ${result.voice} (${(result.audio.length / 1024).toFixed(1)} KB)`)
+            if (!validation.valid) {
+              const issueStr = validation.issues[0] || 'unknown'
+              console.log(`    ⚠️  Variant ${i + 1} attempt ${attempt}/${MAX_RETRIES_PER_VARIANT}: ${issueStr}`)
+              if (attempt < MAX_RETRIES_PER_VARIANT) {
+                await new Promise(resolve => setTimeout(resolve, 4000))
+                continue
+              }
+              // Last attempt failed — use it anyway but log warning
+              console.log(`    ⚠️  Variant ${i + 1}: using best effort after ${MAX_RETRIES_PER_VARIANT} attempts`)
+            }
 
-          // Rate limit delay
+            // Upload to Vercel Blob
+            const blobPath = `audio/clips/${clip.id}/variant_${i}.mp3`
+            const blob = await put(blobPath, result.audio, {
+              access: 'public',
+              contentType: 'audio/mpeg',
+              allowOverwrite: true,
+            })
+
+            variantUrls.push(blob.url)
+            variantMeta.push({ voice: result.voice, prompt: result.prompt })
+
+            const status = validation.valid ? '✅' : '⚠️'
+            console.log(`    ${status} Variant ${i + 1}/${variantsCount}: ${result.voice} (${(result.audio.length / 1024).toFixed(1)} KB, ~${validation.details.estimatedDurationSec.toFixed(1)}s)`)
+            generated = true
+            break
+          }
+
+          if (!generated) {
+            console.log(`    ❌ Variant ${i + 1}: failed all attempts, skipping`)
+          }
+
+          // Rate limit delay (Gemini TTS has per-minute quotas)
           if (i < variantsCount - 1) {
-            await new Promise(resolve => setTimeout(resolve, 500))
+            await new Promise(resolve => setTimeout(resolve, 5000))
           }
         }
 
@@ -227,7 +267,7 @@ async function migrateClips() {
       }
 
       // Longer delay between clips to avoid rate limits
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      await new Promise(resolve => setTimeout(resolve, 5000))
     }
 
     // Check limit
