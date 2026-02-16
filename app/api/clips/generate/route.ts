@@ -186,12 +186,11 @@ async function generateAudio(text: string, clipId: string, openai: OpenAI, diffi
     console.log('🔊 [TTS] Generating audio for text:', text.substring(0, 50) + '...')
     console.log('🔊 [TTS] Clip ID:', clipId, 'Difficulty:', difficulty)
     
-    // Use natural conversation voices for variety
-    const CONVERSATIONAL_VOICES = ['nova', 'shimmer', 'echo', 'fable']
-    const voice = CONVERSATIONAL_VOICES[Math.floor(Math.random() * CONVERSATIONAL_VOICES.length)]
+    // Use intimate voice selection (prefers softer voices like shimmer/nova for mumbled speech)
+    const { getVariedSpeed, getNaturalSpeechInstructions, getIntimateVoice } = await import('@/lib/naturalSpeechVariation')
+    const voice = getIntimateVoice()
     
     // Get varied speed based on difficulty (adds natural variation)
-    const { getVariedSpeed, getNaturalSpeechInstructions } = await import('@/lib/naturalSpeechVariation')
     const speed = getVariedSpeed(difficulty || 'medium')
     const instructions = getNaturalSpeechInstructions()
     

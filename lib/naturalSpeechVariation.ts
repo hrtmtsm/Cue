@@ -8,16 +8,18 @@
 type Difficulty = 'easy' | 'medium' | 'hard'
 
 /**
- * Speech style variations for natural, imperfect speech
- * Each clip gets a random style to avoid sounding identical
+ * Speech style variations for intimate, soft, mumbled speech
+ * Each clip gets a random style to sound like thinking out loud, not clear conversation
  */
 const SPEECH_STYLES = [
-  "Speak quickly with words blending together naturally, like real fast speech. Don't enunciate every syllable perfectly - let words run together.",
-  "Speak casually, don't enunciate every syllable perfectly. Let contractions and common words blur together naturally.",
-  "Speak with natural rhythm, some words can be mumbled slightly. Not every word needs to be crystal clear - be natural.",
-  "Speak conversationally, let words run together naturally like native speakers do. Don't articulate every syllable clearly.",
-  "Speak like you're in a real conversation - words can blend, some syllables can be softer. Be natural, not perfect.",
-  "Speak quickly and casually. Let words flow together - don't make every boundary clear. Sound like real speech, not reading.",
+  "Speak very softly and casually, almost mumbling to yourself. Like you're thinking out loud, not talking to anyone.",
+  "Speak in a quiet, intimate voice. Sound like you're whispering your thoughts, not performing for an audience.",
+  "Talk softly and quickly, like you're muttering under your breath. Let words blur together naturally.",
+  "Speak in a hushed, casual tone. Sound like someone overhearing your private thoughts.",
+  "Use a soft, mumbled delivery. Sound like you're talking to yourself while doing something else.",
+  "Speak quietly and naturally, like internal monologue spoken aloud. Not trying to be clear or understood.",
+  "Speak in a relaxed, soft voice. Like you're half-talking to yourself, half-thinking. Words can run together.",
+  "Use a gentle, mumbly tone. Sound like casual self-talk, not prepared speech.",
 ]
 
 /**
@@ -29,11 +31,11 @@ export function getRandomSpeechStyle(): string {
 
 /**
  * Get natural, imperfect speech instructions
- * Emphasizes that speech should NOT be perfect
+ * Emphasizes intimate, soft, mumbled speech like thinking out loud
  */
 export function getNaturalSpeechInstructions(): string {
   const style = getRandomSpeechStyle()
-  return `${style} Speak like real conversation - NOT perfectly enunciated reading. Let words run together naturally like native speakers do. Don't articulate every syllable clearly - be natural and casual.`
+  return `${style} Don't try to be clearly understood - sound like private thoughts, not public speech. Let words blur and mumble together naturally.`
 }
 
 /**
@@ -46,9 +48,10 @@ export function getNaturalSpeechInstructions(): string {
  */
 export function getVariedSpeed(difficulty?: Difficulty, variantKey?: string): number {
   // Base speed ranges by difficulty
+  // Faster speeds (1.3-1.5x) help words blur together for mumbled, intimate speech
   const speedRanges: Record<Difficulty, { min: number; max: number }> = {
-    easy: { min: 1.0, max: 1.2 },   // Slower, clearer for easier listening
-    medium: { min: 1.2, max: 1.4 }, // Normal conversation pace
+    easy: { min: 1.1, max: 1.3 },   // Slightly faster for natural blur
+    medium: { min: 1.3, max: 1.5 }, // Faster pace to blur words (thinking out loud)
     hard: { min: 1.4, max: 1.7 },   // Fast, blurred speech for advanced
   }
   
@@ -67,12 +70,31 @@ export function getVariedSpeed(difficulty?: Difficulty, variantKey?: string): nu
  */
 export function getVariedSpeedWithVariant(variantKey: string, difficulty?: Difficulty): number {
   // If variant key specifies speed, use it as base but still add variation
+  // Faster speeds help create mumbled, intimate speech
   if (variantKey === 'clean_slow') {
-    return 1.0 + (Math.random() * 0.2) // 1.0-1.2
+    return 1.1 + (Math.random() * 0.2) // 1.1-1.3 (slightly faster for natural blur)
   } else if (variantKey === 'clean_fast') {
     return 1.4 + (Math.random() * 0.3) // 1.4-1.7
   } else {
     // Use difficulty-based variation
     return getVariedSpeed(difficulty, variantKey)
+  }
+}
+
+/**
+ * Get preferred voices for intimate, soft speech
+ * Prefers softer voices like 'shimmer' and 'nova' over clearer ones
+ */
+export function getIntimateVoice(): string {
+  // Weighted selection: prefer softer voices (shimmer, nova) 70% of the time
+  const softVoices = ['shimmer', 'nova']
+  const otherVoices = ['echo', 'fable']
+  
+  if (Math.random() < 0.7) {
+    // 70% chance: use soft, intimate voices
+    return softVoices[Math.floor(Math.random() * softVoices.length)]
+  } else {
+    // 30% chance: use other voices for variety
+    return otherVoices[Math.floor(Math.random() * otherVoices.length)]
   }
 }

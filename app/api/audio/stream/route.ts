@@ -4,7 +4,7 @@ import { put } from '@vercel/blob'
 import { getSupabaseAdminClient } from '@/lib/supabase/server'
 import { resolveUserId } from '@/lib/supabase/resolveUserId'
 import { generateTextHash } from '@/lib/audioHash'
-import { getNaturalSpeechInstructions, getVariedSpeedWithVariant } from '@/lib/naturalSpeechVariation'
+import { getNaturalSpeechInstructions, getVariedSpeedWithVariant, getIntimateVoice } from '@/lib/naturalSpeechVariation'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -116,10 +116,9 @@ export async function GET(request: NextRequest) {
     }
     // If blob_path is blob: URL or invalid, ignore it and proceed with streaming
 
-    // Generate audio using OpenAI TTS (streaming) with natural, varied speech settings
-    // Use natural conversation voices and varied speed for naturalness
-    const CONVERSATIONAL_VOICES = ['nova', 'shimmer', 'echo', 'fable']
-    const voice = CONVERSATIONAL_VOICES[Math.floor(Math.random() * CONVERSATIONAL_VOICES.length)]
+    // Generate audio using OpenAI TTS (streaming) with intimate, mumbled speech settings
+    // Use intimate voice selection (prefers softer voices like shimmer/nova)
+    const voice = getIntimateVoice()
     
     // Extract difficulty from clipId if available
     const difficulty = extractDifficultyFromClipId(clipId || '')

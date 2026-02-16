@@ -4,19 +4,14 @@ import { put } from '@vercel/blob'
 import { getSupabaseAdminClient } from '@/lib/supabase/server'
 import { resolveUserId } from '@/lib/supabase/resolveUserId'
 import { generateTextHash, getTextPreview } from '@/lib/audioHash'
-import { getNaturalSpeechInstructions, getVariedSpeedWithVariant } from '@/lib/naturalSpeechVariation'
+import { getNaturalSpeechInstructions, getVariedSpeedWithVariant, getIntimateVoice } from '@/lib/naturalSpeechVariation'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
-// Natural conversation voices (curated for variety)
-const CONVERSATIONAL_VOICES = ['nova', 'shimmer', 'echo', 'fable'] as const
-
-// Get random voice for natural variety
-function getRandomVoice(): string {
-  return CONVERSATIONAL_VOICES[Math.floor(Math.random() * CONVERSATIONAL_VOICES.length)]
-}
+// Use intimate voice selection (prefers softer voices like shimmer/nova)
+// This is now handled by getIntimateVoice() from naturalSpeechVariation
 
 // Extract difficulty from clipId if it contains difficulty info
 // Format: clip_<timestamp>_<random> or clip_<difficulty>_<id>
@@ -115,8 +110,8 @@ export async function POST(request: NextRequest) {
     const transcriptHash = generateTextHash(transcript)
     console.log('🔐 [Audio Generate] Transcript hash:', transcriptHash.substring(0, 12) + '...')
     
-    // Select random voice from conversational voices for natural variety
-    const voice = getRandomVoice()
+    // Select intimate voice (prefers softer voices like shimmer/nova for mumbled speech)
+    const voice = getIntimateVoice()
     
     // Get varied speed with natural variation (different per clip to avoid sounding identical)
     // Extract difficulty from clipId if available, otherwise use variant key

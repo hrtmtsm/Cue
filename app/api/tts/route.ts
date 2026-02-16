@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import crypto from 'crypto'
-import { getNaturalSpeechInstructions, getVariedSpeed } from '@/lib/naturalSpeechVariation'
+import { getNaturalSpeechInstructions, getVariedSpeed, getIntimateVoice } from '@/lib/naturalSpeechVariation'
 
 export const runtime = 'nodejs'
 
@@ -118,10 +118,9 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Generate audio with OpenAI TTS using natural, varied speech settings
-    // Use gpt-4o-mini-tts model with varied instructions and speed for naturalness
-    const CONVERSATIONAL_VOICES = ['nova', 'shimmer', 'echo', 'fable']
-    const voice = CONVERSATIONAL_VOICES[Math.floor(Math.random() * CONVERSATIONAL_VOICES.length)]
+    // Generate audio with OpenAI TTS using intimate, mumbled speech settings
+    // Use gpt-4o-mini-tts model with intimate voice selection (prefers softer voices)
+    const voice = getIntimateVoice()
     
     // Get varied speed (defaults to medium difficulty)
     const speed = getVariedSpeed('medium')
