@@ -18,6 +18,7 @@ import ExitPracticeModal from '@/components/ExitPracticeModal'
 import { getStoryByIdClientDbOnly } from '@/lib/storyClient'
 import { getAudioMetadata, generateAudio } from '@/lib/audioApi'
 import { useClipLessonProgress } from '@/lib/clipLessonProgress'
+import { trackEvent } from '@/lib/posthog/usePostHog'
 
 interface PracticeData {
   audioUrl: string
@@ -100,6 +101,19 @@ function RespondPageContent() {
   const audioContextRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
   const updateIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Track first value moment (activation) - fires once per user
+  useEffect(() => {
+    // Check if this is user's first practice session
+    const hasActivated = localStorage.getItem('hasActivated')
+    
+    if (!hasActivated) {
+      trackEvent('first_value_moment', {
+        action: 'started_first_practice'
+      })
+      localStorage.setItem('hasActivated', 'true')
+    }
+  }, [])
 
   // Auto-focus textarea on mount so the keyboard appears immediately on mobile.
   useEffect(() => {

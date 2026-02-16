@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { motion, useInView } from 'framer-motion'
 import { useRef, useState, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
+import { trackEvent } from '@/lib/posthog/usePostHog'
 
 export default function FinalCTA({ locale }: { locale: string }) {
   const ref = useRef(null)
@@ -35,12 +36,14 @@ export default function FinalCTA({ locale }: { locale: string }) {
           <div className="flex flex-col sm:flex-row gap-4 md:gap-6 justify-center items-center pt-4">
             <Link
               href={`/${locale}/auth`}
+              onClick={() => trackEvent('cta_clicked', { location: 'footer', type: 'signup' })}
               className="w-full sm:w-auto px-10 py-5 bg-blue-600 text-white rounded-xl text-xl font-semibold hover:bg-blue-700 transition-colors shadow-lg hover:shadow-xl font-inter text-center"
             >
               {t('button')}
             </Link>
             <Link
               href={`/${locale}/auth/login`}
+              onClick={() => trackEvent('cta_clicked', { location: 'footer', type: 'login' })}
               className="w-full sm:w-auto px-10 py-5 border-2 border-gray-300 text-gray-700 rounded-xl text-xl font-semibold hover:border-gray-400 hover:bg-gray-50 transition font-inter text-center"
             >
               {t('alreadyHaveAccount')}

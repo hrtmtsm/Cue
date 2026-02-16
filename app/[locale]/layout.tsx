@@ -3,6 +3,7 @@ import { getMessages } from 'next-intl/server'
 import { notFound } from 'next/navigation'
 import { locales } from '@/i18n'
 import { Inter } from 'next/font/google'
+import { PostHogProvider } from '@/lib/posthog/PostHogProvider'
 import '../globals.css'
 
 const inter = Inter({
@@ -42,9 +43,11 @@ export default async function LocaleLayout({
     <html lang={locale} className={`${inter.variable} overflow-x-hidden`}>
       <body className={`${inter.className} bg-gray-50 antialiased overflow-x-hidden`}>
         <NextIntlClientProvider messages={messages} locale={locale}>
-          <div className="min-h-dvh w-full">
-            {children}
-          </div>
+          <PostHogProvider>
+            <div className="min-h-dvh w-full">
+              {children}
+            </div>
+          </PostHogProvider>
         </NextIntlClientProvider>
       </body>
     </html>

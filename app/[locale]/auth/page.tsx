@@ -7,11 +7,13 @@ import { useLocale, useTranslations } from 'next-intl'
 import { Eye, EyeOff } from 'lucide-react'
 import { Heading, Label, Caption } from '@/components/ui/Typography'
 import { getSupabaseClient } from '@/lib/supabase/auth-helpers'
+import { usePostHog, trackEvent } from '@/lib/posthog/usePostHog'
 
 export default function AuthChoicePage() {
   const router = useRouter()
   const locale = useLocale()
   const t = useTranslations()
+  const posthog = usePostHog()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -23,6 +25,9 @@ export default function AuthChoicePage() {
   async function handleGoogle() {
     console.log('🔵 [Google OAuth] ===== BUTTON CLICKED =====')
     console.log('🔵 [Google OAuth] Function called, starting OAuth flow...')
+    
+    // Track Google signup CTA click
+    trackEvent('cta_clicked', { location: 'auth', type: 'google_signup' })
     
     setError('')
     setIsLoading(true)
@@ -150,7 +155,13 @@ export default function AuthChoicePage() {
         const { data: { session } } = await supabase.auth.getSession()
         
         if (session) {
-          // User is logged in - redirect to onboarding
+          // User is logged in - CRITICAL: Identify FIRST, then track event
+          posthog.identify(session.user.id, {
+            email: session.user.email,
+          })
+          trackEvent('signup_completed', { method: 'email' })
+          
+          // Redirect to onboarding
           router.push(`/${locale}/onboarding/name`)
           router.refresh()
         } else {

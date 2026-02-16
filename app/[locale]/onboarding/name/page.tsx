@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 import { getSupabaseClient } from '@/lib/supabase/auth-helpers'
 import { Heading, Label, Caption } from '@/components/ui/Typography'
+import { trackEvent } from '@/lib/posthog/usePostHog'
 
 function NamePageContent() {
   const router = useRouter()
@@ -20,6 +21,24 @@ function NamePageContent() {
   
   // Ref to prevent autoFocus from triggering interaction state
   const isInitialMount = useRef(true)
+
+  // Track onboarding start and Google signup completion
+  useEffect(() => {
+    // Track onboarding_started event (fires once on mount)
+    trackEvent('onboarding_started')
+    
+    // If coming from Google OAuth, track signup completion
+    if (isGoogleAuth) {
+      // User just completed Google OAuth signup
+      // PostHogProvider already identified the user
+      trackEvent('signup_completed', { method: 'google' })
+      
+      // Clean up URL
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete('googleAuth')
+      router.replace(newUrl.pathname)
+    }
+  }, [isGoogleAuth, router])
 
   // Pre-fill name from Google if OAuth
   useEffect(() => {
