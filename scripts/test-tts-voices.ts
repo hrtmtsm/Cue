@@ -60,11 +60,12 @@ async function main() {
       console.log(`🎵 Generating ${voice}...`)
       
       const response = await openai.audio.speech.create({
-        model: 'tts-1',
+        model: 'gpt-4o-mini-tts',
         voice: voice,
         input: text,
         response_format: 'mp3',
-        speed: naturalSpeed, // Use natural conversation speed (1.25x)
+        speed: naturalSpeed, // Use natural conversation speed (1.3x)
+        instructions: "Speak naturally like a casual conversation. Use natural pauses and conversational rhythm. Sound like you're talking to a friend, not reading a script.",
       })
 
       // Convert response to buffer

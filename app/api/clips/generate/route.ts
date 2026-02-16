@@ -30,12 +30,15 @@ function buildPrompt(profile: ClipProfile, targetWeakness?: TargetWeakness | nul
 Requirements:
 - 1-2 sentences maximum
 - 10-20 words total
-- Natural conversational tone
+- Natural conversational tone (use contractions like "you're", "I'm", "don't", "can't")
+- Add natural fillers occasionally ("um", "uh", "you know") for realism
+- Use casual, everyday language (not formal)
 - Easy vocabulary (no rare words)
 - Target style: ${targetStyle}
 - Difficulty: ${difficulty || 'medium'}
 - No bullet points or lists
 - No special symbols or formatting
+- Sound like you're talking to a friend, not reading a script
 
 `
 
@@ -127,7 +130,7 @@ async function generateText(profile: ClipProfile, openai: OpenAI, targetWeakness
       messages: [
         {
           role: 'system',
-          content: 'You are a language learning content generator. Generate natural, conversational English sentences that help learners practice listening.',
+          content: 'You are a language learning content generator. Generate natural, conversational English sentences that help learners practice listening. Use contractions (you\'re, I\'m, don\'t), casual language, and natural pauses. Make it sound like a real conversation, not formal speech.',
         },
         {
           role: 'user',
@@ -156,7 +159,7 @@ async function generateText(profile: ClipProfile, openai: OpenAI, targetWeakness
         messages: [
           {
             role: 'system',
-            content: 'You are a language learning content generator. Generate natural, conversational English sentences that help learners practice listening.',
+            content: 'You are a language learning content generator. Generate natural, conversational English sentences that help learners practice listening. Use contractions (you\'re, I\'m, don\'t), casual language, and natural pauses. Make it sound like a real conversation, not formal speech.',
           },
           {
             role: 'user',
@@ -183,13 +186,18 @@ async function generateAudio(text: string, clipId: string, openai: OpenAI): Prom
     console.log('🔊 [TTS] Generating audio for text:', text.substring(0, 50) + '...')
     console.log('🔊 [TTS] Clip ID:', clipId)
     
-    // Call OpenAI TTS API with natural conversation speed
-    // Use 1.25x speed for natural pace (not robotic TOEIC-level 1.0)
+    // Use natural conversation voices for variety
+    const CONVERSATIONAL_VOICES = ['nova', 'shimmer', 'echo', 'fable']
+    const voice = CONVERSATIONAL_VOICES[Math.floor(Math.random() * CONVERSATIONAL_VOICES.length)]
+    const speed = 1.3 // Natural conversation pace (1.25-1.35 range)
+    
+    // Call OpenAI TTS API with natural conversation settings
     const mp3 = await openai.audio.speech.create({
-      model: 'tts-1',
-      voice: 'alloy', // Options: alloy, echo, fable, onyx, nova, shimmer
+      model: 'gpt-4o-mini-tts',
+      voice: voice,
       input: text,
-      speed: 1.25, // Natural conversation pace
+      speed: speed,
+      instructions: "Speak naturally like a casual conversation. Use natural pauses and conversational rhythm. Sound like you're talking to a friend, not reading a script.",
     })
     
     // Convert response to buffer

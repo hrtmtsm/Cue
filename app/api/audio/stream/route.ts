@@ -103,13 +103,17 @@ export async function GET(request: NextRequest) {
     }
     // If blob_path is blob: URL or invalid, ignore it and proceed with streaming
 
-    // Generate audio using OpenAI TTS (streaming)
-    // Use natural conversation speed (1.25x) for more natural, less robotic speech
+    // Generate audio using OpenAI TTS (streaming) with natural conversation settings
+    // Use natural conversation voices and speed for variety and naturalness
+    const CONVERSATIONAL_VOICES = ['nova', 'shimmer', 'echo', 'fable']
+    const voice = CONVERSATIONAL_VOICES[Math.floor(Math.random() * CONVERSATIONAL_VOICES.length)]
     const speed = getNaturalConversationSpeed(variantKey)
-    console.log('🎤 [Audio Stream] Calling OpenAI TTS (streaming)...', {
-      model: 'tts-1',
-      voice: 'alloy',
-      speed,
+    const clampedSpeed = Math.max(1.25, Math.min(1.35, speed))
+    
+    console.log('🎤 [Audio Stream] Calling OpenAI TTS (streaming, natural conversation)...', {
+      model: 'gpt-4o-mini-tts',
+      voice,
+      speed: clampedSpeed,
       variantKey,
     })
     
@@ -118,10 +122,11 @@ export async function GET(request: NextRequest) {
     }
     
     const openaiResponse = await openai.audio.speech.create({
-      model: 'tts-1',
-      voice: 'alloy',
+      model: 'gpt-4o-mini-tts',
+      voice: voice,
       input: transcript,
-      speed: speed, // Natural conversation pace (1.25x)
+      speed: clampedSpeed,
+      instructions: "Speak naturally like a casual conversation. Use natural pauses and conversational rhythm. Sound like you're talking to a friend, not reading a script.",
     })
 
     // OpenAI SDK returns a Response-like object
@@ -154,7 +159,8 @@ export async function GET(request: NextRequest) {
           variantKey,
           transcript,
           transcriptHash,
-          supabaseAdmin
+          supabaseAdmin,
+          voice
         )
       }
       
@@ -175,7 +181,7 @@ export async function GET(request: NextRequest) {
       const [clientStream, uploadStream] = openaiStream.tee()
       
       // Start background upload (don't await - let it run in background)
-      uploadToBlobInBackground(uploadStream, userId, clipId, variantKey, transcript, transcriptHash, supabaseAdmin)
+      uploadToBlobInBackground(uploadStream, userId, clipId, variantKey, transcript, transcriptHash, supabaseAdmin, voice)
       
       // Return client stream immediately
       return new Response(clientStream, {
@@ -230,7 +236,8 @@ async function uploadToBlobInBackground(
   variantKey: string,
   transcript: string,
   transcriptHash: string,
-  supabaseAdmin: any
+  supabaseAdmin: any,
+  voice?: string
 ) {
   try {
     // Convert stream to ArrayBuffer for upload
@@ -296,7 +303,7 @@ async function uploadToBlobInBackground(
         transcript,
         transcript_hash: transcriptHash,
         variant_key: variantKey,
-        voice_profile: 'alloy',
+        voice_profile: voice || 'nova',
         audio_status: 'ready',
         blob_path: blob.url, // Store durable https URL (never blob: URL)
         updated_at: new Date().toISOString(),
@@ -372,7 +379,7 @@ async function uploadToBlobInBackground(
               transcript,
               transcript_hash: transcriptHash,
               variant_key: variantKey,
-              voice_profile: 'alloy',
+              voice_profile: voice || 'nova',
               audio_status: 'ready',
               blob_path: blob.url,
               updated_at: new Date().toISOString(),

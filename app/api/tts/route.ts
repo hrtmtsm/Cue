@@ -117,14 +117,18 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Generate audio with OpenAI TTS
-    // Note: OpenAI TTS API doesn't support speed parameter directly
-    // We generate at natural pace and adjust via playbackRate on client
-    // Use normalized text to ensure connected speech (no choppy boundaries)
+    // Generate audio with OpenAI TTS using natural conversation settings
+    // Use gpt-4o-mini-tts model with instructions for natural speech
+    const CONVERSATIONAL_VOICES = ['nova', 'shimmer', 'echo', 'fable']
+    const voice = CONVERSATIONAL_VOICES[Math.floor(Math.random() * CONVERSATIONAL_VOICES.length)]
+    const speed = 1.3 // Natural conversation pace (1.25-1.35 range)
+    
     const response = await openai.audio.speech.create({
-      model: model,
-      voice: selectedVoice,
-      input: normalizedText, // Use normalized text for natural connected speech
+      model: 'gpt-4o-mini-tts',
+      voice: voice,
+      input: normalizedText,
+      speed: speed,
+      instructions: "Speak naturally like a casual conversation. Use natural pauses and conversational rhythm. Sound like you're talking to a friend, not reading a script.",
     })
 
     // Convert response to buffer

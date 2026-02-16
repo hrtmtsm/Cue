@@ -10,8 +10,13 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
-// Voice rotation for variety (6 different voices)
-const VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'] as const
+// Natural conversation voices (curated for variety)
+const CONVERSATIONAL_VOICES = ['nova', 'shimmer', 'echo', 'fable'] as const
+
+// Get random voice for natural variety
+function getRandomVoice(): string {
+  return CONVERSATIONAL_VOICES[Math.floor(Math.random() * CONVERSATIONAL_VOICES.length)]
+}
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
@@ -94,13 +99,13 @@ export async function POST(request: NextRequest) {
     const transcriptHash = generateTextHash(transcript)
     console.log('🔐 [Audio Generate] Transcript hash:', transcriptHash.substring(0, 12) + '...')
     
-    // Select voice based on clip ID for variety (calculate early for use in DB upsert)
-    const clipMatch = clipId.match(/(\d+)$/)
-    const clipNum = clipMatch ? parseInt(clipMatch[1]) : 0
-    const voice = VOICES[clipNum % VOICES.length]
+    // Select random voice from conversational voices for natural variety
+    const voice = getRandomVoice()
     
-    // Get natural conversation speed (1.25-1.5x for natural pace, not robotic TOEIC-level)
+    // Get natural conversation speed (1.25-1.35x for natural pace)
     const speed = getNaturalConversationSpeed(variantKey)
+    // Clamp to 1.25-1.35 range for optimal naturalness
+    const clampedSpeed = Math.max(1.25, Math.min(1.35, speed))
 
     // Get Supabase admin client
     const supabaseAdmin = getSupabaseAdminClient()
@@ -322,13 +327,12 @@ export async function POST(request: NextRequest) {
       status: audioRow.audio_status,
     })
 
-    // Generate audio using OpenAI TTS
-    console.log('🎤 [Audio Generate] Calling OpenAI TTS...', {
-      model: 'tts-1-hd',
+    // Generate audio using OpenAI TTS with natural conversation settings
+    console.log('🎤 [Audio Generate] Calling OpenAI TTS (natural conversation)...', {
+      model: 'gpt-4o-mini-tts',
       voice,
-      speed,
+      speed: clampedSpeed,
       variantKey,
-      clipNum,
     })
     
     let audioArrayBuffer: ArrayBuffer
@@ -338,10 +342,11 @@ export async function POST(request: NextRequest) {
       }
       
       const response = await openai.audio.speech.create({
-        model: 'tts-1-hd',
+        model: 'gpt-4o-mini-tts',
         voice: voice,
         input: transcript,
-        speed: speed,
+        speed: clampedSpeed,
+        instructions: "Speak naturally like a casual conversation. Use natural pauses and conversational rhythm. Sound like you're talking to a friend, not reading a script.",
       })
 
       audioArrayBuffer = await response.arrayBuffer()

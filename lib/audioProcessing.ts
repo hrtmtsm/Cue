@@ -26,20 +26,20 @@ interface AudioProcessingOptions {
 /**
  * Get natural audio processing speed for TTS generation
  * 
- * Returns speed value optimized for natural conversation (1.25-1.5x)
+ * Returns speed value optimized for natural conversation (1.25-1.35x)
  * This makes TTS sound more like real conversation rather than robotic TOEIC-level speech
  * 
  * @param variantKey - Audio variant key (clean_normal, clean_slow, clean_fast)
- * @returns Speed multiplier (1.0 = normal, 1.25-1.5 = natural conversation)
+ * @returns Speed multiplier (1.25-1.35 = natural conversation pace)
  */
 export function getNaturalConversationSpeed(variantKey: string = 'clean_normal'): number {
-  // Speed adjustment optimized for natural conversation
+  // Speed adjustment optimized for natural conversation (1.25-1.35x range)
   // OpenAI TTS supports speed parameter directly (0.25x to 4.0x)
   const speedMap: Record<string, number> = {
-    'clean_slow': 0.9, // Slightly slower for easier listening
-    'clean_fast': 1.35, // Faster for advanced learners
-    'clean_normal': 1.25, // Natural conversation pace (faster than TOEIC 1.0)
+    'clean_slow': 1.0, // Standard pace for easier listening
+    'clean_fast': 1.35, // Faster for advanced learners (max of range)
+    'clean_normal': 1.3, // Natural conversation pace (middle of 1.25-1.35 range)
   }
   
-  return speedMap[variantKey] || 1.25
+  return speedMap[variantKey] || 1.3
 }
