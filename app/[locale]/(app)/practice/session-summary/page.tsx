@@ -3,19 +3,25 @@
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useLocale } from 'next-intl'
 import { Suspense, useEffect } from 'react'
+import { useSubscription } from '@/lib/useSubscription'
 
 function SessionSummaryPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const locale = useLocale()
   const sessionId = searchParams.get('session') || ''
+  const { isPro } = useSubscription()
 
-  // Mark today's session as complete (for free tier daily limit)
+  // Mark today's session as complete (for free tier daily limit only)
+  // Pro users have unlimited sessions, so don't set this for them
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const today = new Date().toDateString()
-    localStorage.setItem('lastSessionCompleted', today)
-  }, [])
+    // Only set for free users (Pro users have unlimited sessions)
+    if (!isPro) {
+      const today = new Date().toDateString()
+      localStorage.setItem('lastSessionCompleted', today)
+    }
+  }, [isPro])
 
   return (
     <main className="flex min-h-screen flex-col px-6 py-6">

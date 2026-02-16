@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdminClient } from '@/lib/supabase/server'
 import { resolveUserId } from '@/lib/supabase/resolveUserId'
+import { canAccessListeningTips } from '@/lib/subscriptionCheck'
 
 /**
  * GET /api/saved-tips
@@ -20,6 +21,15 @@ export async function GET(request: NextRequest) {
     }
 
     const userId = userIdResolved.userId
+
+    // Check subscription - listening tips are Pro-only
+    const canAccess = await canAccessListeningTips(userId)
+    if (!canAccess) {
+      return NextResponse.json(
+        { error: 'Pro subscription required to access listening tips' },
+        { status: 403 }
+      )
+    }
 
     // Fetch saved tips from database
     const supabaseAdmin = getSupabaseAdminClient()
@@ -65,6 +75,15 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = userIdResolved.userId
+
+    // Check subscription - listening tips are Pro-only
+    const canAccess = await canAccessListeningTips(userId)
+    if (!canAccess) {
+      return NextResponse.json(
+        { error: 'Pro subscription required to save listening tips' },
+        { status: 403 }
+      )
+    }
 
     // Parse request body
     const body = await request.json()
@@ -154,6 +173,15 @@ export async function DELETE(request: NextRequest) {
     }
 
     const userId = userIdResolved.userId
+
+    // Check subscription - listening tips are Pro-only
+    const canAccess = await canAccessListeningTips(userId)
+    if (!canAccess) {
+      return NextResponse.json(
+        { error: 'Pro subscription required to manage listening tips' },
+        { status: 403 }
+      )
+    }
 
     // Get tip ID from query parameters
     const { searchParams } = new URL(request.url)

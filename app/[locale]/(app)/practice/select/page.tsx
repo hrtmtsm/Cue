@@ -1404,11 +1404,40 @@ function PracticeSelectContent() {
     }
   }, [])
 
-  const handleStartPractice = () => {
-    // Respect daily free-tier limit
-    if (!dailyStory || hasCompletedToday()) return
-    // Go directly to the first clip in the story (skip intermediate list)
-    router.push(`/${locale}/practice/story/${dailyStory.id}?clipIndex=0`)
+  const handleStartPractice = async () => {
+    // Client-side pre-check
+    if (!dailyStory) return
+    
+    const hasCompleted = hasCompletedToday()
+    
+    // Server-side validation
+    try {
+      const response = await fetch('/api/session/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ hasCompletedToday: hasCompleted }),
+      })
+
+      const { canStart, isPro, reason } = await response.json()
+
+      if (!canStart) {
+        // Show error message (reason contains upgrade prompt)
+        console.log('[Practice Select] Session blocked:', reason)
+        // The UI already shows the locked state when hasCompletedToday() is true
+        // This server check ensures they can't bypass it
+        return
+      }
+
+      // Continue with existing logic
+      router.push(`/${locale}/practice/story/${dailyStory.id}?clipIndex=0`)
+    } catch (error) {
+      console.error('[Practice Select] Failed to check session:', error)
+      // Fallback: still allow if client check passes (graceful degradation)
+      if (!hasCompleted) {
+        router.push(`/${locale}/practice/story/${dailyStory.id}?clipIndex=0`)
+      }
+    }
   }
 
 

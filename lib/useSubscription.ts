@@ -88,10 +88,10 @@ export function useSubscription() {
     // Initial fetch
     fetchStatus(false)
 
-    // Auto-polling: Check every 3 seconds for 30 seconds after mount
+    // Auto-polling: Check every 3 seconds for 60 seconds after mount
     // This catches delayed Stripe webhooks after checkout
     let pollCount = 0
-    const maxPolls = 10 // 10 polls × 3 seconds = 30 seconds
+    const maxPolls = 20 // 20 polls × 3 seconds = 60 seconds
     
     const startPolling = () => {
       pollTimeoutRef.current = setTimeout(() => {
@@ -110,12 +110,22 @@ export function useSubscription() {
     // Start polling after 3 seconds (give initial fetch time to complete)
     const initialDelay = setTimeout(startPolling, 3000)
 
+    // Refetch on window focus (catches subscription updates when user returns to tab)
+    const handleFocus = () => {
+      if (mountedRef.current) {
+        console.log('[useSubscription] Window focused, refetching...')
+        fetchStatus(true)
+      }
+    }
+    window.addEventListener('focus', handleFocus)
+
     return () => {
       mountedRef.current = false
       clearTimeout(initialDelay)
       if (pollTimeoutRef.current) {
         clearTimeout(pollTimeoutRef.current)
       }
+      window.removeEventListener('focus', handleFocus)
     }
   }, [fetchStatus])
 
