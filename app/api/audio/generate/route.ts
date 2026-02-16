@@ -1,39 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import OpenAI from 'openai'
-import { put } from '@vercel/blob'
 import { getSupabaseAdminClient } from '@/lib/supabase/server'
 import { resolveUserId } from '@/lib/supabase/resolveUserId'
-import { generateTextHash, getTextPreview } from '@/lib/audioHash'
-import { getNaturalSpeechInstructions, getVariedSpeedWithVariant, getIntimateVoice } from '@/lib/naturalSpeechVariation'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
-
-// Use intimate voice selection (prefers softer voices like shimmer/nova)
-// This is now handled by getIntimateVoice() from naturalSpeechVariation
-
-// Extract difficulty from clipId if it contains difficulty info
-// Format: clip_<timestamp>_<random> or clip_<difficulty>_<id>
-function extractDifficultyFromClipId(clipId: string): 'easy' | 'medium' | 'hard' | undefined {
-  // Try to extract difficulty from clipId pattern
-  // This is a best-effort extraction - may not always work
-  const lowerId = clipId.toLowerCase()
-  if (lowerId.includes('easy') || lowerId.includes('_e_')) {
-    return 'easy'
-  } else if (lowerId.includes('hard') || lowerId.includes('_h_')) {
-    return 'hard'
-  } else if (lowerId.includes('medium') || lowerId.includes('_m_')) {
-    return 'medium'
-  }
-  return undefined // Unknown difficulty
-}
+import { generateTextHash } from '@/lib/audioHash'
+import { generateGeminiTTS, isGeminiTTSConfigured } from '@/lib/gemini-tts'
+import { getRandomVariantUrl } from '@/lib/generate-clip-variants'
+import { getCachedAudio, setCachedAudio, getCacheKey } from '@/lib/audio-cache'
+import { put } from '@vercel/blob'
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
   let clipId: string | undefined
   let userId: string | undefined
-  let variantKey: string | undefined
   
   try {
     console.log('🎵 [Audio Generate] Request started')
@@ -46,8 +23,6 @@ export async function POST(request: NextRequest) {
       console.log('✅ [Audio Generate] User resolved:', {
         userId: userId.substring(0, 8) + '...',
         source: userIdResolved.source,
-        VERCEL_ENV: process.env.VERCEL_ENV || 'development',
-        NODE_ENV: process.env.NODE_ENV,
       })
     } catch (error: any) {
       console.error('🚫 [Audio Generate] Failed to resolve user:', error.message)
@@ -65,12 +40,7 @@ export async function POST(request: NextRequest) {
     try {
       body = await request.json()
     } catch (parseError: any) {
-      console.error('❌ [Audio Generate] Error parsing request body:', {
-        message: parseError?.message,
-        name: parseError?.name,
-        stack: parseError?.stack,
-        err: parseError,
-      })
+      console.error('❌ [Audio Generate] Error parsing request body:', parseError?.message)
       return NextResponse.json(
         { 
           error: 'Invalid request body',
@@ -83,16 +53,6 @@ export async function POST(request: NextRequest) {
 
     clipId = body.clipId
     const transcript = body.transcript
-    variantKey = body.variantKey || 'clean_normal'
-
-    // Log request details (safe info only)
-    console.log('📝 [Audio Generate] Request details:', {
-      clipId,
-      variantKey,
-      transcriptLength: transcript?.length || 0,
-      hasTranscript: !!transcript,
-      hasClipId: !!clipId,
-    })
 
     if (!clipId || !transcript) {
       console.error('❌ [Audio Generate] Missing required fields:', { clipId: !!clipId, transcript: !!transcript })
@@ -106,256 +66,165 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Compute transcript hash
-    const transcriptHash = generateTextHash(transcript)
-    console.log('🔐 [Audio Generate] Transcript hash:', transcriptHash.substring(0, 12) + '...')
-    
-    // Select intimate voice (prefers softer voices like shimmer/nova for mumbled speech)
-    const voice = getIntimateVoice()
-    
-    // Get varied speed with natural variation (different per clip to avoid sounding identical)
-    // Extract difficulty from clipId if available, otherwise use variant key
-    const difficulty = extractDifficultyFromClipId(clipId)
-    const speed = getVariedSpeedWithVariant(variantKey, difficulty)
-    
-    // Get natural, imperfect speech instructions (varies per clip)
-    const instructions = getNaturalSpeechInstructions()
+    console.log('📝 [Audio Generate] Request details:', {
+      clipId,
+      transcriptLength: transcript?.length || 0,
+    })
 
-    // Get Supabase admin client
-    const supabaseAdmin = getSupabaseAdminClient()
-    
-    // Check for existing audio (with transcript_hash for idempotency)
-    console.log('🔍 [Audio Generate] Checking for existing audio...')
-    const { data: existingAudio, error: fetchError } = await supabaseAdmin
-      .from('clip_audio')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('clip_id', clipId)
-      .eq('variant_key', variantKey)
-      .eq('transcript_hash', transcriptHash)
-      .single()
-
-    if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 = not found (expected)
-      console.error('❌ [Audio Generate] Error fetching existing audio:', fetchError)
-      return NextResponse.json(
-        {
-          error: 'Database query failed',
-          code: 'DB_QUERY_ERROR',
-          message: 'Failed to check existing audio. Please try again.',
-          details: fetchError.message,
-        },
-        { status: 500 }
-      )
-    }
-
-    // If existing audio with same hash exists and is ready, return it immediately (idempotency)
-    // CRITICAL: Only return if blob_path is a valid https URL (never blob: URL)
-    if (existingAudio && existingAudio.transcript_hash === transcriptHash && existingAudio.audio_status === 'ready' && existingAudio.blob_path) {
-      // Validate blob_path is https URL (not blob: URL)
-      if (existingAudio.blob_path.startsWith('blob:')) {
-        console.warn('⚠️ [Audio Generate] Existing audio has invalid blob_path (blob: URL), regenerating:', {
+    // ──────────────────────────────────────────────
+    // Strategy 1: Check pre-generated Gemini variants
+    // ──────────────────────────────────────────────
+    try {
+      const variantUrl = await getRandomVariantUrl(clipId)
+      if (variantUrl) {
+        const duration = Date.now() - startTime
+        console.log('✅ [Audio Generate] Serving pre-generated Gemini variant:', {
           clipId,
-          transcriptHash: transcriptHash.substring(0, 12) + '...',
-        })
-        // Continue to generation - don't return invalid URL
-      } else {
-        const validUrl = existingAudio.blob_path.startsWith('https://') 
-          ? existingAudio.blob_path
-          : `https://${process.env.BLOB_READ_WRITE_TOKEN?.split('_')[3] || 'public'}.public.blob.vercel-storage.com${existingAudio.blob_path.startsWith('/') ? existingAudio.blob_path : '/' + existingAudio.blob_path}`
-        console.log('✅ [Audio Generate] Existing audio found (idempotent return):', {
-          clipId,
-          transcriptHash: transcriptHash.substring(0, 12) + '...',
-          blobPath: validUrl.substring(0, 80) + '...',
+          variantUrl: variantUrl.substring(0, 80) + '...',
+          durationMs: duration,
         })
         return NextResponse.json({
           success: true,
           clipId,
-          transcriptHash,
-          blobPath: validUrl, // Return valid https URL
+          blobPath: variantUrl,
+          source: 'gemini_variant',
         })
       }
+    } catch (variantError: any) {
+      // Table might not exist yet - that's fine, fall through
+      console.log('⚠️ [Audio Generate] Variant lookup failed (table may not exist):', variantError.message)
     }
 
-    // Upsert with generating status
-    const onConflictColumns = 'clip_id,variant_key'
-    console.log('💾 [Audio Generate] Upserting clip_audio row...', {
-      onConflict: onConflictColumns,
-      clipId,
-      variantKey,
-    })
-    let audioRow: any = null
-    let upsertError: any = null
+    // ──────────────────────────────────────────────
+    // Strategy 2: Check in-memory session cache
+    // ──────────────────────────────────────────────
+    const cacheKey = getCacheKey(clipId, userId)
+    const cachedAudio = getCachedAudio(cacheKey)
 
-    // Try upsert first
-    const upsertResult = await supabaseAdmin
-      .from('clip_audio')
-      .upsert({
-        user_id: userId,
-        clip_id: clipId,
-        transcript,
-        transcript_hash: transcriptHash,
-        variant_key: variantKey,
-        voice_profile: voice, // Use selected voice for this clip
-        audio_status: 'generating',
-        blob_path: null,
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: onConflictColumns,
+    if (cachedAudio) {
+      console.log('✅ [Audio Generate] Serving from session cache:', { clipId })
+      return new NextResponse(new Uint8Array(cachedAudio), {
+        headers: {
+          'Content-Type': 'audio/mpeg',
+          'Cache-Control': 'public, max-age=31536000, immutable',
+          'X-Source': 'session-cache',
+        },
       })
-      .select()
+    }
+
+    // ──────────────────────────────────────────────
+    // Strategy 3: Check existing clip_audio in DB (legacy OpenAI audio)
+    // ──────────────────────────────────────────────
+    const supabaseAdmin = getSupabaseAdminClient()
+    const transcriptHash = generateTextHash(transcript)
+    const variantKey = body.variantKey || 'clean_normal'
+
+    const { data: existingAudio } = await supabaseAdmin
+      .from('clip_audio')
+      .select('blob_path, audio_status, transcript_hash')
+      .eq('user_id', userId)
+      .eq('clip_id', clipId)
+      .eq('variant_key', variantKey)
+      .eq('audio_status', 'ready')
       .single()
 
-    audioRow = upsertResult.data
-    upsertError = upsertResult.error
-
-    // Fallback for PostgreSQL error 42P10 (invalid_column_reference)
-    // This occurs when ON CONFLICT columns don't match any unique constraint
-    if (upsertError?.code === '42P10' || upsertError?.code === '42704') {
-      console.warn('⚠️ [Audio Generate] ON CONFLICT error (42P10), using fallback path:', {
-        errorCode: upsertError.code,
-        errorMessage: upsertError.message,
+    if (existingAudio?.blob_path && existingAudio.blob_path.startsWith('https://')) {
+      const duration = Date.now() - startTime
+      console.log('✅ [Audio Generate] Serving legacy cached audio:', {
         clipId,
-        variantKey,
+        blobPath: existingAudio.blob_path.substring(0, 80) + '...',
+        durationMs: duration,
       })
+      return NextResponse.json({
+        success: true,
+        clipId,
+        transcriptHash,
+        blobPath: existingAudio.blob_path,
+        source: 'legacy_cache',
+      })
+    }
+
+    // ──────────────────────────────────────────────
+    // Strategy 4: Generate on-demand with Gemini TTS (fallback)
+    // ──────────────────────────────────────────────
+    if (isGeminiTTSConfigured()) {
+      console.log('🎤 [Audio Generate] Generating on-demand with Gemini TTS...', { clipId })
 
       try {
-        // Try to find existing row by (user_id, clip_id, variant_key) - actual unique constraint
-        const { data: existingRow, error: selectError } = await supabaseAdmin
-          .from('clip_audio')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('clip_id', clipId)
-          .eq('variant_key', variantKey)
-          .single()
+        const result = await generateGeminiTTS({ text: transcript })
 
-        if (selectError && selectError.code !== 'PGRST116') { // PGRST116 = not found
-          console.error('❌ [Audio Generate] Fallback: Error selecting existing row:', selectError)
-          throw selectError
+        // Cache in memory for session
+        setCachedAudio(cacheKey, result.audio)
+
+        // Upload to Vercel Blob in background (non-blocking)
+        if (process.env.BLOB_READ_WRITE_TOKEN) {
+          const blobPath = `audio/${userId}/${clipId}/gemini_${transcriptHash}.mp3`
+          put(blobPath, result.audio, {
+            access: 'public',
+            contentType: 'audio/mpeg',
+          }).then(blob => {
+            console.log('☁️ [Audio Generate] Background upload to Blob complete:', blob.url.substring(0, 80))
+            // Update clip_audio table with new blob URL
+            supabaseAdmin
+              .from('clip_audio')
+              .upsert({
+                user_id: userId,
+                clip_id: clipId,
+                transcript,
+                transcript_hash: transcriptHash,
+                variant_key: variantKey,
+                voice_profile: result.voice,
+                audio_status: 'ready',
+                blob_path: blob.url,
+                updated_at: new Date().toISOString(),
+              }, {
+                onConflict: 'user_id,clip_id,variant_key',
+              })
+              .then(({ error }) => {
+                if (error) console.error('❌ [Audio Generate] Background DB update error:', error.message)
+              })
+          }).catch(err => {
+            console.error('❌ [Audio Generate] Background upload error:', err.message)
+          })
         }
 
-        if (existingRow) {
-          // Row exists: update it
-          console.log('✅ [Audio Generate] Fallback: Found existing row, updating...', {
-            existingId: existingRow.id,
-            clipId,
-            variantKey,
-          })
-
-          const { data: updatedRow, error: updateError } = await supabaseAdmin
-            .from('clip_audio')
-            .update({
-              transcript,
-              transcript_hash: transcriptHash,
-              audio_status: 'generating',
-              blob_path: null,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', existingRow.id)
-            .select()
-            .single()
-
-          if (updateError || !updatedRow) {
-            console.error('❌ [Audio Generate] Fallback: Error updating existing row:', updateError)
-            throw updateError || new Error('Update returned no data')
-          }
-
-          audioRow = updatedRow
-          upsertError = null // Clear error since fallback succeeded
-        } else {
-          // Row doesn't exist: insert new one
-          console.log('✅ [Audio Generate] Fallback: No existing row found, inserting new row...', {
-            clipId,
-            variantKey,
-          })
-
-          const { data: insertedRow, error: insertError } = await supabaseAdmin
-            .from('clip_audio')
-            .insert({
-              user_id: userId,
-              clip_id: clipId,
-              transcript,
-              transcript_hash: transcriptHash,
-              variant_key: variantKey,
-              voice_profile: voice, // Use selected voice for this clip
-              audio_status: 'generating',
-              blob_path: null,
-              updated_at: new Date().toISOString(),
-            })
-            .select()
-            .single()
-
-          if (insertError || !insertedRow) {
-            console.error('❌ [Audio Generate] Fallback: Error inserting new row:', insertError)
-            throw insertError || new Error('Insert returned no data')
-          }
-
-          audioRow = insertedRow
-          upsertError = null // Clear error since fallback succeeded
-        }
-
-        console.log('✅ [Audio Generate] Fallback path completed successfully:', {
-          audioRowId: audioRow.id,
+        const duration = Date.now() - startTime
+        console.log('✅ [Audio Generate] Gemini TTS on-demand success:', {
           clipId,
-          variantKey,
+          voice: result.voice,
+          audioSizeKB: Math.round(result.audio.length / 1024),
+          durationMs: duration,
         })
-      } catch (fallbackError: any) {
-        console.error('❌ [Audio Generate] Fallback path failed:', fallbackError)
-        // Continue with original error - will be handled below
-        upsertError = fallbackError
-      }
-    }
 
-    if (upsertError || !audioRow) {
-      console.error('❌ [Audio Generate] Error upserting clip_audio:', {
-        error: upsertError,
-        hasAudioRow: !!audioRow,
-        tableExists: upsertError?.code !== '42P01', // 42P01 = relation does not exist
-      })
-      
-      // Check if table doesn't exist
-      if (upsertError?.code === '42P01' || upsertError?.message?.includes('does not exist')) {
-        return NextResponse.json(
-          {
-            error: 'Database table not found',
-            code: 'TABLE_MISSING',
-            message: 'The clip_audio table does not exist. Please run the migration first.',
-            details: 'See supabase/migrations/001_create_clip_audio.sql',
+        // Return audio directly
+        return new NextResponse(result.audio, {
+          headers: {
+            'Content-Type': 'audio/mpeg',
+            'Cache-Control': 'public, max-age=31536000, immutable',
+            'X-Source': 'gemini-on-demand',
+            'X-Voice': result.voice,
           },
-          { status: 500 }
-        )
+        })
+      } catch (geminiError: any) {
+        console.error('❌ [Audio Generate] Gemini TTS error:', geminiError.message)
+        // Fall through to OpenAI fallback
       }
-      
-      return NextResponse.json(
-        {
-          error: 'Failed to create audio record',
-          code: 'DB_UPSERT_ERROR',
-          message: 'Failed to save audio record to database.',
-          details: upsertError?.message || 'Unknown error',
-        },
-        { status: 500 }
-      )
     }
 
-    console.log('✅ [Audio Generate] DB row created/updated:', {
-      audioRowId: audioRow.id,
-      status: audioRow.audio_status,
-    })
-
-    // Generate audio using OpenAI TTS with natural, varied speech settings
-    console.log('🎤 [Audio Generate] Calling OpenAI TTS (natural, varied speech)...', {
-      model: 'gpt-4o-mini-tts',
-      voice,
-      speed,
-      variantKey,
-      difficulty,
-    })
-    
-    let audioArrayBuffer: ArrayBuffer
-    try {
-      if (!process.env.OPENAI_API_KEY) {
-        throw new Error('OPENAI_API_KEY environment variable is not set')
-      }
+    // ──────────────────────────────────────────────
+    // Strategy 5: OpenAI TTS fallback (if Gemini unavailable)
+    // ──────────────────────────────────────────────
+    if (process.env.OPENAI_API_KEY) {
+      console.log('🔄 [Audio Generate] Falling back to OpenAI TTS...', { clipId })
       
+      const OpenAI = (await import('openai')).default
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+      
+      const { getNaturalSpeechInstructions, getVariedSpeed, getIntimateVoice } = await import('@/lib/naturalSpeechVariation')
+      const voice = getIntimateVoice()
+      const speed = getVariedSpeed('medium')
+      const instructions = getNaturalSpeechInstructions()
+
       const response = await openai.audio.speech.create({
         model: 'gpt-4o-mini-tts',
         voice: voice,
@@ -364,153 +233,82 @@ export async function POST(request: NextRequest) {
         instructions: instructions,
       })
 
-      audioArrayBuffer = await response.arrayBuffer()
-      console.log('✅ [Audio Generate] OpenAI TTS success:', {
-        audioSizeBytes: audioArrayBuffer.byteLength,
-        audioSizeKB: Math.round(audioArrayBuffer.byteLength / 1024),
-      })
-    } catch (error: any) {
-      console.error('❌ [Audio Generate] OpenAI TTS error:', {
-        error: error.message,
-        stack: error.stack,
-        code: error.code,
-        status: error.status,
-        hasApiKey: !!process.env.OPENAI_API_KEY,
-      })
-      
-      // Update status to error
-      try {
-        await supabaseAdmin
-          .from('clip_audio')
-          .update({ audio_status: 'error' })
-          .eq('id', audioRow.id)
-      } catch (updateError) {
-        console.error('❌ [Audio Generate] Failed to update error status:', updateError)
+      const audioArrayBuffer = await response.arrayBuffer()
+      const audioBuffer = Buffer.from(audioArrayBuffer)
+
+      // Cache in memory
+      setCachedAudio(cacheKey, audioBuffer)
+
+      // Upload to Vercel Blob
+      if (process.env.BLOB_READ_WRITE_TOKEN) {
+        try {
+          const blobPath = `audio/${userId}/${clipId}/${variantKey}/${transcriptHash}.mp3`
+          const blob = await put(blobPath, audioArrayBuffer, {
+            access: 'public',
+            contentType: 'audio/mpeg',
+          })
+
+          await supabaseAdmin
+            .from('clip_audio')
+            .upsert({
+              user_id: userId,
+              clip_id: clipId,
+              transcript,
+              transcript_hash: transcriptHash,
+              variant_key: variantKey,
+              voice_profile: voice,
+              audio_status: 'ready',
+              blob_path: blob.url,
+              updated_at: new Date().toISOString(),
+            }, {
+              onConflict: 'user_id,clip_id,variant_key',
+            })
+
+          const duration = Date.now() - startTime
+          console.log('✅ [Audio Generate] OpenAI fallback success:', {
+            clipId,
+            blobPath: blob.url.substring(0, 80),
+            durationMs: duration,
+          })
+
+          return NextResponse.json({
+            success: true,
+            clipId,
+            transcriptHash,
+            blobPath: blob.url,
+            source: 'openai_fallback',
+          })
+        } catch (uploadError: any) {
+          console.error('❌ [Audio Generate] OpenAI upload error:', uploadError.message)
+        }
       }
 
-      return NextResponse.json(
-        {
-          error: 'Failed to generate audio',
-          code: 'OPENAI_ERROR',
-          message: error.message || 'OpenAI TTS service error. Please try again.',
-          details: error.code || 'Unknown error',
+      // Return audio directly if blob upload failed
+      return new NextResponse(audioBuffer, {
+        headers: {
+          'Content-Type': 'audio/mpeg',
+          'X-Source': 'openai-fallback-direct',
         },
-        { status: 500 }
-      )
+      })
     }
 
-    // Upload to Vercel Blob
-    // Include transcript_hash in path for uniqueness and to avoid overwrites
-    const blobPath = `audio/${userId}/${clipId}/${variantKey}/${transcriptHash}.mp3`
-    console.log('☁️ [Audio Generate] Uploading to Vercel Blob...', { blobPath, transcriptHash: transcriptHash.substring(0, 12) + '...' })
-    
-    try {
-      if (!process.env.BLOB_READ_WRITE_TOKEN) {
-        throw new Error('BLOB_READ_WRITE_TOKEN environment variable is not set')
-      }
-      
-      const blob = await put(blobPath, audioArrayBuffer, {
-        access: 'public',
-        contentType: 'audio/mpeg',
-      })
-      
-      console.log('✅ [Audio Generate] Vercel Blob upload success:', {
-        blobUrl: blob.url,
-        blobPath: blob.pathname,
-        storedPath: blobPath,
-      })
-      
-      // CRITICAL: Ensure blob.url is an https URL (not blob: URL)
-      // Vercel Blob's blob.url should always be https://, but validate to be safe
-      const blobUrl = blob.url
-      if (!blobUrl || !blobUrl.startsWith('https://')) {
-        throw new Error(`Invalid blob.url (not https): ${blobUrl}`)
-      }
-      
-      const blobPathForStorage = blob.pathname || blobPath
-      
-      // Update row: status='ready', blob_path (store durable https URL, NEVER blob: URL)
-      console.log('💾 [Audio Generate] Updating clip_audio to ready status with https URL...')
-      const { error: updateError } = await supabaseAdmin
-        .from('clip_audio')
-        .update({
-          audio_status: 'ready',
-          blob_path: blobUrl, // Store durable https URL (never blob: URL)
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', audioRow.id)
-
-      if (updateError) {
-        console.error('❌ [Audio Generate] Error updating clip_audio:', {
-          error: updateError,
-          audioRowId: audioRow.id,
-        })
-        return NextResponse.json(
-          {
-            error: 'Failed to update audio record',
-            code: 'DB_UPDATE_ERROR',
-            message: 'Audio generated but failed to update database. Please try again.',
-            details: updateError.message,
-          },
-          { status: 500 }
-        )
-      }
-
-      const duration = Date.now() - startTime
-      console.log('✅ [Audio Generate] Success!', {
-        clipId,
-        durationMs: duration,
-        durationSec: Math.round(duration / 1000),
-        blobPath: blobPathForStorage,
-        blobUrl: blobUrl,
-      })
-
-      return NextResponse.json({
-        success: true,
-        clipId,
-        transcriptHash,
-        blobPath: blobUrl,
-      })
-    } catch (error: any) {
-      console.error('❌ [Audio Generate] Vercel Blob upload error:', {
-        error: error.message,
-        stack: error.stack,
-        hasBlobToken: !!process.env.BLOB_READ_WRITE_TOKEN,
-        blobPath,
-      })
-      
-      // Update status to error
-      try {
-        await supabaseAdmin
-          .from('clip_audio')
-          .update({ audio_status: 'error' })
-          .eq('id', audioRow.id)
-      } catch (updateError) {
-        console.error('❌ [Audio Generate] Failed to update error status:', updateError)
-      }
-
-      return NextResponse.json(
-        {
-          error: 'Failed to upload audio',
-          code: 'BLOB_UPLOAD_ERROR',
-          message: error.message || 'Failed to upload audio to storage. Please try again.',
-          details: error.code || 'Unknown error',
-        },
-        { status: 500 }
-      )
-    }
+    // No TTS provider configured
+    return NextResponse.json(
+      {
+        error: 'No TTS provider configured',
+        code: 'TTS_NOT_CONFIGURED',
+        message: 'Neither Google Cloud nor OpenAI TTS is configured.',
+      },
+      { status: 503 }
+    )
 
   } catch (error: any) {
     const duration = Date.now() - startTime
     console.error('❌ [Audio Generate] Unhandled error:', {
       message: error?.message,
-      name: error?.name,
       stack: error?.stack,
       clipId,
-      variantKey: variantKey || 'clean_normal',
-      userId: userId?.substring(0, 8) + '...',
       durationMs: duration,
-      err: error,
     })
     
     return NextResponse.json(
@@ -524,4 +322,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

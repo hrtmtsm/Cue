@@ -186,26 +186,26 @@ async function generateAudio(text: string, clipId: string, openai: OpenAI, diffi
     console.log('🔊 [TTS] Generating audio for text:', text.substring(0, 50) + '...')
     console.log('🔊 [TTS] Clip ID:', clipId, 'Difficulty:', difficulty)
     
-    // Use intimate voice selection (prefers softer voices like shimmer/nova for mumbled speech)
-    const { getVariedSpeed, getNaturalSpeechInstructions, getIntimateVoice } = await import('@/lib/naturalSpeechVariation')
-    const voice = getIntimateVoice()
+    let buffer: Buffer
+
+    // Try Gemini TTS first
+    const { isGeminiTTSConfigured, generateGeminiTTS } = await import('@/lib/gemini-tts')
     
-    // Get varied speed based on difficulty (adds natural variation)
-    const speed = getVariedSpeed(difficulty || 'medium')
-    const instructions = getNaturalSpeechInstructions()
-    
-    // Call OpenAI TTS API with natural, varied speech settings
-    const mp3 = await openai.audio.speech.create({
-      model: 'gpt-4o-mini-tts',
-      voice: voice,
-      input: text,
-      speed: speed,
-      instructions: instructions,
-    })
-    
-    // Convert response to buffer
-    const buffer = Buffer.from(await mp3.arrayBuffer())
-    console.log('🔊 [TTS] Audio generated, size:', buffer.length, 'bytes')
+    if (isGeminiTTSConfigured()) {
+      console.log('🎤 [TTS] Using Gemini TTS...')
+      try {
+        const result = await generateGeminiTTS({ text })
+        buffer = result.audio
+        console.log(`🔊 [TTS] Gemini audio generated, size: ${buffer.length} bytes, voice: ${result.voice}`)
+      } catch (geminiError: any) {
+        console.warn('⚠️ [TTS] Gemini TTS failed, falling back to OpenAI:', geminiError.message)
+        // Fall through to OpenAI
+        buffer = await generateAudioWithOpenAI(text, openai, difficulty)
+      }
+    } else {
+      // Use OpenAI TTS as fallback
+      buffer = await generateAudioWithOpenAI(text, openai, difficulty)
+    }
     
     // Ensure audio directory exists
     const fs = await import('fs')
@@ -240,6 +240,26 @@ async function generateAudio(text: string, clipId: string, openai: OpenAI, diffi
     console.error('🔴 [TTS] Error generating audio:', error)
     throw error // Re-throw to let caller handle - don't create invalid URLs
   }
+}
+
+async function generateAudioWithOpenAI(text: string, openai: OpenAI, difficulty?: 'easy' | 'medium' | 'hard'): Promise<Buffer> {
+  const { getVariedSpeed, getNaturalSpeechInstructions, getIntimateVoice } = await import('@/lib/naturalSpeechVariation')
+  const voice = getIntimateVoice()
+  const speed = getVariedSpeed(difficulty || 'medium')
+  const instructions = getNaturalSpeechInstructions()
+  
+  console.log('🔊 [TTS] Using OpenAI TTS fallback...')
+  const mp3 = await openai.audio.speech.create({
+    model: 'gpt-4o-mini-tts',
+    voice: voice,
+    input: text,
+    speed: speed,
+    instructions: instructions,
+  })
+  
+  const buffer = Buffer.from(await mp3.arrayBuffer())
+  console.log(`🔊 [TTS] OpenAI audio generated, size: ${buffer.length} bytes`)
+  return buffer
 }
 
 // Mock clip generator for development/fallback

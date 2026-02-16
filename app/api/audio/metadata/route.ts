@@ -3,6 +3,16 @@ import { getSupabaseAdminClient } from '@/lib/supabase/server'
 import { resolveUserId } from '@/lib/supabase/resolveUserId'
 import { generateTextHash } from '@/lib/audioHash'
 
+/**
+ * Audio metadata endpoint
+ * 
+ * Returns audio URL and status for a given clip.
+ * Checks in order:
+ * 1. Pre-generated Gemini variants (clip_audio_variants table)
+ * 2. Diagnostic audio (diagnostic_audio table)
+ * 3. User-specific cached audio (clip_audio table)
+ * 4. Returns needs_generation if nothing found
+ */
 export async function GET(request: NextRequest) {
   try {
     // Resolve userId (authenticated user or dev guest)
@@ -12,8 +22,6 @@ export async function GET(request: NextRequest) {
       console.log('✅ [Audio Metadata] User resolved:', {
         userId: userIdResolved.userId.substring(0, 8) + '...',
         source: userIdResolved.source,
-        VERCEL_ENV: process.env.VERCEL_ENV || 'development',
-        NODE_ENV: process.env.NODE_ENV,
       })
     } catch (error: any) {
       console.error('🚫 [Audio Metadata] Failed to resolve user:', error.message)
@@ -21,7 +29,7 @@ export async function GET(request: NextRequest) {
         { 
           error: 'Unauthorized',
           code: 'AUTH_REQUIRED',
-          message: error.message || 'Authentication required. Please sign in.'
+          message: error.message || 'Authentication required.'
         },
         { status: 401 }
       )
@@ -40,13 +48,48 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get Supabase admin client
     const supabaseAdmin = getSupabaseAdminClient()
-    
-    // Compute transcript hash if transcript is available
     const transcriptHash = transcript ? generateTextHash(transcript) : null
 
-    // Check if clip is diagnostic
+    // ──────────────────────────────────────────────
+    // Strategy 1: Check pre-generated Gemini variants
+    // ──────────────────────────────────────────────
+    try {
+      const { data: variants } = await supabaseAdmin
+        .from('clip_audio_variants')
+        .select('variant_urls')
+        .eq('clip_id', clipId)
+        .single()
+
+      if (variants?.variant_urls && Array.isArray(variants.variant_urls) && variants.variant_urls.length > 0) {
+        // Select a random variant
+        const randomIndex = Math.floor(Math.random() * variants.variant_urls.length)
+        const audioUrl = variants.variant_urls[randomIndex]
+        
+        console.log('✅ [Audio Metadata] Serving Gemini variant:', {
+          clipId,
+          variantCount: variants.variant_urls.length,
+          selectedIndex: randomIndex,
+        })
+
+        return NextResponse.json({
+          clipId,
+          transcript,
+          transcriptHash,
+          audioStatus: 'ready',
+          audioUrl,
+          variantKey,
+          source: 'gemini_variant',
+        })
+      }
+    } catch (variantError: any) {
+      // Table might not exist yet - that's fine
+      console.log('⚠️ [Audio Metadata] Variant lookup failed (table may not exist):', variantError.message)
+    }
+
+    // ──────────────────────────────────────────────
+    // Strategy 2: Check diagnostic audio
+    // ──────────────────────────────────────────────
     const { data: clipInfo } = await supabaseAdmin
       .from('curated_clips')
       .select('clip_type')
@@ -55,14 +98,11 @@ export async function GET(request: NextRequest) {
     
     const isDiagnostic = clipInfo?.clip_type === 'diagnostic'
 
-    // Strategy: For diagnostic clips, check diagnostic_audio table
-    // For regular clips, check user audio from clip_audio table
     let audioRow: any = null
     let error: any = null
 
     if (isDiagnostic) {
-      // Diagnostic clips: Check diagnostic_audio table
-      console.log('🔍 [Audio Metadata] Diagnostic clip detected, checking diagnostic_audio table...', { clipId })
+      console.log('🔍 [Audio Metadata] Diagnostic clip detected...', { clipId })
       
       const { data: diagnosticAudio, error: diagnosticError } = await supabaseAdmin
         .from('diagnostic_audio')
@@ -71,7 +111,6 @@ export async function GET(request: NextRequest) {
         .maybeSingle()
       
       if (!diagnosticError && diagnosticAudio) {
-        // Map diagnostic_audio to clip_audio format for compatibility
         audioRow = {
           clip_id: diagnosticAudio.clip_id,
           audio_status: diagnosticAudio.status,
@@ -82,15 +121,15 @@ export async function GET(request: NextRequest) {
         }
         console.log('✅ [Audio Metadata] Found diagnostic audio:', { clipId })
       } else if (diagnosticError && diagnosticError.code !== 'PGRST116') {
-        // PGRST116 = not found, which is fine
         error = diagnosticError
       }
     }
 
-    // Check user audio (for regular clips only, or as fallback for diagnostic clips if not found)
+    // ──────────────────────────────────────────────
+    // Strategy 3: Check user-specific cached audio (clip_audio table)
+    // ──────────────────────────────────────────────
     if (!audioRow && !isDiagnostic) {
       if (transcript && transcriptHash) {
-        // Try exact match with transcript_hash first
         const exactMatch = await supabaseAdmin
           .from('clip_audio')
           .select('*')
@@ -102,24 +141,18 @@ export async function GET(request: NextRequest) {
         
         if (!exactMatch.error && exactMatch.data) {
           audioRow = exactMatch.data
-          // Validate hash matches (integrity check)
           if (audioRow.transcript_hash !== transcriptHash) {
-            console.warn('⚠️ [Audio Metadata] Hash mismatch detected - trying fallback lookup', {
-              clipId,
-              variantKey,
-              transcriptHashClient: transcriptHash,
-              transcriptHashRow: audioRow.transcript_hash,
-            })
-            audioRow = null // Clear and try fallback
+            console.warn('⚠️ [Audio Metadata] Hash mismatch detected', { clipId })
+            audioRow = null
           }
         } else {
           error = exactMatch.error
         }
       }
 
-      // Fallback: If no exact match or transcript unavailable, find latest ready audio
+      // Fallback: latest ready audio for this clip
       if (!audioRow) {
-        const fallbackQuery = supabaseAdmin
+        const fallbackResult = await supabaseAdmin
           .from('clip_audio')
           .select('*')
           .eq('user_id', userId)
@@ -128,16 +161,11 @@ export async function GET(request: NextRequest) {
           .eq('audio_status', 'ready')
           .order('updated_at', { ascending: false })
           .limit(1)
-        
-        const fallbackResult = await fallbackQuery.single()
+          .single()
         
         if (!fallbackResult.error && fallbackResult.data) {
           audioRow = fallbackResult.data
-          console.log('✅ [Audio Metadata] Using fallback lookup (latest ready audio):', {
-            clipId,
-            variantKey,
-            transcriptHash: audioRow.transcript_hash?.substring(0, 12) + '...',
-          })
+          console.log('✅ [Audio Metadata] Using fallback lookup:', { clipId })
         } else {
           error = fallbackResult.error
         }
@@ -155,12 +183,6 @@ export async function GET(request: NextRequest) {
 
     // If transcript was provided and hash doesn't match, force needs_generation
     if (transcript && transcriptHash && audioRow.transcript_hash !== transcriptHash) {
-      console.warn('⚠️ [Audio Metadata] Hash mismatch - forcing needs_generation', {
-        clipId,
-        variantKey,
-        transcriptHashClient: transcriptHash,
-        transcriptHashRow: audioRow.transcript_hash,
-      })
       return NextResponse.json({
         clipId,
         transcript,
@@ -169,40 +191,27 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // If ready, use blob_path (must be durable https URL, never blob: URL)
+    // Resolve audio URL from blob_path
     let audioUrl: string | undefined
     if (audioRow.audio_status === 'ready' && audioRow.blob_path) {
-      // CRITICAL: blob: URLs are ephemeral and must never be persisted or returned
-      // If blob_path starts with 'blob:', treat it as invalid and ignore it
       if (audioRow.blob_path.startsWith('blob:')) {
-        console.warn('⚠️ [Audio Metadata] Invalid blob_path (blob: URL detected), ignoring:', {
-          blobPath: audioRow.blob_path.substring(0, 80) + '...',
-          clipId,
-          variantKey,
-        })
-        // Fallback to latest ready record with https URL for (user_id, clip_id, variant_key)
-        const fallbackQuery = supabaseAdmin
+        // Invalid blob: URL - try fallback
+        const fallbackResult = await supabaseAdmin
           .from('clip_audio')
           .select('*')
           .eq('user_id', userId)
           .eq('clip_id', clipId)
           .eq('variant_key', variantKey)
           .eq('audio_status', 'ready')
-          .not('blob_path', 'like', 'blob:%') // Exclude blob: URLs
-          .like('blob_path', 'https://%') // Only https URLs
+          .not('blob_path', 'like', 'blob:%')
+          .like('blob_path', 'https://%')
           .order('updated_at', { ascending: false })
           .limit(1)
+          .single()
         
-        const fallbackResult = await fallbackQuery.single()
-        
-        if (!fallbackResult.error && fallbackResult.data && fallbackResult.data.blob_path?.startsWith('https://')) {
+        if (!fallbackResult.error && fallbackResult.data?.blob_path?.startsWith('https://')) {
           audioUrl = fallbackResult.data.blob_path
-          console.log('✅ [Audio Metadata] Using fallback https URL:', {
-            audioUrl: audioUrl?.substring(0, 80) + '...',
-          })
         } else {
-          // No valid https URL found - return needs_generation
-          console.log('⚠️ [Audio Metadata] No valid https URL found, returning needs_generation')
           return NextResponse.json({
             clipId,
             transcript: transcript || '',
@@ -211,19 +220,14 @@ export async function GET(request: NextRequest) {
           })
         }
       } else if (audioRow.blob_path.startsWith('http')) {
-        // Already a full https URL (correct format)
         audioUrl = audioRow.blob_path
       } else {
-        // Legacy: construct URL from pathname (only if not blob:)
+        // Legacy pathname format
         const tokenParts = process.env.BLOB_READ_WRITE_TOKEN?.split('_') || []
         const account = tokenParts.length >= 4 ? tokenParts[3] : 'public'
         const pathname = audioRow.blob_path.startsWith('/') ? audioRow.blob_path : `/${audioRow.blob_path}`
         audioUrl = `https://${account}.public.blob.vercel-storage.com${pathname}`
       }
-      console.log('🔗 [Audio Metadata] Using URL:', {
-        blobPath: audioRow.blob_path.substring(0, 50) + '...',
-        audioUrl: audioUrl?.substring(0, 80) + '...',
-      })
     }
 
     return NextResponse.json({
@@ -242,4 +246,3 @@ export async function GET(request: NextRequest) {
     )
   }
 }
-
