@@ -14,6 +14,7 @@ import { config } from 'dotenv'
 import { resolve } from 'path'
 import { writeFileSync, mkdirSync, existsSync } from 'fs'
 import OpenAI from 'openai'
+import { getNaturalConversationSpeed } from '@/lib/audioProcessing'
 
 // Load .env.local
 config({ path: resolve(process.cwd(), '.env.local') })
@@ -24,6 +25,9 @@ const voices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'] as const
 
 // Output directory
 const outputDir = resolve(process.cwd(), 'public', 'test-voices')
+
+// Test with natural conversation speed (1.25x)
+const naturalSpeed = getNaturalConversationSpeed('clean_normal')
 
 async function main() {
   // Check for API key
@@ -47,6 +51,7 @@ async function main() {
   console.log(`🎤 Testing ${voices.length} OpenAI TTS voices...`)
   console.log(`📝 Text: "${text}"`)
   console.log(`📂 Output: ${outputDir}`)
+  console.log(`⚡ Speed: ${naturalSpeed}x (natural conversation pace)`)
   console.log('')
 
   // Generate audio for each voice
@@ -59,6 +64,7 @@ async function main() {
         voice: voice,
         input: text,
         response_format: 'mp3',
+        speed: naturalSpeed, // Use natural conversation speed (1.25x)
       })
 
       // Convert response to buffer
