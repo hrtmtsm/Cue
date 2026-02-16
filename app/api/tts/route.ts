@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
     })
     setCachedAudio(cacheKeyFinal, audioBuffer)
 
-    return new NextResponse(audioBuffer, {
+    return new NextResponse(new Uint8Array(audioBuffer), {
       headers: {
         'Content-Type': 'audio/mpeg',
         'Cache-Control': 'public, max-age=31536000, immutable',

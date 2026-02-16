@@ -197,7 +197,7 @@ export async function POST(request: NextRequest) {
         })
 
         // Return audio directly
-        return new NextResponse(result.audio, {
+        return new NextResponse(new Uint8Array(result.audio), {
           headers: {
             'Content-Type': 'audio/mpeg',
             'Cache-Control': 'public, max-age=31536000, immutable',
@@ -284,7 +284,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Return audio directly if blob upload failed
-      return new NextResponse(audioBuffer, {
+      return new NextResponse(new Uint8Array(audioBuffer), {
         headers: {
           'Content-Type': 'audio/mpeg',
           'X-Source': 'openai-fallback-direct',
