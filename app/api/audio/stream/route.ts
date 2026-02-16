@@ -4,11 +4,24 @@ import { put } from '@vercel/blob'
 import { getSupabaseAdminClient } from '@/lib/supabase/server'
 import { resolveUserId } from '@/lib/supabase/resolveUserId'
 import { generateTextHash } from '@/lib/audioHash'
-import { getNaturalConversationSpeed } from '@/lib/audioProcessing'
+import { getNaturalSpeechInstructions, getVariedSpeedWithVariant } from '@/lib/naturalSpeechVariation'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
+
+// Extract difficulty from clipId if it contains difficulty info
+function extractDifficultyFromClipId(clipId: string): 'easy' | 'medium' | 'hard' | undefined {
+  const lowerId = clipId.toLowerCase()
+  if (lowerId.includes('easy') || lowerId.includes('_e_')) {
+    return 'easy'
+  } else if (lowerId.includes('hard') || lowerId.includes('_h_')) {
+    return 'hard'
+  } else if (lowerId.includes('medium') || lowerId.includes('_m_')) {
+    return 'medium'
+  }
+  return undefined
+}
 
 /**
  * Stream audio directly from OpenAI TTS to client
@@ -103,18 +116,22 @@ export async function GET(request: NextRequest) {
     }
     // If blob_path is blob: URL or invalid, ignore it and proceed with streaming
 
-    // Generate audio using OpenAI TTS (streaming) with natural conversation settings
-    // Use natural conversation voices and speed for variety and naturalness
+    // Generate audio using OpenAI TTS (streaming) with natural, varied speech settings
+    // Use natural conversation voices and varied speed for naturalness
     const CONVERSATIONAL_VOICES = ['nova', 'shimmer', 'echo', 'fable']
     const voice = CONVERSATIONAL_VOICES[Math.floor(Math.random() * CONVERSATIONAL_VOICES.length)]
-    const speed = getNaturalConversationSpeed(variantKey)
-    const clampedSpeed = Math.max(1.25, Math.min(1.35, speed))
     
-    console.log('🎤 [Audio Stream] Calling OpenAI TTS (streaming, natural conversation)...', {
+    // Extract difficulty from clipId if available
+    const difficulty = extractDifficultyFromClipId(clipId || '')
+    const speed = getVariedSpeedWithVariant(variantKey, difficulty)
+    const instructions = getNaturalSpeechInstructions()
+    
+    console.log('🎤 [Audio Stream] Calling OpenAI TTS (streaming, natural varied speech)...', {
       model: 'gpt-4o-mini-tts',
       voice,
-      speed: clampedSpeed,
+      speed,
       variantKey,
+      difficulty,
     })
     
     if (!process.env.OPENAI_API_KEY) {
@@ -125,8 +142,8 @@ export async function GET(request: NextRequest) {
       model: 'gpt-4o-mini-tts',
       voice: voice,
       input: transcript,
-      speed: clampedSpeed,
-      instructions: "Speak naturally like a casual conversation. Use natural pauses and conversational rhythm. Sound like you're talking to a friend, not reading a script.",
+      speed: speed,
+      instructions: instructions,
     })
 
     // OpenAI SDK returns a Response-like object

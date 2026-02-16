@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import crypto from 'crypto'
+import { getNaturalSpeechInstructions, getVariedSpeed } from '@/lib/naturalSpeechVariation'
 
 export const runtime = 'nodejs'
 
@@ -117,18 +118,21 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Generate audio with OpenAI TTS using natural conversation settings
-    // Use gpt-4o-mini-tts model with instructions for natural speech
+    // Generate audio with OpenAI TTS using natural, varied speech settings
+    // Use gpt-4o-mini-tts model with varied instructions and speed for naturalness
     const CONVERSATIONAL_VOICES = ['nova', 'shimmer', 'echo', 'fable']
     const voice = CONVERSATIONAL_VOICES[Math.floor(Math.random() * CONVERSATIONAL_VOICES.length)]
-    const speed = 1.3 // Natural conversation pace (1.25-1.35 range)
+    
+    // Get varied speed (defaults to medium difficulty)
+    const speed = getVariedSpeed('medium')
+    const instructions = getNaturalSpeechInstructions()
     
     const response = await openai.audio.speech.create({
       model: 'gpt-4o-mini-tts',
       voice: voice,
       input: normalizedText,
       speed: speed,
-      instructions: "Speak naturally like a casual conversation. Use natural pauses and conversational rhythm. Sound like you're talking to a friend, not reading a script.",
+      instructions: instructions,
     })
 
     // Convert response to buffer

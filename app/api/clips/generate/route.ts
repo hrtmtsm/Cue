@@ -181,23 +181,27 @@ async function generateText(profile: ClipProfile, openai: OpenAI, targetWeakness
   }
 }
 
-async function generateAudio(text: string, clipId: string, openai: OpenAI): Promise<string> {
+async function generateAudio(text: string, clipId: string, openai: OpenAI, difficulty?: 'easy' | 'medium' | 'hard'): Promise<string> {
   try {
     console.log('🔊 [TTS] Generating audio for text:', text.substring(0, 50) + '...')
-    console.log('🔊 [TTS] Clip ID:', clipId)
+    console.log('🔊 [TTS] Clip ID:', clipId, 'Difficulty:', difficulty)
     
     // Use natural conversation voices for variety
     const CONVERSATIONAL_VOICES = ['nova', 'shimmer', 'echo', 'fable']
     const voice = CONVERSATIONAL_VOICES[Math.floor(Math.random() * CONVERSATIONAL_VOICES.length)]
-    const speed = 1.3 // Natural conversation pace (1.25-1.35 range)
     
-    // Call OpenAI TTS API with natural conversation settings
+    // Get varied speed based on difficulty (adds natural variation)
+    const { getVariedSpeed, getNaturalSpeechInstructions } = await import('@/lib/naturalSpeechVariation')
+    const speed = getVariedSpeed(difficulty || 'medium')
+    const instructions = getNaturalSpeechInstructions()
+    
+    // Call OpenAI TTS API with natural, varied speech settings
     const mp3 = await openai.audio.speech.create({
       model: 'gpt-4o-mini-tts',
       voice: voice,
       input: text,
       speed: speed,
-      instructions: "Speak naturally like a casual conversation. Use natural pauses and conversational rhythm. Sound like you're talking to a friend, not reading a script.",
+      instructions: instructions,
     })
     
     // Convert response to buffer
@@ -264,7 +268,7 @@ async function generateMockClips(profiles: ClipProfile[], openai?: OpenAI | null
     let audioUrl: string
     if (openai) {
       try {
-        audioUrl = await generateAudio(text, clipId, openai)
+        audioUrl = await generateAudio(text, clipId, openai, profile.difficulty)
         console.log(`🔊 [TTS] Generated audio for mock clip ${index + 1}`)
       } catch (error) {
         console.warn(`🔊 [TTS] Failed to generate audio for mock clip, clip will have no audio`)
@@ -445,7 +449,7 @@ export async function POST(request: NextRequest) {
           }
           
           // Generate audio using OpenAI TTS (pass clipId to ensure filename matches)
-          const audioUrl = await generateAudio(text, clipId, openai)
+          const audioUrl = await generateAudio(text, clipId, openai, profile.difficulty)
           console.log(`🔊 [TTS] Audio URL for ${profile.difficulty}:`, audioUrl)
 
           // Create clip object

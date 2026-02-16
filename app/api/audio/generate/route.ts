@@ -4,7 +4,7 @@ import { put } from '@vercel/blob'
 import { getSupabaseAdminClient } from '@/lib/supabase/server'
 import { resolveUserId } from '@/lib/supabase/resolveUserId'
 import { generateTextHash, getTextPreview } from '@/lib/audioHash'
-import { getNaturalConversationSpeed } from '@/lib/audioProcessing'
+import { getNaturalSpeechInstructions, getVariedSpeedWithVariant } from '@/lib/naturalSpeechVariation'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -16,6 +16,22 @@ const CONVERSATIONAL_VOICES = ['nova', 'shimmer', 'echo', 'fable'] as const
 // Get random voice for natural variety
 function getRandomVoice(): string {
   return CONVERSATIONAL_VOICES[Math.floor(Math.random() * CONVERSATIONAL_VOICES.length)]
+}
+
+// Extract difficulty from clipId if it contains difficulty info
+// Format: clip_<timestamp>_<random> or clip_<difficulty>_<id>
+function extractDifficultyFromClipId(clipId: string): 'easy' | 'medium' | 'hard' | undefined {
+  // Try to extract difficulty from clipId pattern
+  // This is a best-effort extraction - may not always work
+  const lowerId = clipId.toLowerCase()
+  if (lowerId.includes('easy') || lowerId.includes('_e_')) {
+    return 'easy'
+  } else if (lowerId.includes('hard') || lowerId.includes('_h_')) {
+    return 'hard'
+  } else if (lowerId.includes('medium') || lowerId.includes('_m_')) {
+    return 'medium'
+  }
+  return undefined // Unknown difficulty
 }
 
 export async function POST(request: NextRequest) {
@@ -102,10 +118,13 @@ export async function POST(request: NextRequest) {
     // Select random voice from conversational voices for natural variety
     const voice = getRandomVoice()
     
-    // Get natural conversation speed (1.25-1.35x for natural pace)
-    const speed = getNaturalConversationSpeed(variantKey)
-    // Clamp to 1.25-1.35 range for optimal naturalness
-    const clampedSpeed = Math.max(1.25, Math.min(1.35, speed))
+    // Get varied speed with natural variation (different per clip to avoid sounding identical)
+    // Extract difficulty from clipId if available, otherwise use variant key
+    const difficulty = extractDifficultyFromClipId(clipId)
+    const speed = getVariedSpeedWithVariant(variantKey, difficulty)
+    
+    // Get natural, imperfect speech instructions (varies per clip)
+    const instructions = getNaturalSpeechInstructions()
 
     // Get Supabase admin client
     const supabaseAdmin = getSupabaseAdminClient()
@@ -327,12 +346,13 @@ export async function POST(request: NextRequest) {
       status: audioRow.audio_status,
     })
 
-    // Generate audio using OpenAI TTS with natural conversation settings
-    console.log('🎤 [Audio Generate] Calling OpenAI TTS (natural conversation)...', {
+    // Generate audio using OpenAI TTS with natural, varied speech settings
+    console.log('🎤 [Audio Generate] Calling OpenAI TTS (natural, varied speech)...', {
       model: 'gpt-4o-mini-tts',
       voice,
-      speed: clampedSpeed,
+      speed,
       variantKey,
+      difficulty,
     })
     
     let audioArrayBuffer: ArrayBuffer
@@ -345,8 +365,8 @@ export async function POST(request: NextRequest) {
         model: 'gpt-4o-mini-tts',
         voice: voice,
         input: transcript,
-        speed: clampedSpeed,
-        instructions: "Speak naturally like a casual conversation. Use natural pauses and conversational rhythm. Sound like you're talking to a friend, not reading a script.",
+        speed: speed,
+        instructions: instructions,
       })
 
       audioArrayBuffer = await response.arrayBuffer()
