@@ -1,18 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import OpenAI from 'openai'
 import crypto from 'crypto'
+import { generateGeminiTTS, isGeminiTTSConfigured } from '@/lib/gemini-tts'
+import { getCachedAudio, setCachedAudio } from '@/lib/audio-cache'
 
 export const runtime = 'nodejs'
 
-const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null
-
-// Available OpenAI TTS voices (curated list)
-const AVAILABLE_VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'] as const
-type VoiceName = typeof AVAILABLE_VOICES[number]
-
-// In-memory LRU cache for audio (MVP)
+// In-memory LRU cache for audio (MVP - also for non-Gemini fallback)
 interface CacheEntry {
   audio: Buffer
   timestamp: number
@@ -21,17 +14,14 @@ interface CacheEntry {
 const audioCache = new Map<string, CacheEntry>()
 const MAX_CACHE_SIZE = 200
 
-// Generate cache key from text, mode, voice, and model
-function generateCacheKey(text: string, mode: string, voice: string, model: string = 'tts-1'): string {
+function generateCacheKey(text: string, mode: string): string {
   const hash = crypto.createHash('sha256')
-  hash.update(`${text}:${mode}:${voice}:${model}`)
+  hash.update(`${text}:${mode}`)
   return hash.digest('hex')
 }
 
-// LRU cache eviction
 function evictOldestIfNeeded() {
   if (audioCache.size >= MAX_CACHE_SIZE) {
-    // Find oldest entry
     let oldestKey: string | null = null
     let oldestTime = Date.now()
     
@@ -48,21 +38,9 @@ function evictOldestIfNeeded() {
   }
 }
 
-// Select random voice (or use seed for stability)
-function selectVoice(voiceSeed?: string): VoiceName {
-  if (voiceSeed) {
-    // Use seed to deterministically select voice
-    const seedHash = crypto.createHash('md5').update(voiceSeed).digest('hex')
-    const index = parseInt(seedHash.substring(0, 8), 16) % AVAILABLE_VOICES.length
-    return AVAILABLE_VOICES[index]
-  }
-  // Random selection
-  return AVAILABLE_VOICES[Math.floor(Math.random() * AVAILABLE_VOICES.length)]
-}
-
 export async function POST(req: NextRequest) {
   try {
-    const { text, mode = 'normal', voiceSeed, cacheKey } = await req.json()
+    const { text, mode = 'normal', cacheKey } = await req.json()
 
     if (!text || typeof text !== 'string' || text.trim() === '') {
       return NextResponse.json(
@@ -78,72 +56,80 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (!openai) {
-      console.error('OpenAI API key not configured')
+    // Normalize text
+    const normalizedText = text
+      .trim()
+      .replace(/^["']|["']$/g, '')
+      .replace(/\s+/g, ' ')
+      .replace(/->/g, '')
+      .trim()
+
+    // Check local cache
+    const cacheKeyFinal = cacheKey || generateCacheKey(normalizedText, mode)
+    const cached = audioCache.get(cacheKeyFinal)
+    
+    if (cached) {
+      return new NextResponse(new Uint8Array(cached.audio), {
+        headers: {
+          'Content-Type': 'audio/mpeg',
+          'Cache-Control': 'public, max-age=31536000, immutable',
+          'X-Cache': 'HIT',
+          'X-Source': 'local-cache',
+        },
+      })
+    }
+
+    // Also check session cache
+    const sessionCached = getCachedAudio(cacheKeyFinal)
+    if (sessionCached) {
+      return new NextResponse(new Uint8Array(sessionCached), {
+        headers: {
+          'Content-Type': 'audio/mpeg',
+          'Cache-Control': 'public, max-age=31536000, immutable',
+          'X-Cache': 'HIT',
+          'X-Source': 'session-cache',
+        },
+      })
+    }
+
+    let audioBuffer: Buffer
+    let source: string
+
+    // Try Gemini TTS first
+    if (isGeminiTTSConfigured()) {
+      try {
+        const result = await generateGeminiTTS({ text: normalizedText })
+        audioBuffer = result.audio
+        source = `gemini:${result.voice}`
+      } catch (geminiError: any) {
+        console.error('⚠️ [TTS] Gemini TTS failed, trying OpenAI fallback:', geminiError.message)
+        // Fall through to OpenAI
+        audioBuffer = await generateWithOpenAI(normalizedText, mode)
+        source = 'openai-fallback'
+      }
+    } else if (process.env.OPENAI_API_KEY) {
+      audioBuffer = await generateWithOpenAI(normalizedText, mode)
+      source = 'openai'
+    } else {
       return NextResponse.json(
         { error: 'TTS service not available' },
         { status: 503 }
       )
     }
 
-    // Select voice (stable based on seed)
-    const selectedVoice = selectVoice(voiceSeed)
-
-    // Normalize text: remove extra quotes/spaces that cause pauses, ensure whole phrase
-    const normalizedText = text
-      .trim()
-      .replace(/^["']|["']$/g, '') // Remove surrounding quotes
-      .replace(/\s+/g, ' ') // Normalize whitespace
-      .replace(/->/g, '') // Remove arrow notation (visual only)
-      .trim()
-
-    // Use tts-1 for faster generation (lower latency)
-    const model = 'tts-1'
-
-    // Check cache
-    const cacheKeyFinal = cacheKey || generateCacheKey(normalizedText, mode, selectedVoice, model)
-    const cached = audioCache.get(cacheKeyFinal)
-    
-    if (cached) {
-      // Cache hit - return immediately
-      return new NextResponse(new Uint8Array(cached.audio), {
-        headers: {
-          'Content-Type': 'audio/mpeg',
-          'Cache-Control': 'public, max-age=31536000, immutable',
-          'X-Cache': 'HIT',
-          'X-Voice': selectedVoice,
-          'X-Mode': mode,
-        },
-      })
-    }
-
-    // Generate audio with OpenAI TTS
-    // Note: OpenAI TTS API doesn't support speed parameter directly
-    // We generate at natural pace and adjust via playbackRate on client
-    // Use normalized text to ensure connected speech (no choppy boundaries)
-    const response = await openai.audio.speech.create({
-      model: model,
-      voice: selectedVoice,
-      input: normalizedText, // Use normalized text for natural connected speech
-    })
-
-    // Convert response to buffer
-    const audioBuffer = Buffer.from(await response.arrayBuffer())
-
-    // Store in cache
+    // Store in both caches
     evictOldestIfNeeded()
     audioCache.set(cacheKeyFinal, {
       audio: audioBuffer,
       timestamp: Date.now(),
     })
+    setCachedAudio(cacheKeyFinal, audioBuffer)
 
-    // Return audio with appropriate headers
-    return new NextResponse(audioBuffer, {
+    return new NextResponse(new Uint8Array(audioBuffer), {
       headers: {
         'Content-Type': 'audio/mpeg',
         'Cache-Control': 'public, max-age=31536000, immutable',
-        'X-Voice': selectedVoice, // Include voice in header for debugging
-        'X-Mode': mode, // Include mode in header
+        'X-Source': source,
       },
     })
   } catch (error: any) {
@@ -153,4 +139,24 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+async function generateWithOpenAI(text: string, mode: string): Promise<Buffer> {
+  const OpenAI = (await import('openai')).default
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  
+  const { getNaturalSpeechInstructions, getVariedSpeed, getIntimateVoice } = await import('@/lib/naturalSpeechVariation')
+  const voice = getIntimateVoice()
+  const speed = getVariedSpeed('medium')
+  const instructions = getNaturalSpeechInstructions()
+
+  const response = await openai.audio.speech.create({
+    model: 'gpt-4o-mini-tts',
+    voice: voice,
+    input: text,
+    speed: speed,
+    instructions: instructions,
+  })
+
+  return Buffer.from(await response.arrayBuffer())
 }

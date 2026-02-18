@@ -12,6 +12,7 @@ interface InsightCardProps {
   onSave?: (tipData: SaveTipData) => Promise<boolean>
   onUnsave?: (phrase: string) => Promise<boolean>
   isSaved?: boolean
+  isPro?: boolean // Subscription status for gating listening tips
 }
 
 interface AudioCacheEntry {
@@ -21,7 +22,7 @@ interface AudioCacheEntry {
   error: string | null
 }
 
-export default function InsightCard({ insight, voiceId, cardId, onSave, onUnsave, isSaved = false }: InsightCardProps) {
+export default function InsightCard({ insight, voiceId, cardId, onSave, onUnsave, isSaved = false, isPro = false }: InsightCardProps) {
   // Audio state management with cache
   const [audioCache, setAudioCache] = useState<Record<string, AudioCacheEntry>>({})
   const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null)
@@ -365,56 +366,83 @@ export default function InsightCard({ insight, voiceId, cardId, onSave, onUnsave
         )}
       </div>
       
-      {/* 2. LISTENING TIP SECTION - No skeleton on icon */}
+      {/* 2. LISTENING TIP SECTION - Gated by subscription */}
       {howItSounds && (
         <div className="mb-10">
-          <div className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2" style={{ fontFamily: "'SF Pro Rounded', -apple-system, system-ui, sans-serif" }}>
-            How it sounds
-          </div>
-          
-          {/* Sound hint text (if exists) */}
-          {soundHint && (
-            <div className="text-base text-gray-700 mb-3" style={{ fontFamily: "'Inter', -apple-system, system-ui, sans-serif" }}>
-              {soundHint}
-            </div>
-          )}
-          
-          {/* How it sounds - simple Play/Pause, no skeleton */}
-          <div 
-            className="bg-gray-50 rounded-lg px-3 py-2.5 md:px-4 md:py-3 flex items-center justify-center gap-2 md:gap-3 pointer-events-auto"
-            onClick={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
-            onTouchEnd={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              onClick={(e) => handlePlaySound('how-it-sounds', e)}
-              onMouseDown={(e) => {
-                e.stopPropagation()
-                e.preventDefault()
-              }}
-              disabled={!audioCache[`${cardId}:how-it-sounds`]?.isReady}
-              className="flex-shrink-0 w-8 h-8 flex items-center justify-center text-gray-600 hover:text-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-1"
-              aria-label="Play audio"
-            >
-              {playingId === 'how-it-sounds' ? (
-                <Pause weight="fill" className="w-4 h-4" />
-              ) : (
-                <Play weight="fill" className="w-4 h-4" />
+          {isPro ? (
+            <>
+              <div className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2" style={{ fontFamily: "'SF Pro Rounded', -apple-system, system-ui, sans-serif" }}>
+                How it sounds
+              </div>
+              
+              {/* Sound hint text (if exists) */}
+              {soundHint && (
+                <div className="text-base text-gray-700 mb-3" style={{ fontFamily: "'Inter', -apple-system, system-ui, sans-serif" }}>
+                  {soundHint}
+                </div>
               )}
-            </button>
-            
-            <div className="text-base text-gray-900 font-mono flex-1 pt-2" style={{ fontFamily: "'Inter', -apple-system, system-ui, sans-serif" }}>
-              <span className="text-gray-700">"{actualChunkText}"</span>
-              <span className="text-gray-300 mx-2">→</span>
-              <span className="font-medium">{howItSounds?.phonetic || howItSounds?.simplified || howItSounds?.compact || howItSoundsFormatted}</span>
-            </div>
-          </div>
-          
-          {/* Error message if audio failed */}
-          {audioCache[`${cardId}:how-it-sounds`]?.error && (
-            <div className="text-xs text-red-600 mt-1 ml-11">
-              Audio failed to load
+              
+              {/* How it sounds - simple Play/Pause, no skeleton */}
+              <div 
+                className="bg-gray-50 rounded-lg px-3 py-2.5 md:px-4 md:py-3 flex items-center justify-center gap-2 md:gap-3 pointer-events-auto"
+                onClick={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                onTouchEnd={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  onClick={(e) => handlePlaySound('how-it-sounds', e)}
+                  onMouseDown={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                  }}
+                  disabled={!audioCache[`${cardId}:how-it-sounds`]?.isReady}
+                  className="flex-shrink-0 w-8 h-8 flex items-center justify-center text-gray-600 hover:text-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-1"
+                  aria-label="Play audio"
+                >
+                  {playingId === 'how-it-sounds' ? (
+                    <Pause weight="fill" className="w-4 h-4" />
+                  ) : (
+                    <Play weight="fill" className="w-4 h-4" />
+                  )}
+                </button>
+                
+                <div className="text-base text-gray-900 font-mono flex-1 pt-2" style={{ fontFamily: "'Inter', -apple-system, system-ui, sans-serif" }}>
+                  <span className="text-gray-700">"{actualChunkText}"</span>
+                  <span className="text-gray-300 mx-2">→</span>
+                  <span className="font-medium">{howItSounds?.phonetic || howItSounds?.simplified || howItSounds?.compact || howItSoundsFormatted}</span>
+                </div>
+              </div>
+              
+              {/* Error message if audio failed */}
+              {audioCache[`${cardId}:how-it-sounds`]?.error && (
+                <div className="text-xs text-red-600 mt-1 ml-11">
+                  Audio failed to load
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+              <div className="flex items-center gap-2 mb-2">
+                <X weight="bold" className="w-5 h-5 text-gray-400" />
+                <h3 className="font-medium text-gray-600" style={{ fontFamily: "'SF Pro Rounded', -apple-system, system-ui, sans-serif" }}>
+                  AI Listening Tips
+                </h3>
+              </div>
+              <p className="text-sm text-gray-500 mb-3" style={{ fontFamily: "'Inter', -apple-system, system-ui, sans-serif" }}>
+                Get personalized insights on difficult sounds and connected speech patterns
+              </p>
+              <button
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    window.location.href = '/pro'
+                  }
+                }}
+                className="w-full py-2 px-4 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                style={{ fontFamily: "'SF Pro Rounded', -apple-system, system-ui, sans-serif" }}
+              >
+                Upgrade to Pro
+              </button>
             </div>
           )}
         </div>

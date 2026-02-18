@@ -71,11 +71,27 @@ export async function getAudioMetadata(
 
     // If API call fails, return needs_generation
     let errorText = ''
+    let errorJson: any = {}
     try {
       errorText = await response.text()
+      try {
+        errorJson = JSON.parse(errorText)
+      } catch {
+        // Not JSON, keep as text
+      }
     } catch (e) {
       // Ignore text parsing errors
     }
+    
+    console.error('❌ [getAudioMetadata] API Error:', {
+      status: response.status,
+      statusText: response.statusText,
+      errorCode: errorJson.code,
+      errorMessage: errorJson.message,
+      errorDetails: errorJson,
+      fullErrorText: errorText,
+    })
+    
     console.error('[Diagnosis] Error', {
       message: `Audio metadata fetch failed: ${response.status}`,
       name: 'ResponseError',
@@ -148,6 +164,15 @@ export async function streamAudio(
       } catch (e) {
         // Ignore parsing errors
       }
+      
+      console.error('❌ [streamAudio] API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorCode: errorJson.code,
+        errorMessage: errorJson.message,
+        errorDetails: errorJson,
+        fullErrorText: errorText,
+      })
       
       console.error('[Diagnosis] Error', {
         message: `Audio stream failed: ${response.status}`,
@@ -241,6 +266,14 @@ export async function generateAudio(
     // Get session if available
     const { data: { session }, error: authError } = await supabase.auth.getSession()
     
+    console.log('🔍 [generateAudio] Client-side session check:', {
+      hasSession: !!session,
+      hasAccessToken: !!session?.access_token,
+      userId: session?.user?.id?.substring(0, 8) || 'N/A',
+      expiresAt: session?.expires_at,
+      authError: authError?.message || 'none',
+    })
+    
     // Build headers - include auth token if available, otherwise let server handle dev guest
     // Server will use DEV_GUEST_USER_ID in dev mode if no auth token is provided
     const headers: HeadersInit = {
@@ -248,6 +281,9 @@ export async function generateAudio(
     }
     if (!authError && session?.access_token) {
       headers['Authorization'] = `Bearer ${session.access_token}`
+      console.log('✅ [generateAudio] Adding Authorization header')
+    } else {
+      console.log('⚠️ [generateAudio] No Authorization header (relying on cookies)')
     }
 
     const response = await fetch('/api/audio/generate', {
@@ -258,6 +294,12 @@ export async function generateAudio(
         transcript,
         variantKey,
       }),
+    })
+
+    console.log('🔍 [generateAudio] API response:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
     })
 
     if (!response.ok) {
@@ -273,6 +315,15 @@ export async function generateAudio(
       } catch (e) {
         // Ignore parsing errors
       }
+      
+      console.error('❌ [generateAudio] API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorCode: errorJson.code,
+        errorMessage: errorJson.message,
+        errorDetails: errorJson,
+        fullErrorText: errorText,
+      })
       
       console.error('[Diagnosis] Error', {
         message: `Audio generation failed: ${response.status}`,

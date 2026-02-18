@@ -15,6 +15,7 @@ import ExitPracticeModal from '@/components/ExitPracticeModal'
 import { getStoryByIdClient } from '@/lib/storyClient'
 import { getAudioMetadata, generateAudio } from '@/lib/audioApi'
 import { useClipLessonProgress } from '@/lib/clipLessonProgress'
+import { getSupabase } from '@/lib/supabase/client'
 
 interface PracticeData {
   audioUrl: string
@@ -102,6 +103,44 @@ function RespondPageContent() {
       textareaRef.current?.focus()
     }, 100)
     return () => clearTimeout(timer)
+  }, [])
+
+  // Session check for debugging auth issues
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const supabase = getSupabase()
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        console.log('🔍 [Practice] Session check:', {
+          hasSession: !!session,
+          userId: session?.user?.id?.substring(0, 8) || 'N/A',
+          email: session?.user?.email || 'N/A',
+          expiresAt: session?.expires_at,
+          expiresIn: session?.expires_at ? Math.floor((session.expires_at * 1000 - Date.now()) / 1000) : 'N/A',
+          hasAccessToken: !!session?.access_token,
+          error: error?.message || 'none',
+        })
+      } catch (err: any) {
+        console.error('❌ [Practice] Session check failed:', err)
+      }
+    }
+    
+    checkSession()
+    
+    // Also check on auth state changes
+    const supabase = getSupabase()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔍 [Practice] Auth state changed:', {
+        event,
+        hasSession: !!session,
+        userId: session?.user?.id?.substring(0, 8) || 'N/A',
+      })
+    })
+    
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [])
 
   // Cleanup audio analysis on unmount

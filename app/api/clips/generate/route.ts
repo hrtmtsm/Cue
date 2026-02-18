@@ -30,12 +30,15 @@ function buildPrompt(profile: ClipProfile, targetWeakness?: TargetWeakness | nul
 Requirements:
 - 1-2 sentences maximum
 - 10-20 words total
-- Natural conversational tone
+- Natural conversational tone (use contractions like "you're", "I'm", "don't", "can't")
+- Add natural fillers occasionally ("um", "uh", "you know") for realism
+- Use casual, everyday language (not formal)
 - Easy vocabulary (no rare words)
 - Target style: ${targetStyle}
 - Difficulty: ${difficulty || 'medium'}
 - No bullet points or lists
 - No special symbols or formatting
+- Sound like you're talking to a friend, not reading a script
 
 `
 
@@ -127,7 +130,7 @@ async function generateText(profile: ClipProfile, openai: OpenAI, targetWeakness
       messages: [
         {
           role: 'system',
-          content: 'You are a language learning content generator. Generate natural, conversational English sentences that help learners practice listening.',
+          content: 'You are a language learning content generator. Generate natural, conversational English sentences that help learners practice listening. Use contractions (you\'re, I\'m, don\'t), casual language, and natural pauses. Make it sound like a real conversation, not formal speech.',
         },
         {
           role: 'user',
@@ -156,7 +159,7 @@ async function generateText(profile: ClipProfile, openai: OpenAI, targetWeakness
         messages: [
           {
             role: 'system',
-            content: 'You are a language learning content generator. Generate natural, conversational English sentences that help learners practice listening.',
+            content: 'You are a language learning content generator. Generate natural, conversational English sentences that help learners practice listening. Use contractions (you\'re, I\'m, don\'t), casual language, and natural pauses. Make it sound like a real conversation, not formal speech.',
           },
           {
             role: 'user',
@@ -178,21 +181,31 @@ async function generateText(profile: ClipProfile, openai: OpenAI, targetWeakness
   }
 }
 
-async function generateAudio(text: string, clipId: string, openai: OpenAI): Promise<string> {
+async function generateAudio(text: string, clipId: string, openai: OpenAI, difficulty?: 'easy' | 'medium' | 'hard'): Promise<string> {
   try {
     console.log('🔊 [TTS] Generating audio for text:', text.substring(0, 50) + '...')
-    console.log('🔊 [TTS] Clip ID:', clipId)
+    console.log('🔊 [TTS] Clip ID:', clipId, 'Difficulty:', difficulty)
     
-    // Call OpenAI TTS API
-    const mp3 = await openai.audio.speech.create({
-      model: 'tts-1',
-      voice: 'alloy', // Options: alloy, echo, fable, onyx, nova, shimmer
-      input: text,
-    })
+    let buffer: Buffer
+
+    // Try Gemini TTS first
+    const { isGeminiTTSConfigured, generateGeminiTTS } = await import('@/lib/gemini-tts')
     
-    // Convert response to buffer
-    const buffer = Buffer.from(await mp3.arrayBuffer())
-    console.log('🔊 [TTS] Audio generated, size:', buffer.length, 'bytes')
+    if (isGeminiTTSConfigured()) {
+      console.log('🎤 [TTS] Using Gemini TTS...')
+      try {
+        const result = await generateGeminiTTS({ text })
+        buffer = result.audio
+        console.log(`🔊 [TTS] Gemini audio generated, size: ${buffer.length} bytes, voice: ${result.voice}`)
+      } catch (geminiError: any) {
+        console.warn('⚠️ [TTS] Gemini TTS failed, falling back to OpenAI:', geminiError.message)
+        // Fall through to OpenAI
+        buffer = await generateAudioWithOpenAI(text, openai, difficulty)
+      }
+    } else {
+      // Use OpenAI TTS as fallback
+      buffer = await generateAudioWithOpenAI(text, openai, difficulty)
+    }
     
     // Ensure audio directory exists
     const fs = await import('fs')
@@ -229,6 +242,26 @@ async function generateAudio(text: string, clipId: string, openai: OpenAI): Prom
   }
 }
 
+async function generateAudioWithOpenAI(text: string, openai: OpenAI, difficulty?: 'easy' | 'medium' | 'hard'): Promise<Buffer> {
+  const { getVariedSpeed, getNaturalSpeechInstructions, getIntimateVoice } = await import('@/lib/naturalSpeechVariation')
+  const voice = getIntimateVoice()
+  const speed = getVariedSpeed(difficulty || 'medium')
+  const instructions = getNaturalSpeechInstructions()
+  
+  console.log('🔊 [TTS] Using OpenAI TTS fallback...')
+  const mp3 = await openai.audio.speech.create({
+    model: 'gpt-4o-mini-tts',
+    voice: voice,
+    input: text,
+    speed: speed,
+    instructions: instructions,
+  })
+  
+  const buffer = Buffer.from(await mp3.arrayBuffer())
+  console.log(`🔊 [TTS] OpenAI audio generated, size: ${buffer.length} bytes`)
+  return buffer
+}
+
 // Mock clip generator for development/fallback
 async function generateMockClips(profiles: ClipProfile[], openai?: OpenAI | null): Promise<Clip[]> {
   const mockTexts = [
@@ -254,7 +287,7 @@ async function generateMockClips(profiles: ClipProfile[], openai?: OpenAI | null
     let audioUrl: string
     if (openai) {
       try {
-        audioUrl = await generateAudio(text, clipId, openai)
+        audioUrl = await generateAudio(text, clipId, openai, profile.difficulty)
         console.log(`🔊 [TTS] Generated audio for mock clip ${index + 1}`)
       } catch (error) {
         console.warn(`🔊 [TTS] Failed to generate audio for mock clip, clip will have no audio`)
@@ -435,7 +468,7 @@ export async function POST(request: NextRequest) {
           }
           
           // Generate audio using OpenAI TTS (pass clipId to ensure filename matches)
-          const audioUrl = await generateAudio(text, clipId, openai)
+          const audioUrl = await generateAudio(text, clipId, openai, profile.difficulty)
           console.log(`🔊 [TTS] Audio URL for ${profile.difficulty}:`, audioUrl)
 
           // Create clip object

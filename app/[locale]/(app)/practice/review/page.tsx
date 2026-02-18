@@ -2732,6 +2732,7 @@ function ReviewPageContent() {
                       onSave={handleSaveTip}
                       onUnsave={handleUnsaveTip}
                       isSaved={savedTips.has(aiInsights[currentInsightIndex]?.missed_text || aiInsights[currentInsightIndex]?.display_chunk || aiInsights[currentInsightIndex]?.what_it_was || '')}
+                      isPro={isPro}
                     />
                   </div>
                 </div>
