@@ -71,11 +71,27 @@ export async function getAudioMetadata(
 
     // If API call fails, return needs_generation
     let errorText = ''
+    let errorJson: any = {}
     try {
       errorText = await response.text()
+      try {
+        errorJson = JSON.parse(errorText)
+      } catch {
+        // Not JSON, keep as text
+      }
     } catch (e) {
       // Ignore text parsing errors
     }
+    
+    console.error('❌ [getAudioMetadata] API Error:', {
+      status: response.status,
+      statusText: response.statusText,
+      errorCode: errorJson.code,
+      errorMessage: errorJson.message,
+      errorDetails: errorJson,
+      fullErrorText: errorText,
+    })
+    
     console.error('[Diagnosis] Error', {
       message: `Audio metadata fetch failed: ${response.status}`,
       name: 'ResponseError',
@@ -148,6 +164,15 @@ export async function streamAudio(
       } catch (e) {
         // Ignore parsing errors
       }
+      
+      console.error('❌ [streamAudio] API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorCode: errorJson.code,
+        errorMessage: errorJson.message,
+        errorDetails: errorJson,
+        fullErrorText: errorText,
+      })
       
       console.error('[Diagnosis] Error', {
         message: `Audio stream failed: ${response.status}`,
@@ -290,6 +315,15 @@ export async function generateAudio(
       } catch (e) {
         // Ignore parsing errors
       }
+      
+      console.error('❌ [generateAudio] API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorCode: errorJson.code,
+        errorMessage: errorJson.message,
+        errorDetails: errorJson,
+        fullErrorText: errorText,
+      })
       
       console.error('[Diagnosis] Error', {
         message: `Audio generation failed: ${response.status}`,
