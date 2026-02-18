@@ -19,9 +19,28 @@ import { getAuthUser } from './server'
  * In production, requires authentication
  */
 export async function resolveUserId(request: Request): Promise<{ userId: string; source: 'auth' | 'dev_guest' }> {
+  const vercelEnv = process.env.VERCEL_ENV || 'development'
+  const nodeEnv = process.env.NODE_ENV
+  const isProduction = vercelEnv === 'production' && nodeEnv === 'production'
+  
+  console.log('🔍 [resolveUserId] Starting auth resolution:', {
+    VERCEL_ENV: vercelEnv,
+    NODE_ENV: nodeEnv,
+    isProduction,
+    hasRequest: !!request,
+  })
+
   // First: Try cookie-based authentication (primary method for browser requests)
   try {
     const cookieStore = await cookies()
+    const allCookies = cookieStore.getAll()
+    
+    console.log('🔍 [resolveUserId] Cookie check:', {
+      cookieCount: allCookies.length,
+      cookieNames: allCookies.map(c => c.name),
+      hasSupabaseCookies: allCookies.some(c => c.name.includes('supabase') || c.name.includes('sb-')),
+    })
+    
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -43,12 +62,26 @@ export async function resolveUserId(request: Request): Promise<{ userId: string;
         email: user.email,
       })
       return { userId: user.id, source: 'auth' }
+    } else {
+      console.log('⚠️ [resolveUserId] Cookie auth failed:', {
+        error: error?.message,
+        hasUser: !!user,
+      })
     }
-  } catch (cookieError) {
-    console.warn('[resolveUserId] Cookie auth failed:', cookieError)
+  } catch (cookieError: any) {
+    console.warn('⚠️ [resolveUserId] Cookie auth exception:', {
+      message: cookieError?.message,
+      stack: cookieError?.stack,
+    })
   }
 
   // Second: Try header-based authentication (fallback for API calls with Bearer tokens)
+  const authHeader = request.headers.get('authorization')
+  console.log('🔍 [resolveUserId] Header check:', {
+    hasAuthHeader: !!authHeader,
+    headerPrefix: authHeader?.substring(0, 20) || 'N/A',
+  })
+  
   const auth = await getAuthUser(request)
   if (auth) {
     console.log('✅ [resolveUserId] Authenticated user (header):', {
@@ -59,8 +92,10 @@ export async function resolveUserId(request: Request): Promise<{ userId: string;
   }
 
   // Third: Dev guest fallback (non-production only)
-  const vercelEnv = process.env.VERCEL_ENV || 'development'
-  const isProduction = vercelEnv === 'production' && process.env.NODE_ENV === 'production'
+  console.log('🔍 [resolveUserId] Checking dev guest fallback:', {
+    isProduction,
+    hasDevGuestId: !!process.env.DEV_GUEST_USER_ID,
+  })
   
   if (!isProduction) {
     const devGuestUserId = process.env.DEV_GUEST_USER_ID
@@ -75,5 +110,12 @@ export async function resolveUserId(request: Request): Promise<{ userId: string;
   }
 
   // Production: require authentication
+  console.error('❌ [resolveUserId] Production mode - no auth found:', {
+    vercelEnv,
+    nodeEnv,
+    isProduction,
+    cookieCheck: 'failed',
+    headerCheck: 'failed',
+  })
   throw new Error('Authentication required in production mode')
 }

@@ -12,6 +12,19 @@ export async function POST(request: NextRequest) {
   let clipId: string | undefined
   let userId: string | undefined
   
+  // 🔍 DEBUG: Log request details at the very start
+  const cookieHeader = request.headers.get('cookie')
+  const authHeader = request.headers.get('authorization')
+  console.log('🔍 [Audio Generate] Request received:', {
+    hasCookies: cookieHeader ? 'YES' : 'NO',
+    cookieCount: cookieHeader ? cookieHeader.split(';').length : 0,
+    hasAuth: authHeader ? 'YES' : 'NO',
+    authHeaderPrefix: authHeader?.substring(0, 20) || 'N/A',
+    vercelEnv: process.env.VERCEL_ENV,
+    nodeEnv: process.env.NODE_ENV,
+    url: request.url,
+  })
+  
   try {
     console.log('🎵 [Audio Generate] Request started')
     
@@ -25,7 +38,12 @@ export async function POST(request: NextRequest) {
         source: userIdResolved.source,
       })
     } catch (error: any) {
-      console.error('🚫 [Audio Generate] Failed to resolve user:', error.message)
+      console.error('🚫 [Audio Generate] Failed to resolve user:', {
+        message: error.message,
+        stack: error.stack,
+        vercelEnv: process.env.VERCEL_ENV,
+        nodeEnv: process.env.NODE_ENV,
+      })
       return NextResponse.json(
         { 
           error: 'Unauthorized',
