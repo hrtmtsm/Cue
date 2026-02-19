@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations, useLocale } from 'next-intl'
+import { RefreshCw, Loader2 } from 'lucide-react'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { getSupabaseClient } from '@/lib/supabase/auth-helpers'
 import { Heading, Body, Label, Caption } from '@/components/ui/Typography'
@@ -21,7 +22,7 @@ function ProfileContent() {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
   const [isSessionReady, setIsSessionReady] = useState(false)
-  const { isPro, subscription, loading: subscriptionLoading } = useSubscription()
+  const { isPro, subscription, loading: subscriptionLoading, refetch, refetching } = useSubscription()
   const [isManagingSubscription, setIsManagingSubscription] = useState(false)
 
   const handleManageSubscription = async () => {
@@ -342,39 +343,61 @@ function ProfileContent() {
             {subscriptionLoading ? (
               <Body size="bodyStrong" className="text-gray-600">{t('profile.subscription.loading')}</Body>
             ) : (
-              <div className="flex items-center justify-between">
-                <div>
-                  <Body size="bodyStrong" className="mb-1">
-                    {isPro ? t('profile.subscription.proPlan') : t('profile.subscription.freePlan')}
-                  </Body>
-                  {isPro && subscription && (
-                    <Caption tone="muted">
-                      {subscription.cancelAtPeriodEnd 
-                        ? t('profile.subscription.proUntil', { date: new Date(subscription.currentPeriodEnd).toLocaleDateString() })
-                        : `Renews on ${new Date(subscription.currentPeriodEnd).toLocaleDateString()}`
-                      }
-                    </Caption>
-                  )}
-                  {!isPro && (
-                    <Caption tone="muted">Upgrade to unlock unlimited sessions</Caption>
-                  )}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Body size="bodyStrong" className="mb-1">
+                      {isPro ? t('profile.subscription.proPlan') : t('profile.subscription.freePlan')}
+                    </Body>
+                    {isPro && subscription && (
+                      <Caption tone="muted">
+                        {subscription.cancelAtPeriodEnd 
+                          ? t('profile.subscription.proUntil', { date: new Date(subscription.currentPeriodEnd).toLocaleDateString() })
+                          : `Renews on ${new Date(subscription.currentPeriodEnd).toLocaleDateString()}`
+                        }
+                      </Caption>
+                    )}
+                    {!isPro && (
+                      <Caption tone="muted">Upgrade to unlock unlimited sessions</Caption>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {isPro ? (
+                      <button
+                        onClick={handleManageSubscription}
+                        disabled={isManagingSubscription}
+                        className="text-blue-600 font-medium text-sm hover:text-blue-700 transition-colors disabled:opacity-50"
+                      >
+                        {isManagingSubscription ? t('profile.subscription.loading') : t('profile.subscription.manage')}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => router.push(`/${locale}/pro`)}
+                        className="text-blue-600 font-medium text-sm hover:text-blue-700 transition-colors"
+                      >
+                        {t('profile.subscription.upgrade')}
+                      </button>
+                    )}
+                  </div>
                 </div>
-                {isPro ? (
-                  <button
-                    onClick={handleManageSubscription}
-                    disabled={isManagingSubscription}
-                    className="text-blue-600 font-medium text-sm hover:text-blue-700 transition-colors disabled:opacity-50"
-                  >
-                    {isManagingSubscription ? t('profile.subscription.loading') : t('profile.subscription.manage')}
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => router.push(`/${locale}/pro`)}
-                    className="text-blue-600 font-medium text-sm hover:text-blue-700 transition-colors"
-                  >
-                    {t('profile.subscription.upgrade')}
-                  </button>
-                )}
+                {/* Manual refresh button */}
+                <button
+                  onClick={() => refetch()}
+                  disabled={refetching}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {refetching ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Refreshing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-4 h-4" />
+                      Refresh Status
+                    </>
+                  )}
+                </button>
               </div>
             )}
           </div>
