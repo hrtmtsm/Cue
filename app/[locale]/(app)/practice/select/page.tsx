@@ -93,7 +93,7 @@ function PracticeSelectContent() {
   const [tipsSavedToday, setTipsSavedToday] = useState<SavedTip[]>([])
   const [isLoadingToday, setIsLoadingToday] = useState(true)
   const { name: userName, loading: nameLoading } = useGreetingName()
-  const { isPro, refetch, refetching } = useSubscription()
+  const { isPro, loading: subscriptionLoading, refetch, refetching } = useSubscription()
   
   // Dev-only: Log to confirm this component is running
   console.log('🎯 [LOCALE PracticeSelect] Component rendered - THIS IS THE ACTUAL COMPONENT', {
@@ -120,6 +120,50 @@ function PracticeSelectContent() {
     
     checkSession();
   }, []);
+
+  // Server-side session check to override stale localStorage
+  // Ensures new accounts on same browser don't see a previous user's completed state
+  useEffect(() => {
+    const verifySessionFromServer = async () => {
+      try {
+        // Get current user ID to detect cross-account stale localStorage
+        const supabase = getSupabaseClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        const currentUserId = user?.id
+        const storedUserId = localStorage.getItem('lastSessionUserId')
+
+        // If localStorage belongs to a DIFFERENT user, clear it
+        if (currentUserId && storedUserId && storedUserId !== currentUserId) {
+          localStorage.removeItem('lastSessionCompleted')
+          localStorage.removeItem('lastPracticeDate')
+          localStorage.removeItem('lastSessionUserId')
+          setCompletedToday(false)
+          return
+        }
+
+        // Same user (or no stored ID yet): trust the server for today's session state
+        const res = await fetch('/api/session/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({}),
+        })
+        if (!res.ok) return
+        const { canStart, isPro: serverIsPro } = await res.json()
+
+        if (!canStart && !serverIsPro) {
+          // Server confirms free user completed a session today
+          setCompletedToday(true)
+        }
+        // If canStart: don't touch localStorage or completedToday for same-user —
+        // they may be a Pro user who completed sessions and just canceled mid-day.
+        // hasCompletedToday() will correctly check isPro + localStorage for that case.
+      } catch {
+        // Non-critical: fall back to localStorage state
+      }
+    }
+    verifySessionFromServer()
+  }, [])
 
   // Auto-mark practice access for new user detection
   useEffect(() => {
@@ -1596,7 +1640,7 @@ function PracticeSelectContent() {
           <>
             {/* Main Daily Session Card - with free-tier limit */}
             <div className="mt-5">
-              {hasCompletedToday() ? (
+              {hasCompletedToday() && !subscriptionLoading ? (
                 // Locked state: session already completed today
                 <div className="rounded-2xl border-2 border-gray-200 bg-gray-50 p-8 text-center space-y-4">
                   <Heading as="h2" size="section">

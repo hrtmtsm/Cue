@@ -342,39 +342,43 @@ function ProfileContent() {
             {subscriptionLoading ? (
               <Body size="bodyStrong" className="text-gray-600">{t('profile.subscription.loading')}</Body>
             ) : (
-              <div className="flex items-center justify-between">
-                <div>
-                  <Body size="bodyStrong" className="mb-1">
-                    {isPro ? t('profile.subscription.proPlan') : t('profile.subscription.freePlan')}
-                  </Body>
-                  {isPro && subscription && (
-                    <Caption tone="muted">
-                      {subscription.cancelAtPeriodEnd 
-                        ? t('profile.subscription.proUntil', { date: new Date(subscription.currentPeriodEnd).toLocaleDateString() })
-                        : `Renews on ${new Date(subscription.currentPeriodEnd).toLocaleDateString()}`
-                      }
-                    </Caption>
-                  )}
-                  {!isPro && (
-                    <Caption tone="muted">Upgrade to unlock unlimited sessions</Caption>
-                  )}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Body size="bodyStrong" className="mb-1">
+                      {isPro ? t('profile.subscription.proPlan') : t('profile.subscription.freePlan')}
+                    </Body>
+                    {isPro && subscription && (
+                      <Caption tone="muted">
+                        {subscription.cancelAtPeriodEnd
+                          ? `Cancels on ${new Date(subscription.currentPeriodEnd).toLocaleDateString()} · You'll be on Free Plan after that`
+                          : `Renews on ${new Date(subscription.currentPeriodEnd).toLocaleDateString()}`
+                        }
+                      </Caption>
+                    )}
+                    {!isPro && (
+                      <Caption tone="muted">Upgrade to unlock unlimited sessions</Caption>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {isPro ? (
+                      <button
+                        onClick={handleManageSubscription}
+                        disabled={isManagingSubscription}
+                        className="text-blue-600 font-medium text-sm hover:text-blue-700 transition-colors disabled:opacity-50"
+                      >
+                        {isManagingSubscription ? t('profile.subscription.loading') : t('profile.subscription.manage')}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => router.push(`/${locale}/pro`)}
+                        className="text-blue-600 font-medium text-sm hover:text-blue-700 transition-colors"
+                      >
+                        {t('profile.subscription.upgrade')}
+                      </button>
+                    )}
+                  </div>
                 </div>
-                {isPro ? (
-                  <button
-                    onClick={handleManageSubscription}
-                    disabled={isManagingSubscription}
-                    className="text-blue-600 font-medium text-sm hover:text-blue-700 transition-colors disabled:opacity-50"
-                  >
-                    {isManagingSubscription ? t('profile.subscription.loading') : t('profile.subscription.manage')}
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => router.push(`/${locale}/pro`)}
-                    className="text-blue-600 font-medium text-sm hover:text-blue-700 transition-colors"
-                  >
-                    {t('profile.subscription.upgrade')}
-                  </button>
-                )}
               </div>
             )}
           </div>

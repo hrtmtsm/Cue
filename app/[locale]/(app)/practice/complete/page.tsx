@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { Suspense, useEffect, useState } from 'react'
 import { markStoryCompleted, getNextUncompletedStory, getCompletedStories } from '@/lib/storyRotation'
 import { useSubscription } from '@/lib/useSubscription'
+import { getSupabaseClient } from '@/lib/supabase/auth-helpers'
 import { loadUserStories } from '@/lib/storyClient'
 import { getListeningProfile, getUserPreferences } from '@/lib/userPreferences'
 import { getProgress, incrementProgress } from '@/lib/progress'
@@ -35,6 +36,7 @@ function PracticeCompletePageContent() {
 
   const [streak, setStreak] = useState(0)
   const [isStartingSession, setIsStartingSession] = useState(false)
+  const [sessionRecorded, setSessionRecorded] = useState(false)
 
   // Handler: Start next practice session (for Pro users)
   const handleStartNextSession = async () => {
@@ -93,6 +95,40 @@ function PracticeCompletePageContent() {
       router.replace(newUrl.pathname + newUrl.search)
     }
   }, [searchParams, refetch, router])
+
+  // Record session completion in database (enforces free tier daily limit)
+  useEffect(() => {
+    if (typeof window === 'undefined' || sessionRecorded) return
+
+    // Always set localStorage immediately (client-side limit check)
+    const today = new Date().toDateString()
+    localStorage.setItem('lastSessionCompleted', today)
+    setSessionRecorded(true)
+
+    // Also store the user ID so we can detect cross-account stale state on the select page
+    getSupabaseClient().auth.getUser().then(({ data: { user } }) => {
+      if (user?.id) localStorage.setItem('lastSessionUserId', user.id)
+    })
+
+    // Call server-side to record in practice_sessions table
+    // Records for ALL users (free and Pro) so cancellation mid-day is handled correctly
+    fetch('/api/session/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ storyId: storyId || null }),
+    })
+      .then(res => {
+        if (res.ok) {
+          console.log('[Practice Complete] Session recorded in database')
+        } else {
+          console.warn('[Practice Complete] Failed to record session in DB, status:', res.status)
+        }
+      })
+      .catch(err => {
+        console.warn('[Practice Complete] Error recording session:', err)
+      })
+  }, [sessionRecorded, storyId])
 
   // On mount: mark today's session as complete and update streak + progress
   useEffect(() => {

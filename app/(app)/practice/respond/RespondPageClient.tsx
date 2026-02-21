@@ -1584,7 +1584,7 @@ function RespondPageContent() {
   const handleCheckAnswer = (e?: React.MouseEvent) => {
     // Enhanced debugging
     console.log('🔍 [DEBUG] handleCheckAnswer called')
-    console.log('🔍 [DEBUG] Event:', e)
+    console.log('🔍 [DEBUG] Event type:', e?.type)
     console.log('🔍 [DEBUG] Current pathname:', typeof window !== 'undefined' ? window.location.pathname : 'SSR')
     console.log('🔍 [DEBUG] Current search:', typeof window !== 'undefined' ? window.location.search : 'SSR')
     console.log('🔍 [DEBUG] userInput:', userInput?.substring(0, 50) + (userInput?.length > 50 ? '...' : ''))

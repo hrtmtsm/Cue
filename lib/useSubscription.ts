@@ -29,15 +29,21 @@ export function useSubscription() {
   const mountedRef = useRef(true)
   const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  const fetchStatus = useCallback(async (isRefetch = false) => {
+  const fetchStatus = useCallback(async (isRefetch = false, syncFromStripe = false) => {
     try {
       if (isRefetch) {
         setRefetching(true)
       }
 
-      const res = await fetch('/api/subscription/status', {
+      // syncFromStripe=true: fetch live from Stripe and update DB (used for manual refresh)
+      // Otherwise: read from DB cache (fast, used for initial load and auto-polling)
+      const url = syncFromStripe ? '/api/subscription/sync' : '/api/subscription/status'
+      const method = syncFromStripe ? 'POST' : 'GET'
+
+      const res = await fetch(url, {
+        method,
         credentials: 'include',
-        cache: 'no-store', // Always fetch fresh data
+        cache: 'no-store',
       })
 
       if (!res.ok) {
@@ -76,10 +82,10 @@ export function useSubscription() {
     }
   }, [])
 
-  // Manual refetch function
+  // Manual refetch function — syncs directly from Stripe for accurate data
   const refetch = useCallback(async () => {
-    console.log('[useSubscription] Manual refetch requested')
-    await fetchStatus(true)
+    console.log('[useSubscription] Manual refetch requested (syncing from Stripe)')
+    await fetchStatus(true, true)
   }, [fetchStatus])
 
   useEffect(() => {

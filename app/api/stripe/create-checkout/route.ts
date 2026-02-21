@@ -72,24 +72,66 @@ export async function POST(request: NextRequest) {
       userData_user.user_metadata?.full_name ||
       undefined
 
-    // Check if customer already exists
-    let customerId: string
-
+    // Check if user already has a subscription record
     const { data: existingSubscription } = await supabaseAdmin
       .from('subscriptions')
-      .select('stripe_customer_id')
+      .select('stripe_customer_id, stripe_subscription_id, status, cancel_at_period_end')
       .eq('user_id', userId)
-      .single()
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_URL
+
+    // If user has a subscription set to cancel, REACTIVATE it instead of creating a new one
+    if (existingSubscription?.stripe_subscription_id && existingSubscription?.cancel_at_period_end) {
+      console.log('[Create Checkout] Reactivating canceled subscription instead of creating new:', {
+        userId: userId.substring(0, 8) + '...',
+        subId: existingSubscription.stripe_subscription_id,
+      })
+      
+      // Remove the cancel_at_period_end flag — reactivates the subscription
+      const { stripe: stripeLib } = await import('@/lib/stripe/server')
+      await stripeLib.subscriptions.update(existingSubscription.stripe_subscription_id, {
+        cancel_at_period_end: false,
+      })
+      
+      // Update DB to reflect reactivation
+      await supabaseAdmin
+        .from('subscriptions')
+        .update({ cancel_at_period_end: false })
+        .eq('user_id', userId)
+
+      // Redirect to success page directly (no new checkout needed)
+      let successUrl = `${origin}/pro/success?reactivated=true`
+      if (returnTo) successUrl += `&returnTo=${encodeURIComponent(returnTo)}`
+      
+      return NextResponse.json({ url: successUrl, reactivated: true })
+    }
+
+    // Check if user already has an active subscription (no cancel pending)
+    if (existingSubscription?.stripe_subscription_id && existingSubscription?.status === 'active' && !existingSubscription?.cancel_at_period_end) {
+      console.log('[Create Checkout] User already has active subscription, redirecting to success:', {
+        userId: userId.substring(0, 8) + '...',
+        subId: existingSubscription.stripe_subscription_id,
+      })
+      let successUrl = `${origin}/pro/success?already_active=true`
+      if (returnTo) successUrl += `&returnTo=${encodeURIComponent(returnTo)}`
+      return NextResponse.json({ url: successUrl, alreadyActive: true })
+    }
+
+    // No active subscription — proceed with new checkout
+    let customerId: string
 
     if (existingSubscription?.stripe_customer_id) {
-      // Use existing customer
+      // Reuse existing Stripe customer
       customerId = existingSubscription.stripe_customer_id
       console.log('[Create Checkout] Using existing customer:', {
         userId: userId.substring(0, 8) + '...',
         customerId,
       })
     } else {
-      // Create new customer
+      // Create new Stripe customer
       const customer = await createCustomer(userEmail, userId, userName)
       customerId = customer.id
       console.log('[Create Checkout] Created new customer:', {
@@ -98,15 +140,12 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Create checkout session
-    const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_URL
-    
     // Build success URL with optional returnTo parameter
     let successUrl = `${origin}/pro/success?session_id={CHECKOUT_SESSION_ID}`
     if (returnTo) {
       successUrl += `&returnTo=${encodeURIComponent(returnTo)}`
     }
-    
+
     const session = await createCheckoutSession(
       customerId,
       priceId,
