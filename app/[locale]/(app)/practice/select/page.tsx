@@ -121,6 +121,36 @@ function PracticeSelectContent() {
     checkSession();
   }, []);
 
+  // Server-side session check to override stale localStorage
+  // Ensures new accounts (or cleared localStorage) show correct state
+  useEffect(() => {
+    const verifySessionFromServer = async () => {
+      try {
+        const res = await fetch('/api/session/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({}),
+        })
+        if (!res.ok) return
+        const { canStart, isPro: serverIsPro } = await res.json()
+        // If server says user CAN start, they haven't completed today — clear stale state
+        if (canStart) {
+          setCompletedToday(false)
+          // Also clear stale localStorage keys that may belong to a previous account
+          localStorage.removeItem('lastSessionCompleted')
+          localStorage.removeItem('lastPracticeDate')
+        } else if (!serverIsPro) {
+          // Server confirms session was completed today for this user
+          setCompletedToday(true)
+        }
+      } catch {
+        // Non-critical: fall back to localStorage state
+      }
+    }
+    verifySessionFromServer()
+  }, [])
+
   // Auto-mark practice access for new user detection
   useEffect(() => {
     const markPracticeAccess = async () => {
