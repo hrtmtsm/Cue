@@ -64,31 +64,74 @@ export async function POST(request: NextRequest) {
         // Retrieve the subscription details
         const subscription = await stripe.subscriptions.retrieve(subscriptionId)
 
-        // Create or update subscription record
-        const { error } = await supabase.from('subscriptions').upsert(
-          {
-            user_id: userId,
-            stripe_customer_id: customerId,
-            stripe_subscription_id: subscription.id,
-            stripe_price_id: subscription.items.data[0].price.id,
-            status: subscription.status,
-            current_period_start: new Date(
-              subscription.current_period_start * 1000
-            ).toISOString(),
-            current_period_end: new Date(
-              subscription.current_period_end * 1000
-            ).toISOString(),
-            cancel_at_period_end: subscription.cancel_at_period_end,
-          },
-          {
-            onConflict: 'user_id',
-          }
-        )
+        const subscriptionData = {
+          user_id: userId,
+          stripe_customer_id: customerId,
+          stripe_subscription_id: subscription.id,
+          stripe_price_id: subscription.items.data[0].price.id,
+          status: subscription.status,
+          current_period_start: new Date(
+            subscription.current_period_start * 1000
+          ).toISOString(),
+          current_period_end: new Date(
+            subscription.current_period_end * 1000
+          ).toISOString(),
+          cancel_at_period_end: subscription.cancel_at_period_end,
+        }
 
-        if (error) {
-          console.error('[Stripe Webhook] Failed to upsert subscription:', error)
+        console.log('[Stripe Webhook] Checkout subscription data:', {
+          userId: userId.substring(0, 8) + '...',
+          subscriptionId: subscription.id,
+          status: subscription.status,
+          cancelAtPeriodEnd: subscription.cancel_at_period_end,
+        })
+
+        // First: check if user already has a subscription record (any subscription ID)
+        const { data: existingByUser } = await supabase
+          .from('subscriptions')
+          .select('id, stripe_subscription_id')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        let result
+        if (existingByUser) {
+          // User has an existing record — update it with the new subscription data
+          // This handles re-subscriptions correctly
+          console.log('[Stripe Webhook] Updating existing record for user:', {
+            oldSubId: existingByUser.stripe_subscription_id,
+            newSubId: subscription.id,
+          })
+          result = await supabase
+            .from('subscriptions')
+            .update(subscriptionData)
+            .eq('id', existingByUser.id)
+            .select()
         } else {
-          console.log('[Stripe Webhook] Subscription created/updated')
+          // No existing record — insert a new one
+          console.log('[Stripe Webhook] Inserting new subscription record')
+          result = await supabase
+            .from('subscriptions')
+            .insert(subscriptionData)
+            .select()
+        }
+
+        if (result.error) {
+          console.error('[Stripe Webhook] Failed to upsert subscription:', {
+            error: result.error.message,
+            code: result.error.code,
+            userId: userId.substring(0, 8) + '...',
+            subscriptionId: subscription.id,
+          })
+        } else {
+          console.log('[Stripe Webhook] Subscription created/updated:', {
+            userId: userId.substring(0, 8) + '...',
+            subscriptionId: subscription.id,
+            status: subscription.status,
+            cancelAtPeriodEnd: subscription.cancel_at_period_end,
+            periodEnd: new Date(subscription.current_period_end * 1000).toISOString(),
+          })
         }
         break
       }
@@ -142,10 +185,35 @@ export async function POST(request: NextRequest) {
             subscriptionId: subscription.id,
           })
         } else {
-          console.log('[Stripe Webhook] Subscription updated in DB:', {
-            rowsAffected: data?.length || 0,
-            cancelAtPeriodEnd: subscription.cancel_at_period_end,
-          })
+        console.log('[Stripe Webhook] Subscription updated in DB:', {
+          rowsAffected: data?.length || 0,
+          cancelAtPeriodEnd: subscription.cancel_at_period_end,
+          subscriptionId: subscription.id,
+          userId: data?.[0]?.user_id?.substring(0, 8) + '...' || 'unknown',
+        })
+        
+        // If no rows were updated, try to find by customer ID and update
+        if (!data || data.length === 0) {
+          console.warn('[Stripe Webhook] No subscription found by subscription_id, trying customer_id...')
+          const { data: customerSubs } = await supabase
+            .from('subscriptions')
+            .select('id, user_id')
+            .eq('stripe_customer_id', customerId)
+            .limit(1)
+          
+          if (customerSubs && customerSubs.length > 0) {
+            const { error: updateByCustomerError } = await supabase
+              .from('subscriptions')
+              .update(updateData)
+              .eq('stripe_customer_id', customerId)
+            
+            if (updateByCustomerError) {
+              console.error('[Stripe Webhook] Failed to update by customer_id:', updateByCustomerError)
+            } else {
+              console.log('[Stripe Webhook] Updated subscription by customer_id')
+            }
+          }
+        }
         }
         break
       }
