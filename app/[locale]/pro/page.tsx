@@ -39,7 +39,8 @@ function ProPageContent() {
 
       if (!res.ok) {
         const data = await res.json()
-        throw new Error(data.error || 'Failed to create checkout session')
+        console.error('[Pro Page] Checkout error details:', data)
+        throw new Error(data.message || data.error || 'Failed to create checkout session')
       }
 
       const data = await res.json()
