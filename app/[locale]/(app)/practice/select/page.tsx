@@ -1667,6 +1667,11 @@ function PracticeSelectContent() {
                       <Body tone="sub" className="mt-1">
                         {t('practice.subtitle')}
                       </Body>
+                      {!isPro && !subscriptionLoading && (
+                        <Caption tone="muted" className="mt-1">
+                          Free plan · 1 session per day
+                        </Caption>
+                      )}
                     </div>
                   </div>
 
