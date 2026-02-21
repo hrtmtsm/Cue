@@ -10,6 +10,18 @@ function SuccessPageContent() {
   const returnTo = searchParams.get('returnTo')
   const [countdown, setCountdown] = useState(5)
 
+  // Immediately sync subscription from Stripe on mount
+  // This ensures the DB is updated even without webhooks
+  useEffect(() => {
+    fetch('/api/subscription/sync', {
+      method: 'POST',
+      credentials: 'include',
+    })
+      .then(res => res.json())
+      .then(data => console.log('[Success] Subscription synced:', data.isPro ? 'Pro ✅' : 'Free'))
+      .catch(err => console.warn('[Success] Sync failed:', err))
+  }, [])
+
   useEffect(() => {
     // Countdown timer
     if (countdown > 0) {
@@ -23,7 +35,7 @@ function SuccessPageContent() {
         router.push(`${returnTo}${separator}upgraded=true`)
       } else {
         // Default: redirect to practice select with upgraded flag
-        router.push('/practice/select?upgraded=true')
+        router.push('/en/practice/select?upgraded=true')
       }
     }
   }, [countdown, router, returnTo])

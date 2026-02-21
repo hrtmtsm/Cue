@@ -22,26 +22,39 @@ export async function POST(request: NextRequest) {
       .limit(1)
       .maybeSingle()
 
-    if (!dbSub?.stripe_customer_id) {
-      console.log('[Subscription Sync] No subscription record found for user:', userId.substring(0, 8) + '...')
-      return NextResponse.json({ isPro: false, subscription: null })
+    let stripeCustomerId = dbSub?.stripe_customer_id
+
+    // If no DB record, look up the customer in Stripe by email
+    if (!stripeCustomerId) {
+      console.log('[Subscription Sync] No DB record, searching Stripe by email for user:', userId.substring(0, 8) + '...')
+      const { data: { user } } = await supabase.auth.admin.getUserById(userId)
+      if (!user?.email) {
+        return NextResponse.json({ isPro: false, subscription: null })
+      }
+      const customers = await stripe.customers.list({ email: user.email, limit: 5 })
+      if (customers.data.length === 0) {
+        console.log('[Subscription Sync] No Stripe customer found for email:', user.email)
+        return NextResponse.json({ isPro: false, subscription: null })
+      }
+      stripeCustomerId = customers.data[0].id
+      console.log('[Subscription Sync] Found Stripe customer by email:', stripeCustomerId)
     }
 
     // Fetch all active subscriptions from Stripe for this customer
     const stripeSubs = await stripe.subscriptions.list({
-      customer: dbSub.stripe_customer_id,
+      customer: stripeCustomerId,
       status: 'active',
       limit: 10,
     })
 
     // Also fetch canceled/past_due to capture full picture
     const allStripeSubs = await stripe.subscriptions.list({
-      customer: dbSub.stripe_customer_id,
+      customer: stripeCustomerId,
       limit: 10,
     })
 
     console.log('[Subscription Sync] Stripe subscriptions:', {
-      customerId: dbSub.stripe_customer_id,
+      customerId: stripeCustomerId,
       activeCount: stripeSubs.data.length,
       totalCount: allStripeSubs.data.length,
     })
@@ -52,12 +65,14 @@ export async function POST(request: NextRequest) {
       .sort((a, b) => b.created - a.created)
 
     if (activeSubs.length === 0) {
-      // No active subscriptions — mark as canceled in DB
+      // No active subscriptions — mark as canceled in DB (if record exists)
       console.log('[Subscription Sync] No active Stripe subscriptions, marking as canceled')
-      await supabase
-        .from('subscriptions')
-        .update({ status: 'canceled', cancel_at_period_end: false })
-        .eq('id', dbSub.id)
+      if (dbSub) {
+        await supabase
+          .from('subscriptions')
+          .update({ status: 'canceled', cancel_at_period_end: false })
+          .eq('id', dbSub.id)
+      }
 
       return NextResponse.json({ isPro: false, subscription: null })
     }
@@ -81,11 +96,18 @@ export async function POST(request: NextRequest) {
       dbWas: { subId: dbSub.stripe_subscription_id, cancelAtPeriodEnd: dbSub.cancel_at_period_end },
     })
 
-    // Update DB to match Stripe
-    await supabase
-      .from('subscriptions')
-      .update(updateData)
-      .eq('id', dbSub.id)
+    // Update DB to match Stripe (upsert by user_id in case no record exists yet)
+    if (dbSub) {
+      await supabase
+        .from('subscriptions')
+        .update(updateData)
+        .eq('id', dbSub.id)
+    } else {
+      // No DB record yet — insert one (webhooks may not have fired)
+      await supabase
+        .from('subscriptions')
+        .upsert({ ...updateData, user_id: userId, stripe_customer_id: stripeCustomerId }, { onConflict: 'user_id' })
+    }
 
     // Determine isPro: active + not expired
     // cancel_at_period_end only affects UI — user keeps Pro access until period ends

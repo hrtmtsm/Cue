@@ -42,9 +42,20 @@ function ProPageContent() {
         throw new Error(data.error || 'Failed to create checkout session')
       }
 
-      const { sessionId } = await res.json()
+      const data = await res.json()
 
-      // Redirect to Stripe Checkout
+      // If server returns a direct URL (reactivation or already active), redirect there
+      if (data.url) {
+        window.location.href = data.url
+        return
+      }
+
+      // Otherwise, redirect to Stripe Checkout using sessionId
+      const { sessionId } = data
+      if (!sessionId) {
+        throw new Error('No session ID returned from server')
+      }
+
       const stripe = await stripePromise
       if (!stripe) {
         throw new Error('Failed to load Stripe')
