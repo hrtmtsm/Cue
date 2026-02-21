@@ -347,22 +347,31 @@ function ProfileContent() {
                 <div className="flex items-center justify-between">
                   <div>
                     <Body size="bodyStrong" className="mb-1">
-                      {isPro ? t('profile.subscription.proPlan') : t('profile.subscription.freePlan')}
+                      {isPro
+                        ? t('profile.subscription.proPlan')
+                        : subscription?.cancelAtPeriodEnd
+                          ? 'Pro Plan (Canceling)'
+                          : t('profile.subscription.freePlan')}
                     </Body>
                     {isPro && subscription && (
                       <Caption tone="muted">
-                        {subscription.cancelAtPeriodEnd 
-                          ? t('profile.subscription.proUntil', { date: new Date(subscription.currentPeriodEnd).toLocaleDateString() })
+                        {subscription.cancelAtPeriodEnd
+                          ? `Cancels on ${new Date(subscription.currentPeriodEnd).toLocaleDateString()} · You'll be on Free Plan after that`
                           : `Renews on ${new Date(subscription.currentPeriodEnd).toLocaleDateString()}`
                         }
                       </Caption>
                     )}
-                    {!isPro && (
+                    {!isPro && subscription?.cancelAtPeriodEnd && subscription.currentPeriodEnd && (
+                      <Caption tone="muted">
+                        {`Cancels on ${new Date(subscription.currentPeriodEnd).toLocaleDateString()} · You'll be on Free Plan after that`}
+                      </Caption>
+                    )}
+                    {!isPro && !subscription?.cancelAtPeriodEnd && (
                       <Caption tone="muted">Upgrade to unlock unlimited sessions</Caption>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    {isPro ? (
+                    {isPro || subscription?.cancelAtPeriodEnd ? (
                       <button
                         onClick={handleManageSubscription}
                         disabled={isManagingSubscription}
