@@ -93,7 +93,7 @@ function PracticeSelectContent() {
   const [tipsSavedToday, setTipsSavedToday] = useState<SavedTip[]>([])
   const [isLoadingToday, setIsLoadingToday] = useState(true)
   const { name: userName, loading: nameLoading } = useGreetingName()
-  const { isPro, refetch, refetching } = useSubscription()
+  const { isPro, loading: subscriptionLoading, refetch, refetching } = useSubscription()
   
   // Dev-only: Log to confirm this component is running
   console.log('🎯 [LOCALE PracticeSelect] Component rendered - THIS IS THE ACTUAL COMPONENT', {
@@ -1626,7 +1626,7 @@ function PracticeSelectContent() {
           <>
             {/* Main Daily Session Card - with free-tier limit */}
             <div className="mt-5">
-              {hasCompletedToday() ? (
+              {hasCompletedToday() && !subscriptionLoading ? (
                 // Locked state: session already completed today
                 <div className="rounded-2xl border-2 border-gray-200 bg-gray-50 p-8 text-center space-y-4">
                   <Heading as="h2" size="section">
