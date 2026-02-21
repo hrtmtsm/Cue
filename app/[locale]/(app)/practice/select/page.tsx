@@ -122,10 +122,26 @@ function PracticeSelectContent() {
   }, []);
 
   // Server-side session check to override stale localStorage
-  // Ensures new accounts (or cleared localStorage) show correct state
+  // Ensures new accounts on same browser don't see a previous user's completed state
   useEffect(() => {
     const verifySessionFromServer = async () => {
       try {
+        // Get current user ID to detect cross-account stale localStorage
+        const supabase = getSupabaseClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        const currentUserId = user?.id
+        const storedUserId = localStorage.getItem('lastSessionUserId')
+
+        // If localStorage belongs to a DIFFERENT user, clear it
+        if (currentUserId && storedUserId && storedUserId !== currentUserId) {
+          localStorage.removeItem('lastSessionCompleted')
+          localStorage.removeItem('lastPracticeDate')
+          localStorage.removeItem('lastSessionUserId')
+          setCompletedToday(false)
+          return
+        }
+
+        // Same user (or no stored ID yet): trust the server for today's session state
         const res = await fetch('/api/session/check', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -134,16 +150,14 @@ function PracticeSelectContent() {
         })
         if (!res.ok) return
         const { canStart, isPro: serverIsPro } = await res.json()
-        // If server says user CAN start, they haven't completed today — clear stale state
-        if (canStart) {
-          setCompletedToday(false)
-          // Also clear stale localStorage keys that may belong to a previous account
-          localStorage.removeItem('lastSessionCompleted')
-          localStorage.removeItem('lastPracticeDate')
-        } else if (!serverIsPro) {
-          // Server confirms session was completed today for this user
+
+        if (!canStart && !serverIsPro) {
+          // Server confirms free user completed a session today
           setCompletedToday(true)
         }
+        // If canStart: don't touch localStorage or completedToday for same-user —
+        // they may be a Pro user who completed sessions and just canceled mid-day.
+        // hasCompletedToday() will correctly check isPro + localStorage for that case.
       } catch {
         // Non-critical: fall back to localStorage state
       }
@@ -1667,11 +1681,6 @@ function PracticeSelectContent() {
                       <Body tone="sub" className="mt-1">
                         {t('practice.subtitle')}
                       </Body>
-                      {!isPro && !subscriptionLoading && (
-                        <Caption tone="muted" className="mt-1">
-                          Free plan · 1 session per day
-                        </Caption>
-                      )}
                     </div>
                   </div>
 

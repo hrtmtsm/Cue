@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { resolveUserId } from '@/lib/supabase/resolveUserId'
-import { getUserSubscription } from '@/lib/subscriptionCheck'
 import { getSupabaseAdminClient } from '@/lib/supabase/server'
 
 /**
@@ -12,17 +11,6 @@ export async function POST(request: NextRequest) {
   try {
     // Resolve user ID (auth user or dev guest)
     const { userId } = await resolveUserId(request)
-
-    // Check subscription from database
-    const { isPro } = await getUserSubscription(userId)
-
-    // Pro users don't need session tracking (unlimited sessions)
-    if (isPro) {
-      return NextResponse.json({
-        success: true,
-        message: 'Pro user - session tracking not needed',
-      })
-    }
 
     // Parse request body
     const body = await request.json()

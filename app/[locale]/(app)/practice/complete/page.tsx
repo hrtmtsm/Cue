@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { Suspense, useEffect, useState } from 'react'
 import { markStoryCompleted, getNextUncompletedStory, getCompletedStories } from '@/lib/storyRotation'
 import { useSubscription } from '@/lib/useSubscription'
+import { getSupabaseClient } from '@/lib/supabase/auth-helpers'
 import { loadUserStories } from '@/lib/storyClient'
 import { getListeningProfile, getUserPreferences } from '@/lib/userPreferences'
 import { getProgress, incrementProgress } from '@/lib/progress'
@@ -104,8 +105,13 @@ function PracticeCompletePageContent() {
     localStorage.setItem('lastSessionCompleted', today)
     setSessionRecorded(true)
 
+    // Also store the user ID so we can detect cross-account stale state on the select page
+    getSupabaseClient().auth.getUser().then(({ data: { user } }) => {
+      if (user?.id) localStorage.setItem('lastSessionUserId', user.id)
+    })
+
     // Call server-side to record in practice_sessions table
-    // Server checks isPro and skips recording for Pro users
+    // Records for ALL users (free and Pro) so cancellation mid-day is handled correctly
     fetch('/api/session/complete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
