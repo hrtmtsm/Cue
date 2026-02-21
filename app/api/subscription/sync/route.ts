@@ -87,10 +87,11 @@ export async function POST(request: NextRequest) {
       .update(updateData)
       .eq('id', dbSub.id)
 
-    // Determine isPro: active + not expired + not canceling
+    // Determine isPro: active + not expired
+    // cancel_at_period_end only affects UI — user keeps Pro access until period ends
     const now = new Date()
     const periodEnd = new Date(latestSub.current_period_end * 1000)
-    const isPro = latestSub.status === 'active' && periodEnd > now && !latestSub.cancel_at_period_end
+    const isPro = latestSub.status === 'active' && periodEnd > now
 
     console.log('[Subscription Sync] Result:', {
       userId: userId.substring(0, 8) + '...',

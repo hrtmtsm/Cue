@@ -346,9 +346,7 @@ function ProfileContent() {
                 <div className="flex items-center justify-between">
                   <div>
                     <Body size="bodyStrong" className="mb-1">
-                      {isPro || subscription?.cancelAtPeriodEnd
-                        ? t('profile.subscription.proPlan')
-                        : t('profile.subscription.freePlan')}
+                      {isPro ? t('profile.subscription.proPlan') : t('profile.subscription.freePlan')}
                     </Body>
                     {isPro && subscription && (
                       <Caption tone="muted">
@@ -358,17 +356,12 @@ function ProfileContent() {
                         }
                       </Caption>
                     )}
-                    {!isPro && subscription?.cancelAtPeriodEnd && subscription.currentPeriodEnd && (
-                      <Caption tone="muted">
-                        {`Cancels on ${new Date(subscription.currentPeriodEnd).toLocaleDateString()} · You'll be on Free Plan after that`}
-                      </Caption>
-                    )}
-                    {!isPro && !subscription?.cancelAtPeriodEnd && (
+                    {!isPro && (
                       <Caption tone="muted">Upgrade to unlock unlimited sessions</Caption>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    {isPro || subscription?.cancelAtPeriodEnd ? (
+                    {isPro ? (
                       <button
                         onClick={handleManageSubscription}
                         disabled={isManagingSubscription}
