@@ -17,6 +17,60 @@ export async function GET(request: NextRequest) {
     // Get subscription from DB first (fast)
     const { isPro, subscription } = await getUserSubscription(userId)
 
+    // If NO DB record at all, do a Stripe lookup by email to self-heal
+    // This handles the case where checkout completed but webhook never fired
+    if (!subscription) {
+      try {
+        const supabase = getSupabaseAdminClient()
+        const { data: { user } } = await supabase.auth.admin.getUserById(userId)
+        if (user?.email) {
+          const customers = await stripe.customers.list({ email: user.email, limit: 5 })
+          for (const customer of customers.data) {
+            const stripeSubs = await stripe.subscriptions.list({
+              customer: customer.id,
+              status: 'active',
+              limit: 5,
+            })
+            if (stripeSubs.data.length > 0) {
+              const latestSub = stripeSubs.data[0]
+              const now = new Date()
+              const periodEnd = new Date(latestSub.current_period_end * 1000)
+              const syncedIsPro = periodEnd > now
+
+              // Upsert to DB so future requests don't need to hit Stripe
+              await supabase.from('subscriptions').upsert({
+                user_id: userId,
+                stripe_customer_id: customer.id,
+                stripe_subscription_id: latestSub.id,
+                stripe_price_id: latestSub.items.data[0]?.price.id ?? '',
+                status: latestSub.status,
+                cancel_at_period_end: latestSub.cancel_at_period_end,
+                current_period_start: new Date(latestSub.current_period_start * 1000).toISOString(),
+                current_period_end: periodEnd.toISOString(),
+              }, { onConflict: 'user_id' })
+
+              console.log('[Subscription Status] Self-healed from Stripe (no DB record):', {
+                userId: userId.substring(0, 8) + '...',
+                customerId: customer.id,
+                isPro: syncedIsPro,
+              })
+
+              return NextResponse.json({
+                isPro: syncedIsPro,
+                subscription: {
+                  status: latestSub.status,
+                  currentPeriodEnd: periodEnd.toISOString(),
+                  cancelAtPeriodEnd: latestSub.cancel_at_period_end,
+                },
+              })
+            }
+          }
+        }
+      } catch (healErr) {
+        console.warn('[Subscription Status] Self-heal Stripe lookup failed:', healErr)
+      }
+    }
+
     // If we have a subscription record, silently sync cancel_at_period_end from Stripe
     // This ensures cancellations are always reflected even without webhooks
     if (subscription?.stripe_subscription_id) {
