@@ -127,7 +127,7 @@ function ProPageContent() {
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Free</h2>
               <div className="flex items-baseline">
-                <span className="text-4xl font-bold text-gray-900">¥0</span>
+                <span className="text-4xl font-bold text-gray-900">$0</span>
               </div>
             </div>
 
@@ -160,7 +160,7 @@ function ProPageContent() {
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-white mb-2">Pro</h2>
               <div className="flex items-baseline">
-                <span className="text-4xl font-bold text-white">¥980</span>
+                <span className="text-4xl font-bold text-white">$9.99</span>
                 <span className="text-blue-100 ml-2">/month</span>
               </div>
             </div>

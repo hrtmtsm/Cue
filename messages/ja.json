@@ -77,6 +77,30 @@
       "subtitle": "無料で始められます。",
       "button": "始める",
       "alreadyHaveAccount": "アカウントをお持ちの方"
+    },
+    "footer": {
+      "copyright": "© 2026, Cue",
+      "tokusho": "特定商取引法に基づく表記"
+    }
+  },
+  "tokusho": {
+    "title": "特定商取引法に基づく表記",
+    "items": {
+      "seller": { "label": "販売業者", "value": "松島悠人" },
+      "manager": { "label": "運営責任者", "value": "松島悠人" },
+      "address": { "label": "所在地", "value": "請求があった場合には遅滞なく開示いたします。" },
+      "phone": { "label": "電話番号", "value": "請求があった場合には遅滞なく開示いたします。" },
+      "email": { "label": "メールアドレス", "value": "hrtmtsh@gmail.com" },
+      "url": { "label": "販売URL", "value": "https://getmycue.app" },
+      "service_name": { "label": "サービス名", "value": "Cue" },
+      "service_desc": { "label": "サービス内容", "value": "英語リスニング学習アプリ（サブスクリプション型）" },
+      "price": { "label": "販売価格", "value": "月額 $9.99（USD）、税込" },
+      "payment": { "label": "支払方法", "value": "クレジットカード（Stripe経由）" },
+      "billing_timing": { "label": "支払時期", "value": "申込み時に課金が発生し、以降は毎月自動更新" },
+      "delivery": { "label": "サービス提供時期", "value": "お支払い確認後、直ちにご利用いただけます。" },
+      "cancellation": { "label": "解約について", "value": "いつでも解約可能です。解約はアカウント設定画面よりお手続きください。解約後も当該請求期間の終了日までご利用いただけます。" },
+      "refund": { "label": "返金について", "value": "サービスの性質上、原則として返金はお受けしておりません。" },
+      "environment": { "label": "動作環境", "value": "インターネット接続環境が必要です。" }
     }
   },
   "nav": {
