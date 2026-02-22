@@ -17,8 +17,7 @@ export function generateStaticParams() {
 }
 
 export const metadata = {
-  title: 'Cue - English Listening Practice',
-  description: 'Practice your English listening skills',
+  metadataBase: new URL('https://getmycue.app'),
   icons: {
     icon: '/icon.svg',
   },
