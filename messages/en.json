@@ -77,6 +77,30 @@
       "subtitle": "Start for free.",
       "button": "Get started",
       "alreadyHaveAccount": "I already have an account"
+    },
+    "footer": {
+      "copyright": "© 2026, Cue",
+      "tokusho": "Specified Commercial Transactions Act"
+    }
+  },
+  "tokusho": {
+    "title": "Specified Commercial Transactions Act",
+    "items": {
+      "seller": { "label": "Seller", "value": "Yuto Matsushima" },
+      "manager": { "label": "Manager", "value": "Yuto Matsushima" },
+      "address": { "label": "Address", "value": "Disclosed upon request without delay." },
+      "phone": { "label": "Phone", "value": "Disclosed upon request without delay." },
+      "email": { "label": "Email", "value": "hrtmtsh@gmail.com" },
+      "url": { "label": "Sales URL", "value": "https://getmycue.app" },
+      "service_name": { "label": "Service Name", "value": "Cue" },
+      "service_desc": { "label": "Service Description", "value": "English listening practice app (subscription-based)" },
+      "price": { "label": "Price", "value": "$9.99/month (USD), tax included" },
+      "payment": { "label": "Payment Method", "value": "Credit card (via Stripe)" },
+      "billing_timing": { "label": "Billing Timing", "value": "Charged at the time of sign-up, then automatically renewed monthly." },
+      "delivery": { "label": "Service Availability", "value": "Available immediately after payment confirmation." },
+      "cancellation": { "label": "Cancellation", "value": "You may cancel at any time from your account settings. Access continues until the end of the current billing period." },
+      "refund": { "label": "Refunds", "value": "Due to the nature of the service, refunds are generally not available." },
+      "environment": { "label": "System Requirements", "value": "Internet connection required." }
     }
   },
   "nav": {

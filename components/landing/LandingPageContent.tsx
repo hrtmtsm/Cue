@@ -1,6 +1,7 @@
 'use client'
 
 import { useTranslations, useLocale } from 'next-intl';
+import Link from 'next/link'
 import Navigation from './Navigation'
 import Hero from './Hero'
 import SellingPoint from './SellingPoint'
@@ -71,6 +72,20 @@ export default function LandingPageContent({ locale: localeProp }: { locale?: st
       />
       
       <FinalCTA locale={locale} />
+
+      {/* Footer */}
+      <footer className="border-t border-gray-100 bg-white py-6 px-8 md:px-16 lg:px-24 xl:px-32">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-center gap-3 text-sm text-gray-400 font-inter">
+          <span>{t('footer.copyright')}</span>
+          <span className="hidden sm:inline">·</span>
+          <Link
+            href={`/${locale}/tokusho`}
+            className="hover:text-gray-600 transition-colors underline-offset-2 hover:underline"
+          >
+            {t('footer.tokusho')}
+          </Link>
+        </div>
+      </footer>
     </div>
   )
 }
