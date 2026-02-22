@@ -14,6 +14,7 @@ const publicRoutes = [
   '/',
   '/auth',
   '/onboarding',
+  '/tokusho',
 ]
 
 // Check if a path is public (allows locale prefix)
