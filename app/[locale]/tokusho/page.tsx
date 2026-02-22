@@ -1,4 +1,3 @@
-import { useTranslations } from 'next-intl'
 import { getTranslations } from 'next-intl/server'
 import Link from 'next/link'
 import { Metadata } from 'next'
@@ -33,14 +32,13 @@ const ITEM_KEYS = [
   'environment',
 ] as const
 
-export default function TokushoPage() {
-  return <TokushoContent />
-}
-
-function TokushoContent() {
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const t = useTranslations('tokusho')
-  const landingT = useTranslations('landing.footer')
+export default async function TokushoPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}) {
+  const { locale } = await params
+  const t = await getTranslations({ locale, namespace: 'tokusho' })
 
   return (
     <main className="min-h-screen bg-white">
@@ -48,7 +46,7 @@ function TokushoContent() {
       <div className="border-b border-gray-100">
         <div className="max-w-3xl mx-auto px-6 py-4">
           <Link
-            href="/"
+            href={`/${locale}`}
             className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
           >
             ← Cue
@@ -90,7 +88,7 @@ function TokushoContent() {
       {/* Footer */}
       <footer className="border-t border-gray-100 mt-12 py-6 px-6">
         <div className="max-w-3xl mx-auto text-center text-sm text-gray-400 font-inter">
-          {landingT('copyright')}
+          © 2026, Cue
         </div>
       </footer>
     </main>

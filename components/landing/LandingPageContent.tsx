@@ -82,7 +82,7 @@ export default function LandingPageContent({ locale: localeProp }: { locale?: st
             href={`/${locale}/tokusho`}
             className="hover:text-gray-600 transition-colors underline-offset-2 hover:underline"
           >
-            {t('footer.tokusho')}
+            特定商取引法に基づく表記
           </Link>
         </div>
       </footer>
