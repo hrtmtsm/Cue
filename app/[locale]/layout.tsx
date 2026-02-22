@@ -17,8 +17,10 @@ export function generateStaticParams() {
 }
 
 export const metadata = {
-  title: 'Cue - English Listening Practice',
-  description: 'Practice your English listening skills',
+  metadataBase: new URL('https://getmycue.app'),
+  verification: {
+    google: 'yj45nRDjp-L1HG8o1F0YtQ5suGh4lf0I5bqHKAd9qi8',
+  },
   icons: {
     icon: '/icon.svg',
   },
