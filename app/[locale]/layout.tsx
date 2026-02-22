@@ -22,8 +22,17 @@ export const metadata = {
     google: 'yj45nRDjp-L1HG8o1F0YtQ5suGh4lf0I5bqHKAd9qi8',
   },
   icons: {
-    icon: '/icon.svg',
+    icon: [
+      { url: '/favicon-96x96.png', sizes: '96x96', type: 'image/png' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico', rel: 'shortcut icon' },
+    ],
+    apple: { url: '/apple-touch-icon.png', sizes: '180x180' },
   },
+  appleWebApp: {
+    title: 'Cue',
+  },
+  manifest: '/site.webmanifest',
 }
 
 export default async function LocaleLayout({
