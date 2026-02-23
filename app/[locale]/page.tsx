@@ -2,7 +2,8 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { type Metadata } from 'next'
-import LandingPageContent from '@/components/landing/LandingPageContent';
+import LandingPageContent from '@/components/landing/LandingPageContent'
+import StructuredData from '@/components/landing/StructuredData'
 
 export async function generateMetadata({
   params,
@@ -27,6 +28,14 @@ export async function generateMetadata({
         '英語リスニング練習',
         'English listening',
       ],
+      alternates: {
+        canonical: 'https://getmycue.app/ja',
+        languages: {
+          'en': 'https://getmycue.app/en',
+          'ja': 'https://getmycue.app/ja',
+          'x-default': 'https://getmycue.app/ja',
+        },
+      },
       openGraph: {
         title: 'Cue – 英語リスニング練習アプリ',
         description:
@@ -43,6 +52,7 @@ export async function generateMetadata({
         ],
         locale: 'ja_JP',
         type: 'website',
+        alternateLocale: ['en_US'],
       },
       twitter: {
         card: 'summary_large_image',
@@ -69,6 +79,14 @@ export async function generateMetadata({
       'English comprehension app',
       'Cue app',
     ],
+    alternates: {
+      canonical: 'https://getmycue.app/en',
+      languages: {
+        'en': 'https://getmycue.app/en',
+        'ja': 'https://getmycue.app/ja',
+        'x-default': 'https://getmycue.app/en',
+      },
+    },
     openGraph: {
       title: 'Cue – English Listening Practice App',
       description:
@@ -85,6 +103,7 @@ export async function generateMetadata({
       ],
       locale: 'en_US',
       type: 'website',
+      alternateLocale: ['ja_JP'],
     },
     twitter: {
       card: 'summary_large_image',
@@ -130,7 +149,12 @@ export default async function LocalizedLanding({ params }: { params: Promise<{ l
     redirect(`/${locale}/practice/select`)
   }
   
-  return <LandingPageContent locale={locale} />;
+  return (
+    <>
+      <StructuredData locale={locale} />
+      <LandingPageContent locale={locale} />
+    </>
+  )
 }
 
 // Generate static params for supported locales
