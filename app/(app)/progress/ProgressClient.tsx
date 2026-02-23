@@ -6,7 +6,7 @@ import { getProgress, migrateLocalStorageToDb } from '@/lib/progress'
 import { Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 import { getPracticeEvents, type DetailedPracticeEvent } from '@/lib/userPreferences'
 import { calculateListeningLevel, getCEFRLabel, type ListeningLevelData } from '@/lib/cefrMetrics'
-import { getAllClipsClient } from '@/lib/clipStorage'
+import { getAllClipsClient } from '@/lib/clipStorage.client'
 import type { Clip } from '@/lib/clipTypes'
 import { loadUserStories } from '@/lib/storyClient'
 

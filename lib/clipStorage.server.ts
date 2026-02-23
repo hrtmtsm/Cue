@@ -1,30 +1,7 @@
 import { Clip } from './clipTypes'
 
-// Client-side storage functions
-export function getAllClipsClient(): Clip[] {
-  if (typeof window === 'undefined') {
-    return []
-  }
-  const stored = localStorage.getItem('userClips')
-  return stored ? JSON.parse(stored) : []
-}
-
-export function saveClipClient(clip: Clip): void {
-  if (typeof window === 'undefined') {
-    return
-  }
-  const clips = getAllClipsClient()
-  clips.push(clip)
-  localStorage.setItem('userClips', JSON.stringify(clips))
-}
-
-// Server-side storage functions (used by API routes)
+// Server-side storage functions (used by API routes only)
 export async function getAllClips(): Promise<Clip[]> {
-  if (typeof window !== 'undefined') {
-    // This shouldn't be called on client, but return empty array if it is
-    return []
-  }
-
   // Dynamic import for server-side only modules
   const fs = await import('fs')
   const path = await import('path')
@@ -51,11 +28,6 @@ export async function getAllClips(): Promise<Clip[]> {
 }
 
 export async function saveClip(clip: Clip): Promise<void> {
-  if (typeof window !== 'undefined') {
-    // This shouldn't be called on client
-    return
-  }
-
   // Dynamic import for server-side only modules
   const fs = await import('fs')
   const path = await import('path')
@@ -90,4 +62,3 @@ export async function getClipsByFocus(focus: string[]): Promise<Clip[]> {
     focus.some(f => clip.focus.includes(f))
   )
 }
-

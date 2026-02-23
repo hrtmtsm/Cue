@@ -698,7 +698,7 @@ export async function POST(request: NextRequest) {
     // Optionally save to filesystem in dev mode only (not relied upon)
     if (process.env.NODE_ENV === 'development') {
       try {
-        const { saveClip } = await import('@/lib/clipStorage')
+        const { saveClip } = await import('@/lib/clipStorage.server')
         for (const clip of clips) {
           await saveClip(clip).catch((err) => {
             console.warn('Failed to save clip to filesystem (non-critical):', err)
