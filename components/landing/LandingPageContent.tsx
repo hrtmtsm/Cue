@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Navigation from './Navigation'
 import Hero from './Hero'
 import SellingPoint from './SellingPoint'
+import FAQ from './FAQ'
 import FinalCTA from './FinalCTA'
 
 export default function LandingPageContent({ locale: localeProp }: { locale?: string }) {
@@ -70,6 +71,8 @@ export default function LandingPageContent({ locale: localeProp }: { locale?: st
         imageGradient="from-blue-50 to-purple-50"
         imageSrc="/landing/section_3.png"
       />
+      
+      <FAQ />
       
       <FinalCTA locale={locale} />
 

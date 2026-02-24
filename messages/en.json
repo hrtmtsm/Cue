@@ -81,6 +81,31 @@
     "footer": {
       "copyright": "© 2026, Cue",
       "tokusho": "Specified Commercial Transactions Act"
+    },
+    "faq": {
+      "title": "Frequently Asked Questions",
+      "items": [
+        {
+          "question": "How does Cue improve my English listening skills?",
+          "answer": "Cue provides daily listening practice with real native speaker audio. You'll get instant feedback on what you missed and why, helping you understand patterns like contractions, sound linking, and reductions that native speakers use naturally."
+        },
+        {
+          "question": "Do I need to pay to use Cue?",
+          "answer": "Cue offers a free plan with one practice session per day. For unlimited practice and access to listening tips, upgrade to Pro for $9.99/month."
+        },
+        {
+          "question": "What makes Cue different from other English learning apps?",
+          "answer": "Cue focuses specifically on listening comprehension with pattern-based feedback. Instead of just telling you what you missed, we explain why it was hard and teach you the listening patterns native speakers actually use."
+        },
+        {
+          "question": "Can I use Cue on my phone?",
+          "answer": "Yes! Cue is a web app that works on any device with a browser - phones, tablets, and computers. No app store download required."
+        },
+        {
+          "question": "How long does it take to see improvement?",
+          "answer": "Many users notice improvement in their listening comprehension within a few weeks of daily practice. Consistent practice is key to developing your ear for natural English speech patterns."
+        }
+      ]
     }
   },
   "tokusho": {
